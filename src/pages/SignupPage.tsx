@@ -257,7 +257,6 @@ export default function SignupPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
     padding: '2.5rem 1.5rem',
           background: 'var(--grey)', 
         }}
@@ -560,9 +559,13 @@ export default function SignupPage() {
 {`
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .form-container {
+    justify-content: center;
+  }
+
   @media (max-width: 768px) {
     .form-container {
-      justify-content: flex-start !important;
+      justify-content: flex-start;
       padding-top: 3rem;
     }
   }
