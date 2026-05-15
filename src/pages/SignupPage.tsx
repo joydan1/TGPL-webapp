@@ -556,7 +556,18 @@ export default function SignupPage() {
         </p>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>
+{`
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 768px) {
+    .form-container {
+      justify-content: flex-start !important;
+      padding-top: 3rem;
+    }
+  }
+`}
+</style>
     </div>
   )
 }
