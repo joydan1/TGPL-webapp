@@ -257,8 +257,8 @@ export default function SignupPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'flex-start',
-          padding: '3rem 1.5rem 2rem',
+          justifyContent: 'center',
+    padding: '2.5rem 1.5rem',
           background: 'var(--grey)', 
         }}
       >
