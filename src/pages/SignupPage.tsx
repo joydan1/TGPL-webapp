@@ -257,13 +257,13 @@ export default function SignupPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2.5rem 1.5rem',
+          justifyContent: 'flex-start',
+          padding: '3rem 1.5rem 2rem',
           background: 'var(--grey)', 
         }}
       >
         {/* Logo  */}
-        <div style={{ marginBottom: '1.75rem' }}>
+        <div style={{ marginBottom: '1.75rem'}}>
           <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
         </div>
 
