@@ -9,6 +9,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
+
 // Protected Route Component
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -30,12 +31,36 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
 }
 
 function App() {
+  const { isAuthenticated } = useAuthStore()
+
   return (
     <Router>
       <Routes>
+
+        {/* Default Route → Signup first */}
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to={isAuthenticated ? ROUTES.DASHBOARD : ROUTES.SIGNUP}
+              replace
+            />
+          }
+        />
+
         {/* Public Routes */}
-        <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-        <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+        <Route
+          path={ROUTES.LOGIN}
+          element={
+            isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} replace /> : <LoginPage />
+          }
+        />
+        <Route
+          path={ROUTES.SIGNUP}
+          element={
+            isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} replace /> : <SignupPage />
+          }
+        />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
 
@@ -52,6 +77,7 @@ function App() {
         {/* 404 */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
+
       </Routes>
     </Router>
   )
