@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { CheckCircle } from 'lucide-react'
 import Input from '../components/Input'
 import Button from '../components/Button'
+import Alert from '../components/Alert'
 import { ROUTES } from '../constants/routes'
 import { authAPI } from '../services/api'
+import { useAuth } from '../hooks/useAuth'
 
 function Spinner() {
   return (
@@ -21,11 +24,17 @@ function Spinner() {
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
+  const { clearError } = useAuth()
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
+
+  // Clear any previous errors on mount
+  React.useEffect(() => {
+    clearError()
+  }, [])
 
   const isFormFilled = email.trim().length > 0
 
@@ -63,222 +72,404 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      <div
-        className="hidden lg:flex lg:flex-col"
-        style={{
-          width: '42%',
-          padding: '2.5rem',
-          position: 'relative',
-          overflow: 'hidden',
-          justifyContent: 'flex-end',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: 'url(/image1.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center top',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
-          }}
-        />
-        <div style={{ position: 'relative', zIndex: 10, marginBottom: '8%', color: 'white' }}>
-          <h1 style={{ fontSize: '3rem', marginBottom: '1rem', lineHeight: 1.15 }}>
-            Master <br />
-            Project Management, <br />
-            Boost Your Career
-          </h1>
-          <p style={{ fontSize: '1.5rem', opacity: 0.82, marginBottom: '2rem', lineHeight: 1.55 }}>
-            Learn the skills to plan, execute, and deliver
-            <br /> successful projects.
-          </p>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={{ width: 36, height: 8, borderRadius: 4, background: '#fff', border: 'none' }}
-            />
-            <button
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.6)',
-                background: 'transparent',
-              }}
-            />
-            <button
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.6)',
-                background: 'transparent',
-              }}
-            />
+    <>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        * { box-sizing: border-box; }
+
+        .forgot-page {
+          min-height: 100vh;
+          display: flex;
+          background: var(--white);
+          margin: 0;
+          padding: 0;
+        }
+
+        /* ── Hero Section (50% width) ── */
+        .forgot-hero {
+          width: 50%;
+          background-image: url(/image1.png);
+          background-size: cover;
+          background-position: center;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
+          padding: 2.5rem;
+          border-top-right-radius: 32px;
+          border-bottom-right-radius: 32px;
+        }
+
+        .forgot-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            180deg,
+            rgba(10, 42, 74, 0.55) 0%,
+            rgba(14, 74, 138, 0.75) 50%,
+            rgba(10, 42, 74, 0.92) 100%
+          );
+          z-index: 1;
+        }
+
+        .forgot-hero-content {
+          position: relative;
+          z-index: 10;
+          color: #fff;
+          margin-bottom: 8%;
+        }
+
+        .forgot-hero-content h1 {
+          font-size: 3rem;
+          font-weight: 800;
+          line-height: 1.15;
+          margin: 0 0 1rem 0;
+        }
+
+        .forgot-hero-content p {
+          font-size: 1.5rem;
+          font-weight: 400;
+          line-height: 1.55;
+          margin: 0 0 2rem 0;
+          opacity: 0.82;
+        }
+
+        .forgot-hero-dots {
+          display: flex;
+          gap: 8px;
+        }
+
+        .dot-button {
+          border: none;
+          background: none;
+          cursor: pointer;
+          padding: 0;
+        }
+
+        .dot-active {
+          width: 36px;
+          height: 8px;
+          border-radius: 4px;
+          background: #fff;
+        }
+
+        .dot-inactive {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.6);
+          background: transparent;
+        }
+
+        /* ── Form Panel (50% width) ── */
+        .forgot-form-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2.5rem 1.5rem;
+          background: var(--grey);
+          overflow: hidden;
+        }
+
+        .forgot-logo {
+          margin-bottom: 1.75rem;
+          text-align: center;
+        }
+
+        .forgot-logo img {
+          height: 2.75rem;
+        }
+
+        .forgot-card {
+          width: 100%;
+          max-width: 440px;
+          background: var(--white);
+          border: 1px solid #E8E8E8;
+          border-radius: var(--radius-lg);
+          padding: 2rem;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .forgot-title {
+          text-align: center;
+          color: var(--black);
+          font-size: 1.75rem;
+          line-height: 1.1;
+          margin: 0 0 0.75rem 0;
+          font-weight: 700;
+        }
+
+        .forgot-subtitle {
+          text-align: center;
+          color: rgba(0, 0, 0, 0.65);
+          font-size: 1rem;
+          line-height: 1.7;
+          margin: 0 0 1.75rem 0;
+        }
+
+        .forgot-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .success-box {
+          margin-bottom: 1.5rem;
+          padding: 1.5rem;
+          border-radius: 1rem;
+          background: #F0F9FF;
+          border: 1px solid #BFDBFE;
+        }
+
+        .success-box p {
+          margin: 0;
+          font-weight: 600;
+          color: var(--primary-500);
+        }
+
+        .success-box ul {
+          margin-top: 1rem;
+          padding-left: 1.25rem;
+          color: rgba(0, 0, 0, 0.75);
+        }
+
+        .success-box li {
+          margin-bottom: 0.5rem;
+        }
+
+        .resend-text {
+          text-align: center;
+          margin-bottom: 1rem;
+          color: rgba(0, 0, 0, 0.65);
+          font-size: 0.95rem;
+        }
+
+        .resend-button {
+          border: none;
+          background: transparent;
+          color: var(--primary-500);
+          cursor: pointer;
+          font-weight: 600;
+          padding: 0;
+          text-decoration: none;
+        }
+
+        .resend-button:hover {
+          text-decoration: underline;
+        }
+
+        .resend-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .back-link-text {
+          margin: 0;
+          color: rgba(0, 0, 0, 0.65);
+          font-size: 0.95rem;
+          text-align: center;
+        }
+
+        .back-link {
+          color: var(--primary-500);
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .back-link:hover {
+          text-decoration: underline;
+        }
+
+        .submit-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          width: 100%;
+          padding: 0.8125rem 1rem;
+          border-radius: var(--radius-md);
+          border: none;
+          font-family: inherit;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 200ms ease;
+          background: var(--primary-500);
+          color: var(--white);
+          letter-spacing: 0.01em;
+          margin-top: 0.75rem;
+        }
+
+        .submit-button:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .secondary-button {
+          width: 100%;
+          padding: 0.9rem 1rem;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--primary-500);
+          background: transparent;
+          color: var(--primary-500);
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 200ms ease;
+          margin-top: 0.75rem;
+        }
+
+        .secondary-button:hover {
+          background: #F0F9FF;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+          .forgot-hero { 
+            display: none;
+          }
+          .forgot-form-panel { width: 100%; }
+        }
+
+        @media (max-width: 640px) {
+          .forgot-hero-content h1 { font-size: 1.5rem; }
+          .forgot-hero-content p { font-size: 1rem; }
+          .forgot-form-panel { padding: 1.5rem 1rem; }
+          .forgot-card { max-width: 100%; }
+          .forgot-title { font-size: 1.5rem; }
+        }
+      `}</style>
+
+      <div className="forgot-page">
+        {/* ── Hero Section ── */}
+        <div className="forgot-hero">
+          <div className="forgot-hero-content">
+            <h1>
+              Master <br />
+              Project Management, <br />
+              Boost Your Career
+            </h1>
+            <p>Learn the skills to plan, execute, and deliver successful projects.</p>
+            <div className="forgot-hero-dots">
+              <button className="dot-button dot-active" aria-label="Slide 1" />
+              <button className="dot-button dot-inactive" aria-label="Slide 2" />
+              <button className="dot-button dot-inactive" aria-label="Slide 3" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2.5rem 1.5rem',
-          background: 'var(--grey)',
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: '440px', textAlign: 'center', marginBottom: '2rem' }}>
-          <img src="/Logo.png" alt="TGPL" style={{ height: '2.5rem', margin: '0 auto' }} />
-        </div>
+        {/* ── Form Panel ── */}
+        <div className="forgot-form-panel">
+          {/* Logo */}
+          <div className="forgot-logo">
+            <img src="/Logo.png" alt="The Global Project Leaders" />
+          </div>
 
-        <div
-          style={{
-            width: '100%',
-            maxWidth: '440px',
-            background: 'var(--white)',
-            border: '1px solid #E8E8E8',
-            marginTop: '1rem',
-            borderRadius: 'var(--radius-lg)',
-            padding: '2rem',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-            <h2 style={{ color: 'var(--black)', fontSize: '1.75rem', lineHeight: 1.1, marginBottom: '0.75rem' }}>
-              {sent ? 'Check your email' : 'Reset your password'}
-            </h2>
-            <p style={{ color: 'rgba(0,0,0,0.65)', fontSize: '1rem', lineHeight: 1.7, margin: 0 }}>
+          {/* Card */}
+          <div className="forgot-card">
+            {sent && (
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    margin: '0 auto 1rem',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CheckCircle size={48} color="var(--success)" strokeWidth={1.5} />
+                </div>
+              </div>
+            )}
+            <h2 className="forgot-title">{sent ? 'Check your email' : 'Reset your password'}</h2>
+            <p className="forgot-subtitle">
               {sent
                 ? `We've sent a password reset link to ${sentEmail}.`
-                : 'Enter your email and we’ll send you a link to reset your password.'}
+                : 'Enter your email and we\'ll send you a link to reset your password.'}
             </p>
-          </div>
 
-          {sent ? (
-            <div>
-              <div
-                style={{
-                  marginBottom: '1.5rem',
-                  padding: '1.5rem',
-                  borderRadius: '1rem',
-                  background: 'var(--primary-50)',
-                  color: 'var(--primary-700)',
-                }}
-              >
-                <p style={{ margin: 0, fontWeight: 600 }}>Next steps:</p>
-                <ul style={{ marginTop: '1rem', paddingLeft: '1.25rem', color: 'rgba(0, 0, 0, 0.75)' }}>
-                  <li>Check your email inbox</li>
-                  <li>Click the reset link (valid for 1 hour)</li>
-                  <li>Create a new password</li>
-                </ul>
-              </div>
+            {/* Error Alert */}
+            {error && <Alert type="error" title="Reset failed">{error}</Alert>}
 
-              <div className="text-center" style={{ marginBottom: '1rem' }}>
-                <p style={{ margin: 0, color: 'rgba(0, 0, 0, 0.65)' }}>
+            {sent ? (
+              <div>
+                {/* Success Box */}
+                <div className="success-box">
+                  <p>Next steps:</p>
+                  <ul>
+                    <li>Check your email inbox</li>
+                    <li>Click the reset link (valid for 1 hour)</li>
+                    <li>Create a new password</li>
+                  </ul>
+                </div>
+
+                {/* Resend */}
+                <p className="resend-text">
                   Didn't receive the email?{' '}
                   <button
                     type="button"
+                    className="resend-button"
                     onClick={handleResend}
                     disabled={isLoading}
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--primary-500)',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      padding: 0,
-                    }}
                   >
                     Resend email
                   </button>
                 </p>
-              </div>
 
-              <Button
-                type="button"
-                onClick={() => navigate(ROUTES.LOGIN)}
-                style={{
-                  width: '100%',
-                  marginTop: '0.75rem',
-                  padding: '0.9rem 1rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--primary-500)',
-                  background: 'transparent',
-                  color: 'var(--primary-500)',
-                  fontWeight: 600,
-                }}
-              >
-                Back to login
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <Input
-                label="Email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={error || undefined}
-              />
-              {error && (
-                <p style={{ color: 'var(--danger)', margin: '0.25rem 0 0 0', fontSize: '0.95rem' }}>{error}</p>
-              )}
-              <Button
-                type="submit"
-                disabled={!isFormFilled || isLoading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  width: '100%',
-                  padding: '0.8125rem 1rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  fontFamily: 'inherit',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: isFormFilled && !isLoading ? 'pointer' : 'not-allowed',
-                  transition: 'var(--transition)',
-                  background: isFormFilled ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-                  color: 'var(--white)',
-                  letterSpacing: '0.01em',
-                  marginTop: '0.75rem',
-                }}
-              >
-                {isLoading ? (
-                  <>
-                    <Spinner />
-                    Sending link...
-                  </>
-                ) : (
-                  'Send reset link'
-                )}
-              </Button>
-              <p style={{ margin: 0, color: 'rgba(0, 0, 0, 0.65)', fontSize: '0.95rem' }}>
-                Remember your password?{' '}
-                <Link to={ROUTES.LOGIN} style={{ color: 'var(--primary-500)', fontWeight: 600 }}>
+                {/* Back to Login */}
+                <Button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => navigate(ROUTES.LOGIN)}
+                >
                   Back to login
-                </Link>
-              </p>
-            </form>
-          )}
+                </Button>
+              </div>
+            ) : (
+              <form className="forgot-form" onSubmit={handleSubmit}>
+                <Input
+                  label="Email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={!isFormFilled || isLoading}
+                  className="submit-button"
+                >
+                  {isLoading ? (
+                    <>
+                      <Spinner />
+                      <span>Sending link...</span>
+                    </>
+                  ) : (
+                    'Send reset link'
+                  )}
+                </Button>
+
+                <p className="back-link-text">
+                  Remember your password?{' '}
+                  <Link to={ROUTES.LOGIN} className="back-link">
+                    Back to login
+                  </Link>
+                </p>
+              </form>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -28,6 +28,8 @@ export interface TokenResponse {
 export interface SignupPayload {
   email: string
   password: string
+  firstName: string
+  lastName: string
 }
 
 export interface LoginPayload {
@@ -66,7 +68,8 @@ class ApiClient {
     // Request interceptor: Add token to headers
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        const token = useAuthStore.getState().token
+        // Get token from localStorage (more reliable than store)
+        const token = localStorage.getItem('token') || useAuthStore.getState().token
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -192,74 +195,72 @@ export const authAPI = {
    * Sign up a new learner account
    */
   signup: async (payload: SignupPayload) => {
-  try {
-    const response = await apiClient.post<UserResponse>(
-      '/v1/auth/signup/',
-      payload,
-    )
-    return { success: true, data: response.data }
-  } catch (error) {
-    const err = error as AxiosError<ApiErrorResponse>
+    try {
+      const response = await apiClient.post<UserResponse>(
+        '/v1/auth/signup/',
+        payload,
+      )
+      return { success: true, data: response.data }
+    } catch (error) {
+      const err = error as AxiosError<ApiErrorResponse>
 
-    const data = err.response?.data
+      const data = err.response?.data
 
-    let message = 'Signup failed'
+      let message = 'Signup failed'
 
-    if (data) {
-      // Handle Django-style field errors
-      const firstKey = Object.keys(data)[0]
-      const firstError = data[firstKey]
+      if (data) {
+        // Handle Django-style field errors
+        const firstKey = Object.keys(data)[0]
+        const firstError = data[firstKey]
 
-      if (Array.isArray(firstError)) {
-        message = firstError[0]
-      } else if (typeof firstError === 'string') {
-        message = firstError
-      } else if (data.detail) {
-        message = data.detail
+        if (Array.isArray(firstError)) {
+          message = firstError[0]
+        } else if (typeof firstError === 'string') {
+          message = firstError
+        } else if (data.detail) {
+          message = data.detail
+        }
+      }
+
+      return {
+        success: false,
+        error: message,
       }
     }
-
-    return {
-      success: false,
-      error: message,
-    }
-  }
-},
-
-
-
+  },
 
   /**
    * Log in with email and password
    */
- login: async (payload: LoginPayload) => {
-  try {
-    const response = await apiClient.post<TokenResponse & { user: any }>(
-      '/api/v1/auth/login/',
-      payload,
-    )
+  login: async (payload: LoginPayload) => {
+    try {
+      const response = await apiClient.post<TokenResponse & { user: any }>(
+        '/v1/auth/login/',
+        payload,
+      )
 
-    const { access, refresh, user } = response.data
+      const { access, refresh, user } = response.data
 
-    localStorage.setItem('refreshToken', refresh)
+      localStorage.setItem('refreshToken', refresh)
 
-    return {
-      success: true,
-      access,
-      refresh,
-      user,
+      return {
+        success: true,
+        access,
+        refresh,
+        user,
+      }
+    } catch (error) {
+      const err = error as AxiosError<ApiErrorResponse>
+
+      const message = err.response?.data?.detail || 'Invalid credentials'
+
+      return {
+        success: false,
+        error: message,
+      }
     }
-  } catch (error) {
-    const err = error as AxiosError<ApiErrorResponse>
+  },
 
-    const message = err.response?.data?.detail || 'Invalid credentials'
-
-    return {
-      success: false,
-      error: message,
-    }
-  }
-},
   /**
    * Get current authenticated user
    */
@@ -281,30 +282,19 @@ export const authAPI = {
    */
   logout: async () => {
     try {
-      await apiClient.post('/api/v1/auth/logout/', {})
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (refreshToken) {
+        await apiClient.post('/v1/auth/logout/', { refresh: refreshToken })
+      }
       localStorage.removeItem('refreshToken')
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
       return { success: true }
     } catch (error) {
-  const err = error as AxiosError<ApiErrorResponse>
-
-  const data = err.response?.data
-
-  let message = 'Login failed'
-
-  if (data?.detail) {
-    message = data.detail
-  }
-
-  // normalize common backend responses
-  if (message.toLowerCase().includes('active account')) {
-    message = 'Your account is inactive. Please contact support or verify your email.'
-  }
-
-  return {
-    success: false,
-    error: message,
-  }
-}
+      const err = error as AxiosError<ApiErrorResponse>
+      const message = err.response?.data?.detail || 'Logout failed'
+      return { success: false, error: message }
+    }
   },
 
   /**

@@ -23,7 +23,7 @@ function Spinner() {
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login, isLoading, error } = useAuth()
+  const { login, isLoading, error, clearError } = useAuth()
 
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -102,109 +102,119 @@ export default function LoginPage() {
       }))
       setRememberMe(true)
     }
+    // Clear any previous errors
+    clearError()
   }, [])
 
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Hero Section with Gradient */}
-  
-<div
-  className="hidden lg:flex lg:flex-col"
-  style={{
-    width: '42%',
-    padding: '2.5rem',
-    position: 'relative',
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    paddingBottom: '4rem',
-  }}
->
-  {/* Background image */}
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      backgroundImage: 'url(/image1.png)', // same as signup
-      backgroundSize: 'cover',
-      backgroundPosition: 'center top',
-    }}
-  />
-
-  {/* Dark blue gradient overlay (IMPORTANT) */}
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      background:
-        'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
-    }}
-  />
-
-  {/* Content */}
-  <div
-    style={{
-      position: 'relative',
-      zIndex: 10,
-      marginBottom: '8%',
-      color: 'white',
-    }}
-  >
-    <h1
-      style={{
-        fontSize: '3rem',
-        marginBottom: '1rem',
-        lineHeight: 1.15,
-      }}
-    >
-      Master <br />
-      Project Management, <br />
-      Boost Your Career
-    </h1>
-
-    <p
-      style={{
-        fontSize: '1.5rem',
-        opacity: 0.82,
-        marginBottom: '2rem',
-        lineHeight: 1.55,
-      }}
-    >
-      Learn the skills to plan, execute, and deliver
-      <br /> successful projects.
-    </p>
-
-    {/* Carousel dots */}
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <button
+      <div
+        className="hidden lg:flex lg:flex-col"
         style={{
-          width: 36,
-          height: 8,
-          borderRadius: 4,
-          background: '#fff',
-          border: 'none',
+          width: '50%',
+          padding: '2.5rem',
+          position: 'relative',
+          overflow: 'hidden',
+          justifyContent: 'flex-end',
+          borderTopRightRadius: '32px',
+          borderBottomRightRadius: '32px',
         }}
-      />
-      <button
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          border: '2px solid rgba(255,255,255,0.6)',
-          background: 'transparent',
-        }}
-      />
-      <button
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          border: '2px solid rgba(255,255,255,0.6)',
-          background: 'transparent',
-        }}
-      />
-    </div>
-  </div>
-</div>
+      >
+        {/* Background image */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'url(/image1.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+
+        {/* Dark blue gradient overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
+          }}
+        />
+
+        {/* Content */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            marginBottom: '8%',
+            color: 'white',
+            paddingRight: '2rem',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '3rem',
+              marginBottom: '1rem',
+              lineHeight: 1.15,
+              fontWeight: 800,
+            }}
+          >
+            Master <br />
+            Project Management, <br />
+            Boost Your Career
+          </h1>
+
+          <p
+            style={{
+              fontSize: '1.5rem',
+              opacity: 0.82,
+              marginBottom: '2rem',
+              lineHeight: 1.55,
+            }}
+          >
+            Learn the skills to plan, execute, and deliver
+            <br /> successful projects.
+          </p>
+
+          {/* Carousel dots */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={{
+                width: 36,
+                height: 8,
+                borderRadius: 4,
+                background: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            />
+            <button
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,0.6)',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            />
+            <button
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,0.6)',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* ── Right form panel ── */}
       <div
@@ -215,10 +225,11 @@ export default function LoginPage() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '2.5rem 1.5rem',
-          background: 'var(--grey)', 
+          background: 'var(--grey)',
+          overflow: 'hidden',
         }}
       >
-        {/* Logo  */}
+        {/* Logo */}
         <div style={{ marginBottom: '1.75rem' }}>
           <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
         </div>
@@ -228,7 +239,6 @@ export default function LoginPage() {
           style={{
             width: '100%',
             maxWidth: '440px',
-            maxHeight: '462px',
             background: 'var(--white)',
             border: '1px solid #E8E8E8',
             borderRadius: 'var(--radius-lg)',
@@ -244,6 +254,7 @@ export default function LoginPage() {
                 fontSize: '1.75rem',
                 lineHeight: 1.1,
                 marginBottom: '0.75rem',
+                fontWeight: 700,
               }}
             >
               Welcome back
@@ -262,7 +273,7 @@ export default function LoginPage() {
           </div>
 
           {/* Error Alert */}
-          {error && <div className="mb-4"><Alert type="error">{error}</Alert></div>}
+          {error && <Alert type="error" title="Login failed">{error}</Alert>}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -275,7 +286,6 @@ export default function LoginPage() {
               value={formData.email}
               onChange={handleInputChange}
               error={formErrors.email}
-             
             />
 
             {/* Password with Forgot Password Link */}
@@ -299,7 +309,6 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   error={formErrors.password}
-                 
                 />
                 <button
                   type="button"
@@ -330,9 +339,7 @@ export default function LoginPage() {
                 fontWeight: 600,
                 cursor: isFormFilled && !isLoading ? 'pointer' : 'not-allowed',
                 transition: 'var(--transition)',
-                background: isFormFilled
-                  ? 'var(--primary-500)'
-                  : 'rgba(36,146,235,0.45)',
+                background: isFormFilled ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
                 color: 'var(--white)',
                 letterSpacing: '0.01em',
               }}
@@ -340,7 +347,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Spinner />
-                  Log in...
+                  <span>Log in...</span>
                 </>
               ) : (
                 'Log in'
@@ -362,8 +369,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Trust Message */}
-         {/* Trust badge */}
+        {/* Trust badge */}
         <p
           style={{
             fontSize: '0.875rem',
@@ -375,8 +381,6 @@ export default function LoginPage() {
         >
           Trusted by 50,000+ learners across emerging markets
         </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '0.75rem' }}>
-        </div>
       </div>
     </div>
   )

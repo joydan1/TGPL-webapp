@@ -15,6 +15,7 @@ interface AuthState {
   setToken: (token: string | null) => void
   login: (user: User, token: string) => void
   logout: () => void
+  hydrate: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -23,17 +24,52 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: false,
   error: null,
+
   setLoading: (isLoading) => set({ isLoading }),
   clearError: () => set({ error: null }),
   setError: (error) => set({ error }),
+
   setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
-  setToken: (token) => set({ token }),
-  login: (user, token) => set({ user, token, isAuthenticated: true, error: null }),
-  logout: () =>
+
+  setToken: (token) => {
+    if (token) {
+      localStorage.setItem('token', token)
+    } else {
+      localStorage.removeItem('token')
+    }
+    set({ token })
+  },
+
+  login: (user, token) => {
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    set({ user, token, isAuthenticated: true, error: null })
+  },
+
+  logout: () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
     set({
       user: null,
       token: null,
       isAuthenticated: false,
       error: null,
-    }),
+    })
+  },
+
+  hydrate: () => {
+    const token = localStorage.getItem('token')
+    const userStr = localStorage.getItem('user')
+
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        set({ token, user, isAuthenticated: true })
+      } catch (error) {
+        console.error('Failed to parse user from localStorage:', error)
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    }
+  },
 }))

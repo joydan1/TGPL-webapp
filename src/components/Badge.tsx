@@ -8,21 +8,36 @@ interface BadgeProps {
 
 const Badge: React.FC<BadgeProps> = ({ variant = 'primary', children, className = '' }) => {
   const variantStyles = {
-    primary: 'bg-primary-500 text-white',
-    secondary: 'bg-black text-white',
-    accent: 'bg-accent-500 text-white',
-    success: 'bg-green-500 text-white',
-    warning: 'bg-yellow-400 text-black',
-    danger: 'bg-red-500 text-white',
+    primary: {
+      backgroundColor: 'var(--primary-500)',
+      color: 'var(--white)',
+    },
+    secondary: {
+      backgroundColor: 'var(--black)',
+      color: 'var(--white)',
+    },
+    accent: {
+      backgroundColor: 'var(--accent-500)',
+      color: 'var(--white)',
+    },
+    success: {
+      backgroundColor: 'var(--success)',
+      color: 'var(--white)',
+    },
+    warning: {
+      backgroundColor: 'var(--warning)',
+      color: 'var(--black)',
+    },
+    danger: {
+      backgroundColor: 'var(--danger)',
+      color: 'var(--white)',
+    },
   }
 
   return (
     <span
-      className={`
-        inline-block px-3 py-1 rounded-full text-sm font-medium
-        ${variantStyles[variant]}
-        ${className}
-      `}
+      className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${className}`}
+      style={variantStyles[variant]}
     >
       {children}
     </span>

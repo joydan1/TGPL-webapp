@@ -11,30 +11,67 @@ const Textarea: React.FC<TextareaProps> = ({
   error,
   hint,
   className = '',
+  style,
   ...props
 }) => {
+  const textareaStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '0.75rem',
+    border: `1px solid ${error ? 'var(--danger)' : 'var(--grey)'}`,
+    borderRadius: 'var(--radius-md)',
+    backgroundColor: 'var(--white)',
+    color: 'var(--black)',
+    fontSize: '1rem',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    boxSizing: 'border-box',
+    transition: 'all 200ms ease',
+    ...style,
+  }
+
   return (
-    <div className="w-full">
+    <div style={{ width: '100%' }}>
       {label && (
-        <label className="block text-sm font-medium text-black mb-2">
+        <label
+          style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            color: 'var(--black)',
+            marginBottom: '0.5rem',
+          }}
+        >
           {label}
         </label>
       )}
       <textarea
-        className={`
-          w-full px-3 py-2 border rounded-lg bg-grey text-black placeholder-grey
-          focus:outline-none focus:ring-2 focus:ring-primary-500
-          disabled:bg-grey disabled:cursor-not-allowed
-          ${error ? 'border-red-500 focus:ring-red-500' : 'border-grey'}
-          ${className}
-        `}
+        style={textareaStyle}
+        className={`focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed ${className}`}
         {...props}
       />
       {error && (
-        <p className="text-sm text-red-500 mt-1">{error}</p>
+        <p
+          style={{
+            fontSize: '0.875rem',
+            color: 'var(--danger)',
+            marginTop: '0.25rem',
+            marginBottom: 0,
+          }}
+        >
+          {error}
+        </p>
       )}
       {hint && !error && (
-        <p className="text-sm text-grey mt-1">{hint}</p>
+        <p
+          style={{
+            fontSize: '0.875rem',
+            color: 'var(--grey)',
+            marginTop: '0.25rem',
+            marginBottom: 0,
+          }}
+        >
+          {hint}
+        </p>
       )}
     </div>
   )

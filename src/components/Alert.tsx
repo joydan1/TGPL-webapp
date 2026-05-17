@@ -9,47 +9,85 @@ interface AlertProps {
 }
 
 const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className = '' }) => {
-  const typeStyles = {
-    info:    'bg-blue-50 border-l-4 border-primary-500 text-primary-700',
-    success: 'bg-green-50 border-l-4 border-green-500 text-green-700',
-    warning: 'bg-yellow-50 border-l-4 border-yellow-500 text-yellow-700',
-    error:   'bg-red-50 border-l-4 border-red-500 text-red-700',
+  const config = {
+    info: {
+      bgColor: '#EFF6FF',
+      borderColor: '#93C5FD',
+      textColor: '#1E40AF',
+      icon: <Info size={16} strokeWidth={2.5} />,
+      iconBgColor: '#DBEAFE',
+      iconBorderColor: '#3B82F6',
+    },
+    success: {
+      bgColor: '#F0FDF4',
+      borderColor: '#86EFAC',
+      textColor: '#166534',
+      icon: <CheckCircle size={16} strokeWidth={2.5} />,
+      iconBgColor: '#DCFCE7',
+      iconBorderColor: '#22C55E',
+    },
+    warning: {
+      bgColor: '#FFFBEB',
+      borderColor: '#FCD34D',
+      textColor: '#92400E',
+      icon: <AlertCircle size={16} strokeWidth={2.5} />,
+      iconBgColor: '#FEF3C7',
+      iconBorderColor: '#F59E0B',
+    },
+    error: {
+      bgColor: '#FEF2F2',
+      borderColor: '#FCA5A5',
+      textColor: '#991B1B',
+      icon: <XCircle size={16} strokeWidth={2.5} />,
+      iconBgColor: '#FECACA',
+      iconBorderColor: '#DC2626',
+    },
   }
 
-  const textColor = {
-    info:    '#1A7ACC',
-    success: '#15803d',
-    warning: '#a16207',
-    error:   '#b91c1c',
-  }
-
-  const iconMap = {
-    info:    <Info size={20} className="text-primary-500" />,
-    success: <CheckCircle size={20} className="text-green-500" />,
-    warning: <AlertCircle size={20} className="text-yellow-600" />,
-    error:   <XCircle size={20} className="text-red-500" />,
-  }
+  const colors = config[type]
 
   return (
     <div
-      className={`rounded-lg p-4 mb-4 ${typeStyles[type]} ${className}`}
+      className={`rounded-xl p-4 mb-4 ${className}`}
+      style={{
+        backgroundColor: colors.bgColor,
+        border: `1px solid ${colors.borderColor}`,
+      }}
     >
-      <div className="flex gap-3">
-        <div className="shrink-0 mt-0.5">
-          {iconMap[type]}
+      <div className="flex gap-3 items-flex-start">
+        {/* Circular Icon Badge */}
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{
+            width: '28px',
+            height: '28px',
+            minWidth: '28px',
+            borderRadius: '50%',
+            backgroundColor: colors.iconBgColor,
+            border: `2px solid ${colors.iconBorderColor}`,
+            color: colors.textColor,
+            marginTop: '2px',
+          }}
+        >
+          {React.cloneElement(colors.icon as React.ReactElement, {
+            color: colors.textColor,
+          })}
         </div>
+
+        {/* Text Content */}
         <div className="flex-1">
           {title && (
             <h4
-              className="font-bold mb-1"
-              
-              style={{ color: textColor[type] }}
+              className="font-bold text-sm mb-1"
+              style={{ color: colors.textColor }}
             >
               {title}
             </h4>
           )}
-          {/* global p { color: white } — must override with inline style */}
-          <p className="text-sm" style={{ color: textColor[type], marginBottom: 0 }}>
+          <p
+            className="text-sm leading-relaxed"
+            style={{ color: colors.textColor, margin: 0 }}
+          >
             {children}
           </p>
         </div>

@@ -18,63 +18,87 @@ const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   const iconMap = {
-    email:    <Mail size={18} style={{ color: '#999999' }} />,
-    password: <Lock size={18} style={{ color: '#999999' }} />,
-    username: <User size={18} style={{ color: '#999999' }} />,
+    email: <Mail size={18} style={{ color: 'var(--grey)' }} />,
+    password: <Lock size={18} style={{ color: 'var(--grey)' }} />,
+    username: <User size={18} style={{ color: 'var(--grey)' }} />,
     none: null,
   }
 
   const hasIcon = iconType !== 'none'
 
+  const inputStyle: React.CSSProperties = {
+    paddingLeft: hasIcon ? '2.75rem' : '1rem',
+    borderColor: error ? 'var(--danger)' : 'var(--grey)',
+    borderWidth: error ? '2px' : '1px',
+    borderStyle: 'solid',
+    borderRadius: 'var(--radius-md)',
+    backgroundColor: 'var(--white)',
+    color: 'var(--black)',
+    fontSize: '1rem',
+    padding: '0.5rem 1rem',
+    width: '100%',
+    boxSizing: 'border-box',
+    transition: 'all 200ms ease',
+    ...style,
+  }
+
   return (
-    <div className="w-full">
+    <div style={{ width: '100%' }}>
       {label && (
         <label
-          className="block text-sm font-medium mb-1"
-          style={{ color: 'var(--black)' }}
+          style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            marginBottom: '0.5rem',
+            color: 'var(--black)',
+          }}
         >
           {label}
         </label>
       )}
-      <div className="relative">
+      <div style={{ position: 'relative' }}>
         {hasIcon && (
           <span
-            className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ left: '1rem' }}      
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '1rem',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+            }}
           >
             {iconMap[iconType]}
           </span>
         )}
         <input
-          style={{
-            
-            paddingLeft: hasIcon ? '2.75rem' : '1rem',
-            // Error state overrides border colour
-            borderColor: error ? 'var(--danger)' : undefined,
-            borderWidth: error ? '2px' : undefined,
-            backgroundColor: error ? 'var(--white)' : undefined,
-            ...style,
-          }}
-          className={`
-            focus:outline-none focus:ring-2 focus:ring-primary-500
-            disabled:cursor-not-allowed
-            ${className}
-          `}
+          style={inputStyle}
+          className={`focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed ${className}`}
           {...props}
         />
       </div>
       {error && (
         <p
-          className="text-sm mt-1"
-          style={{ color: 'var(--danger)', marginBottom: 0 }}
+          style={{
+            fontSize: '0.875rem',
+            marginTop: '0.25rem',
+            marginBottom: 0,
+            color: 'var(--danger)',
+          }}
         >
           {error}
         </p>
       )}
       {hint && !error && (
         <p
-          className="text-sm mt-1"
-          style={{ color: '#999999', marginBottom: 0 }}
+          style={{
+            fontSize: '0.875rem',
+            marginTop: '0.25rem',
+            marginBottom: 0,
+            color: 'var(--grey)',
+          }}
         >
           {hint}
         </p>

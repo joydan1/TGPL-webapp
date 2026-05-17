@@ -7,14 +7,26 @@ interface CardProps {
 }
 
 const Card: React.FC<CardProps> = ({ variant = 'default', children, className = '' }) => {
-  const variantStyles = {
-    default: 'bg-white border border-grey rounded-lg',
-    elevated: 'bg-white rounded-lg shadow-md',
-    outlined: 'bg-white border-2 border-primary-500 rounded-lg',
+  const variantStyles: Record<string, React.CSSProperties> = {
+    default: {
+      backgroundColor: 'var(--white)',
+      border: '1px solid var(--grey)',
+      borderRadius: 'var(--radius-lg)',
+    },
+    elevated: {
+      backgroundColor: 'var(--white)',
+      borderRadius: 'var(--radius-lg)',
+      boxShadow: 'var(--shadow-sm)',
+    },
+    outlined: {
+      backgroundColor: 'var(--white)',
+      border: '2px solid var(--primary-500)',
+      borderRadius: 'var(--radius-lg)',
+    },
   }
 
   return (
-    <div className={`${variantStyles[variant]} ${className}`}>
+    <div className={className} style={variantStyles[variant]}>
       {children}
     </div>
   )
@@ -26,7 +38,13 @@ interface CardHeaderProps {
 }
 
 const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '' }) => (
-  <div className={`px-6 py-4 border-b border-grey ${className}`}>
+  <div
+    className={className}
+    style={{
+      padding: '1.5rem',
+      borderBottom: '1px solid var(--grey)',
+    }}
+  >
     {children}
   </div>
 )
@@ -37,7 +55,12 @@ interface CardBodyProps {
 }
 
 const CardBody: React.FC<CardBodyProps> = ({ children, className = '' }) => (
-  <div className={`px-6 py-4 ${className}`}>
+  <div
+    className={className}
+    style={{
+      padding: '1.5rem',
+    }}
+  >
     {children}
   </div>
 )
@@ -48,7 +71,16 @@ interface CardFooterProps {
 }
 
 const CardFooter: React.FC<CardFooterProps> = ({ children, className = '' }) => (
-  <div className={`px-6 py-4 border-t border-grey bg-grey rounded-b-lg ${className}`}>
+  <div
+    className={className}
+    style={{
+      padding: '1.5rem',
+      borderTop: '1px solid var(--grey)',
+      backgroundColor: 'var(--grey)',
+      borderBottomLeftRadius: 'var(--radius-lg)',
+      borderBottomRightRadius: 'var(--radius-lg)',
+    }}
+  >
     {children}
   </div>
 )

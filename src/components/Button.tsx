@@ -19,27 +19,41 @@ const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseStyles = 'font-sora rounded-lg font-medium transition-all focus:outline-none flex items-center gap-2 justify-center'
-  const defaultStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      backgroundColor: 'var(--primary-500)',
+      color: 'var(--white)',
+    },
+    secondary: {
+      backgroundColor: 'var(--white)',
+      color: 'var(--black)',
+      border: '2px solid var(--black)',
+    },
+    accent: {
+      backgroundColor: 'var(--accent-500)',
+      color: 'var(--white)',
+    },
+    outline: {
+      backgroundColor: 'var(--white)',
+      color: 'var(--primary-500)',
+      border: '2px solid var(--primary-500)',
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      color: 'var(--primary-500)',
+    },
   }
 
-  const variantStyles = {
-    primary: 'bg-primary-500 text-white hover:bg-primary-700 focus:ring-2 focus:ring-primary-100',
-    secondary: 'bg-white text-black border-2 border-black hover:bg-grey focus:ring-2 focus:ring-grey',
-    accent: 'bg-accent-500 text-white hover:bg-accent-700 focus:ring-2 focus:ring-accent-100',
-    outline: 'bg-white text-primary-500 border-2 border-primary-500 hover:bg-primary-50 focus:ring-2 focus:ring-primary-100',
-    ghost: 'bg-transparent text-primary-500 hover:bg-primary-50 focus:ring-2 focus:ring-primary-100',
+  const sizeStyles: Record<string, React.CSSProperties> = {
+    small: { padding: '0.375rem 0.75rem', fontSize: '0.875rem' },
+    medium: { padding: '0.5rem 1rem', fontSize: '1rem' },
+    large: { padding: '0.75rem 1.5rem', fontSize: '1.125rem' },
   }
 
-  const sizeStyles = {
-    small: 'px-3 py-1.5 text-sm',
-    medium: 'px-4 py-2 text-base',
-    large: 'px-6 py-3 text-lg',
-  }
-
-  const disabledStyles = props.disabled ? 'opacity-50 cursor-not-allowed' : ''
+  const disabledStyles: React.CSSProperties = props.disabled
+    ? { opacity: 0.5, cursor: 'not-allowed' }
+    : {}
 
   const content = (
     <>
@@ -49,10 +63,20 @@ const Button: React.FC<ButtonProps> = ({
     </>
   )
 
+  const mergedStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...variantStyles[variant],
+    ...sizeStyles[size],
+    ...disabledStyles,
+    ...style,
+  }
+
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabledStyles} ${className}`}
-      style={{ ...defaultStyle, ...style }}
+      className={`${baseStyles} ${className}`}
+      style={mergedStyle}
       {...props}
     >
       {content}

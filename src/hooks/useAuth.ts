@@ -62,31 +62,8 @@ export const useAuth = () => {
           return { success: false, error: result.error }
         }
 
-        // After signup, automatically log in
-        const loginResult = await authAPI.login(formData)
-        if (!loginResult.success || !loginResult.access) {
-          auth.setError('Signup successful but login failed')
-          return { success: false, error: 'Login after signup failed' }
-        }
-
-        // Fetch user info
-        const userResult = await authAPI.getCurrentUser()
-        const userData = userResult.data
-        if (!userResult.success || !userData) {
-          auth.setError('Failed to fetch user info')
-          return { success: false, error: 'Failed to fetch user info' }
-        }
-
-        const user: User = {
-          id: userData.id as unknown as number,
-          email: userData.email,
-          name: userData.email.split('@')[0],
-          role: userData.role,
-          createdAt: userData.created_at,
-        }
-
-        auth.login(user, loginResult.access)
-        return { success: true, user, token: loginResult.access }
+        // Signup successful - user needs to verify email and login manually
+        return { success: true }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Signup failed'
         auth.setError(message)
@@ -135,6 +112,10 @@ export const useAuth = () => {
     }
   }, [auth])
 
+  const clearError = useCallback(() => {
+    auth.clearError()
+  }, [auth])
+
   return {
     // State
     user: auth.user,
@@ -147,5 +128,6 @@ export const useAuth = () => {
     signup,
     logout,
     loadCurrentUser,
+    clearError,
   }
 }
