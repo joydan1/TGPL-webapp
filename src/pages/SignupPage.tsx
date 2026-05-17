@@ -86,7 +86,6 @@ export default function SignupPage() {
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [successMessage, setSuccessMessage] = useState(false)
 
   // Clear any previous errors on mount
   React.useEffect(() => {
@@ -140,11 +139,7 @@ export default function SignupPage() {
       firstName: formData.firstName,
       lastName: formData.lastName,
     })
-    if (result.success) {
-      setSuccessMessage(true)
-      // Redirect after 2 seconds to let user see the message
-      setTimeout(() => navigate(ROUTES.LOGIN), 2000)
-    }
+    if (result.success) navigate(ROUTES.LOGIN)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -188,7 +183,12 @@ export default function SignupPage() {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(36, 146, 235, 0.65) 0%, rgba(26, 122, 204, 0.65) 76.51%);
+          background: linear-gradient(
+            180deg,
+            rgba(10, 42, 74, 0.55) 0%,
+            rgba(14, 74, 138, 0.75) 50%,
+            rgba(10, 42, 74, 0.92) 100%
+          );
           z-index: 1;
         }
 
@@ -476,7 +476,7 @@ export default function SignupPage() {
               Project Management,<br />
               Boost Your Career
             </h1>
-            <p>Learn the skills to plan, execute, and deliver successful projects.</p>
+            <p>Learn the skills to plan, execute, and deliver <br /> successful projects.</p>
             <div className="signup-hero-dots">
               <button className="dot-button dot-active" aria-label="Slide 1" />
               <button className="dot-button dot-inactive" aria-label="Slide 2" />
@@ -509,13 +509,6 @@ export default function SignupPage() {
                 </button>
               ))}
             </div>
-
-            {/* Success Message */}
-            {successMessage && (
-              <Alert type="success" title="Account created successfully!">
-                Your account has been created. Redirecting to login...
-              </Alert>
-            )}
 
             {/* Errors */}
             {error && <Alert type="error" title="Signup failed">{error}</Alert>}
