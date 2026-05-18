@@ -7,10 +7,10 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
 
-// Protected Route Component
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredRole?: 'learner' | 'trainer' | 'admin'
@@ -37,7 +37,7 @@ function App() {
     <Router>
       <Routes>
 
-        {/* Default Route → Signup first */}
+        {/* Default Route */}
         <Route
           path="/"
           element={
@@ -65,6 +65,14 @@ function App() {
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
 
         {/* Protected Routes */}
+        <Route
+          path={ROUTES.ONBOARDING}
+          element={
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.DASHBOARD}
           element={

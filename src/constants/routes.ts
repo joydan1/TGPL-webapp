@@ -16,6 +16,7 @@ export const ROUTES = {
   // ===========================
   // LEARNER ROUTES (Authenticated learners only)
   // ===========================
+  ONBOARDING: '/onboarding',
   DASHBOARD: '/dashboard',
   COURSES: '/courses',
   COURSE_DETAIL: '/courses/:id',
@@ -263,6 +264,7 @@ export const ROUTE_METADATA: Record<
 export const RouteBuilder = {
   login: () => ROUTES.LOGIN,
   signup: () => ROUTES.SIGNUP,
+  onboarding: () => ROUTES.ONBOARDING,
   dashboard: () => ROUTES.DASHBOARD,
   courses: () => ROUTES.COURSES,
   course: (id: string | number) => getRoute(ROUTES.COURSE_DETAIL, { id }),

@@ -10,7 +10,13 @@ import { ROUTES, RouteBuilder } from '../constants/routes'
 function Spinner() {
   return (
     <svg
-      style={{ animation: 'spin 0.7s linear infinite', width: 18, height: 18, flexShrink: 0 }}
+      style={{
+        animation: 'spin 0.7s linear infinite',
+        width: 18,
+        height: 18,
+        flexShrink: 0,
+        display: 'block',
+      }}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -65,25 +71,26 @@ export default function LoginPage() {
     })
 
     if (result.success) {
-      // Remember me functionality
       if (rememberMe) {
         localStorage.setItem('rememberEmail', formData.email)
       } else {
         localStorage.removeItem('rememberEmail')
       }
-
-      // Redirect based on user role
-      navigate(RouteBuilder.dashboard())
-    }
+       const onboardingComplete = localStorage.getItem('onboardingComplete')
+  if (!onboardingComplete) {
+    navigate(RouteBuilder.onboarding())
+  } else {
+    navigate(RouteBuilder.dashboard())
   }
 
+  }
+  }
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
-    // Clear error for this field when user starts typing
     if (formErrors[name]) {
       setFormErrors((prev) => ({
         ...prev,
@@ -92,7 +99,6 @@ export default function LoginPage() {
     }
   }
 
-  // Load remembered email on component mount
   useEffect(() => {
     const rememberEmail = localStorage.getItem('rememberEmail')
     if (rememberEmail) {
@@ -102,7 +108,6 @@ export default function LoginPage() {
       }))
       setRememberMe(true)
     }
-    // Clear any previous errors
     clearError()
   }, [])
 
@@ -137,7 +142,7 @@ export default function LoginPage() {
           style={{
             position: 'absolute',
             inset: 0,
-             background:
+            background:
               'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
           }}
         />
@@ -216,7 +221,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ── Right form panel ── */}
+      {/* Right form panel */}
       <div
         style={{
           flex: 1,
@@ -234,6 +239,13 @@ export default function LoginPage() {
           <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
         </div>
 
+        {/* Error Alert - outside the card */}
+        {error && (
+          <div style={{ width: '100%', maxWidth: '440px', marginBottom: '1rem' }}>
+            <Alert type="error" title="Login failed">{error}</Alert>
+          </div>
+        )}
+
         {/* White card */}
         <div
           style={{
@@ -246,7 +258,6 @@ export default function LoginPage() {
             boxShadow: 'var(--shadow-sm)',
           }}
         >
-          
           {/* Title */}
           <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
             <h2
@@ -272,9 +283,6 @@ export default function LoginPage() {
               Log in to continue learning.
             </p>
           </div>
-
-          {/* Error Alert */}
-          {error && <Alert type="error" title="Login failed">{error}</Alert>}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -311,7 +319,7 @@ export default function LoginPage() {
                   onChange={handleInputChange}
                   error={formErrors.password}
                 />
-                 <button
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
@@ -332,7 +340,6 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-
             </div>
 
             {/* Submit Button */}
@@ -360,10 +367,18 @@ export default function LoginPage() {
               }}
             >
               {isLoading ? (
-                <>
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: '0.5rem',
+                  }}
+                >
                   <Spinner />
-                  <span>Log in...</span>
-                </>
+                  <span>Logging in...</span>
+                </span>
               ) : (
                 'Log in'
               )}
