@@ -137,7 +137,7 @@ export default function LoginPage() {
           style={{
             position: 'absolute',
             inset: 0,
-            background:
+             background:
               'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
           }}
         />
@@ -246,6 +246,7 @@ export default function LoginPage() {
             boxShadow: 'var(--shadow-sm)',
           }}
         >
+          
           {/* Title */}
           <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
             <h2
@@ -289,19 +290,19 @@ export default function LoginPage() {
             />
 
             {/* Password with Forgot Password Link */}
-            <div className="space-y-6">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-black">
+            <div style={{ marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--black)' }}>
                   Password
                 </label>
                 <Link
                   to={ROUTES.FORGOT_PASSWORD}
-                  className="text-sm text-primary-500 hover:text-primary-700 font-medium transition-colors"
+                  style={{ fontSize: '0.875rem', color: 'var(--primary-500)', textDecoration: 'none', fontWeight: 500 }}
                 >
                   Forgot password?
                 </Link>
               </div>
-              <div className="relative">
+              <div style={{ position: 'relative', marginTop: '0.75rem' }}>
                 <Input
                   name="password"
                   type={showPassword ? 'text' : 'password'}
@@ -310,14 +311,28 @@ export default function LoginPage() {
                   onChange={handleInputChange}
                   error={formErrors.password}
                 />
-                <button
+                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-grey hover:text-black transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#999999',
+                  }}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+
             </div>
 
             {/* Submit Button */}
@@ -356,7 +371,7 @@ export default function LoginPage() {
           </form>
 
           {/* Signup Link */}
-          <div className="text-center mt-10">
+          <div className="text-center" style={{ marginTop: '2.5rem' }}>
             <p style={{ color: 'var(--black)', margin: 0 }}>
               New here?{' '}
               <Link
