@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../../hooks/useAuth'
 import { Eye, EyeOff } from 'lucide-react'
-import Input from '../components/Input'
-import Button from '../components/Button'
-import Alert from '../components/Alert'
-import { ROUTES } from '../constants/routes'
+import Input from '../../components/Input'
+import Button from '../../components/Button'
+import Alert from '../../components/Alert'
+import { ROUTES } from '../../constants/routes'
 
 // Password strength calculator
 type StrengthLevel = { score: number; label: string; color: string }

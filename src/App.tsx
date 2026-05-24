@@ -2,13 +2,24 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuthStore } from './store/auth'
 import { ROUTES } from './constants/routes'
 
-// Pages
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import OnboardingPage from './pages/OnboardingPage'
-import DashboardPage from './pages/DashboardPage'
+// Layout
+import PublicLayout from './layouts/PublicLayout'
+
+// Public Pages
+import LandingPage from './pages/public/LandingPage'
+
+
+// Auth Pages (no header/footer)
+import LoginPage from './pages/auth/LoginPage'
+import SignupPage from './pages/auth/SignupPage'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+
+// App Pages (protected, no public layout)
+import OnboardingPage from './pages/app/OnboardingPage'
+import DashboardPage from './pages/app/DashboardPage'
+
+// Error Pages
 import NotFoundPage from './pages/NotFoundPage'
 
 interface ProtectedRouteProps {
@@ -36,19 +47,23 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* ===== PUBLIC ROUTES (with Header & Footer) ===== */}
+        <Route element={<PublicLayout />}>
+          {/* Home route – conditionally render LandingPage or redirect to dashboard */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to={ROUTES.DASHBOARD} replace />
+              ) : (
+                <LandingPage />
+              )
+            }
+          />
+          
+        </Route>
 
-        {/* Default Route */}
-        <Route
-          path="/"
-          element={
-            <Navigate
-              to={isAuthenticated ? ROUTES.DASHBOARD : ROUTES.SIGNUP}
-              replace
-            />
-          }
-        />
-
-        {/* Public Routes */}
+        {/* ===== AUTH ROUTES (no header/footer) ===== */}
         <Route
           path={ROUTES.LOGIN}
           element={
@@ -64,7 +79,7 @@ function App() {
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
 
-        {/* Protected Routes */}
+        {/* ===== PROTECTED APP ROUTES (no header/footer) ===== */}
         <Route
           path={ROUTES.ONBOARDING}
           element={
@@ -82,10 +97,9 @@ function App() {
           }
         />
 
-        {/* 404 */}
+        {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
-
       </Routes>
     </Router>
   )

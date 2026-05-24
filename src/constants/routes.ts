@@ -12,6 +12,11 @@ export const ROUTES = {
   SIGNUP: '/signup',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password/:token',
+  GET_STARTED: '/getstarted',
+  CONTACT: '/contact',
+  ABOUT: '/about',
+  SERVICES: '/services',
+  FOUNDER: '/founder',
 
   // ===========================
   // LEARNER ROUTES (Authenticated learners only)

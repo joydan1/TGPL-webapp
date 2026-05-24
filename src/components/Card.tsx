@@ -1,12 +1,13 @@
 import React from 'react'
 
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'elevated' | 'outlined'
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
-const Card: React.FC<CardProps> = ({ variant = 'default', children, className = '' }) => {
+const Card: React.FC<CardProps> = ({ variant = 'default', children, className = '', style, ...rest }) => {
   const variantStyles: Record<string, React.CSSProperties> = {
     default: {
       backgroundColor: 'var(--white)',
@@ -26,51 +27,58 @@ const Card: React.FC<CardProps> = ({ variant = 'default', children, className = 
   }
 
   return (
-    <div className={className} style={variantStyles[variant]}>
+    <div className={className} style={{ ...variantStyles[variant], ...style }} {...rest}>
       {children}
     </div>
   )
 }
 
-interface CardHeaderProps {
+interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
-const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '' }) => (
+const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '', style, ...rest }) => (
   <div
     className={className}
     style={{
       padding: '1.5rem',
       borderBottom: '1px solid var(--grey)',
+      ...style,
     }}
+    {...rest}
   >
     {children}
   </div>
 )
 
-interface CardBodyProps {
+interface CardBodyProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
-const CardBody: React.FC<CardBodyProps> = ({ children, className = '' }) => (
+const CardBody: React.FC<CardBodyProps> = ({ children, className = '', style, ...rest }) => (
   <div
     className={className}
     style={{
       padding: '1.5rem',
+      ...style,
     }}
+    {...rest}
   >
     {children}
   </div>
 )
 
-interface CardFooterProps {
+interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
-const CardFooter: React.FC<CardFooterProps> = ({ children, className = '' }) => (
+const CardFooter: React.FC<CardFooterProps> = ({ children, className = '', style, ...rest }) => (
   <div
     className={className}
     style={{
@@ -79,7 +87,9 @@ const CardFooter: React.FC<CardFooterProps> = ({ children, className = '' }) => 
       backgroundColor: 'var(--grey)',
       borderBottomLeftRadius: 'var(--radius-lg)',
       borderBottomRightRadius: 'var(--radius-lg)',
+      ...style,
     }}
+    {...rest}
   >
     {children}
   </div>

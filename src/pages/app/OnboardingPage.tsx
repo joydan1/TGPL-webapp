@@ -1,8 +1,8 @@
 // OnboardingPage.tsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import { RouteBuilder } from '../constants/routes'
+import { useAuth } from '../../hooks/useAuth'
+import { RouteBuilder } from '../../constants/routes'
 import {
   Target, TrendingUp, Briefcase, GraduationCap, Compass,
   CheckSquare, Wrench, MessageCircle, ChevronDown
@@ -554,7 +554,7 @@ export default function OnboardingPage() {
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
         }}
       >
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>😎</div>
+        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>cool1.png</div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
           You are all set!
         </h1>

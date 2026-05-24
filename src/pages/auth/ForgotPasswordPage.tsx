@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
-import Input from '../components/Input'
-import Button from '../components/Button'
-import Alert from '../components/Alert'
-import { ROUTES } from '../constants/routes'
-import { authAPI } from '../services/api'
-import { useAuth } from '../hooks/useAuth'
+import Input from '../../components/Input'
+import Button from '../../components/Button'
+import Alert from '../../components/Alert'
+import { ROUTES } from '../../constants/routes'
+import { authAPI } from '../../services/api'
+import { useAuth } from '../../hooks/useAuth'
 
 function Spinner() {
   return (

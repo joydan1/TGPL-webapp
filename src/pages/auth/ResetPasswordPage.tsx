@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
-import Input from '../components/Input'
-import Button from '../components/Button'
-import { ROUTES } from '../constants/routes'
-import { authAPI } from '../services/api'
+import Input from '../../components/Input'
+import Button from '../../components/Button'
+import { ROUTES } from '../../constants/routes'
+import { authAPI } from '../../services/api'
 
 function Spinner() {
   return (
@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
     }
   }, [token])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!token) return
 
@@ -115,24 +115,31 @@ export default function ResetPasswordPage() {
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              style={{ width: 36, height: 8, borderRadius: 4, background: '#fff', border: 'none' }}
+              aria-label="Slide 1"
+              style={{ width: 36, height: 8, borderRadius: 4, background: '#fff', border: 'none', cursor: 'pointer', padding: 0 }}
             />
             <button
+              aria-label="Slide 2"
               style={{
                 width: 10,
                 height: 10,
                 borderRadius: '50%',
                 border: '2px solid rgba(255,255,255,0.6)',
                 background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
               }}
             />
             <button
+              aria-label="Slide 3"
               style={{
                 width: 10,
                 height: 10,
                 borderRadius: '50%',
                 border: '2px solid rgba(255,255,255,0.6)',
                 background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
               }}
             />
           </div>
@@ -212,7 +219,7 @@ export default function ResetPasswordPage() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="SecurePass123!"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                     error={undefined}
                   />
                   <button
@@ -233,7 +240,7 @@ export default function ResetPasswordPage() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="SecurePass123!"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
                     error={undefined}
                   />
                   <button
@@ -291,6 +298,8 @@ export default function ResetPasswordPage() {
           )}
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
