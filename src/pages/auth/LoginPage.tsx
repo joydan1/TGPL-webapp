@@ -1,927 +1,417 @@
-import React, { useRef } from 'react'
-import { Card, CardBody } from '../../components/Card'
-import { Target, Telescope, BookOpen, Building2, Users, ArrowRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
+import { Eye, EyeOff } from 'lucide-react'
+import Input from '../../components/Input'
 import Button from '../../components/Button'
+import Alert from '../../components/Alert'
+import { ROUTES, RouteBuilder } from '../../constants/routes'
 
-const LandingPage: React.FC = () => {
-  // Section refs for smooth scrolling
-  const aboutRef = useRef<HTMLDivElement>(null)
-  const servicesRef = useRef<HTMLDivElement>(null)
-  const impactRef = useRef<HTMLDivElement>(null)
-  const founderRef = useRef<HTMLDivElement>(null)
-  const getStartedRef = useRef<HTMLDivElement>(null)
-  const contactRef = useRef<HTMLDivElement>(null)
+function Spinner() {
+  return (
+    <svg
+      style={{
+        animation: 'spin 0.7s linear infinite',
+        width: 18,
+        height: 18,
+        flexShrink: 0,
+        display: 'block',
+      }}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} />
+      <path fill="currentColor" style={{ opacity: 0.8 }} d="M4 12a8 8 0 018-8v8H4z" />
+    </svg>
+  )
+}
 
-  // Scroll to section function
-  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth' })
+export default function LoginPage() {
+  const navigate = useNavigate()
+  const { login, isLoading, error, clearError } = useAuth()
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [rememberMe, setRememberMe] = useState(false)
+
+  const isFormFilled = formData.email.trim().length > 0 && formData.password.length > 0
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email'
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
-  // Store refs in window for header navigation
-  React.useEffect(() => {
-    ;(window as any).scrollToAbout = () => scrollToSection(aboutRef)
-    ;(window as any).scrollToServices = () => scrollToSection(servicesRef)
-    ;(window as any).scrollToContact = () => scrollToSection(contactRef)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    const result = await login({
+      email: formData.email,
+      password: formData.password,
+    })
+
+    if (result.success) {
+      if (rememberMe) {
+        localStorage.setItem('rememberEmail', formData.email)
+      } else {
+        localStorage.removeItem('rememberEmail')
+      }
+       const onboardingComplete = localStorage.getItem('onboardingComplete')
+  if (!onboardingComplete) {
+    navigate(RouteBuilder.onboarding())
+  } else {
+    navigate(RouteBuilder.dashboard())
+  }
+
+  }
+  }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }))
+    }
+  }
+
+  useEffect(() => {
+    const rememberEmail = localStorage.getItem('rememberEmail')
+    if (rememberEmail) {
+      setFormData((prev) => ({
+        ...prev,
+        email: rememberEmail,
+      }))
+      setRememberMe(true)
+    }
+    clearError()
   }, [])
 
-  const stats = [
-    { number: '500+', label: 'Professionals Trained' },
-    { number: '100+', label: 'Projects Delivered' },
-    { number: '95%', label: 'Success Rate' },
-  ]
-
-  const services = [
-    {
-      icon: Target,
-      title: 'Project Management',
-      description: 'End-to-end project management from initiation to closing.',
-    },
-    {
-      icon: Building2,
-      title: 'Organizational Consulting',
-      description: 'Help organizations structure and strengthen their systems.',
-    },
-    {
-      icon: BookOpen,
-      title: 'Training Programs',
-      description: 'Equip professionals with practical PM skills.',
-    },
-    {
-      icon: Users,
-      title: 'Community Network',
-      description: 'Connect with Africa\'s growing PM network.',
-    },
-    {
-      icon: Target,
-      title: 'Strategic Planning',
-      description: 'Develop strategies for project delivery excellence.',
-    },
-    {
-      icon: ArrowRight,
-      title: 'Implementation Support',
-      description: 'Guide your team through execution and delivery.',
-    },
-  ]
-
-  const impactStats = [
-    { number: '15+', label: 'Years of Experience' },
-    { number: '200+', label: 'Projects Delivered' },
-    { number: '60%', label: 'Organizations Served' },
-    { number: '7', label: 'African Countries' },
-  ]
-
-  const paths = [
-    {
-      title: 'Join a Training Cohort',
-      description: 'Learn practical project management skills and earn your certification.',
-      icon: BookOpen,
-      buttonText: 'Explore Training',
-    },
-    {
-      title: 'Hire TGPL for a Project',
-      description: 'Need structure and strategy? We\'re ready to help your team execute.',
-      icon: Building2,
-      buttonText: 'Request Consultation',
-      featured: true,
-    },
-    {
-      title: 'Join Our Community',
-      description: 'Stay updated and connect with Africa\'s growing PM network.',
-      icon: Users,
-      buttonText: 'Stay Connected',
-    },
-  ]
-
   return (
-    <>
-      {/* Hero Section */}
-      <section
+    <div className="min-h-screen flex">
+      {/* Left Side - Hero Section with Gradient */}
+      <div
+        className="hidden lg:flex lg:flex-col"
         style={{
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-          animation: 'fadeIn 0.6s ease-out',
+          width: '50%',
+          padding: '2.5rem',
+          position: 'relative',
+          overflow: 'hidden',
+          justifyContent: 'flex-end',
+          borderTopRightRadius: '32px',
+          borderBottomRightRadius: '32px',
         }}
       >
+        {/* Background image */}
         <div
           style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-            textAlign: 'center',
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'url(/image1.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+
+        {/* Dark blue gradient overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
+          }}
+        />
+
+        {/* Content */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            marginBottom: '8%',
+            color: 'white',
+            paddingRight: '2rem',
           }}
         >
           <h1
             style={{
               fontSize: '3rem',
-              fontWeight: 700,
-              color: 'var(--black)',
-              margin: '0 0 1rem 0',
-              animation: 'slideDown 0.6s ease-out',
+              marginBottom: '1rem',
+              lineHeight: 1.15,
+              fontWeight: 800,
             }}
           >
-            Building Africa's Next Generation of Project Leaders
+            Master <br />
+            Project Management, <br />
+            Boost Your Career
           </h1>
 
           <p
             style={{
-              fontSize: '1.1rem',
-              color: '#4a4a4a',
-              maxWidth: '700px',
-              margin: '0 auto 2rem auto',
-              lineHeight: 1.8,
-              animation: 'slideDown 0.6s ease-out 0.1s both',
+              fontSize: '1.5rem',
+              opacity: 0.82,
+              marginBottom: '2rem',
+              lineHeight: 1.55,
             }}
           >
-            We train, consult, and manage projects that drive real impact. From skill development to project delivery, TGPL equips individuals and organizations to execute with excellence, strategy, and resilience.
+            Learn the skills to plan, execute, and deliver
+            <br /> successful projects.
           </p>
 
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center',
-              animation: 'slideDown 0.6s ease-out 0.2s both',
-            }}
-          >
-            <Button variant="primary" size="medium">
-              Get Started
-            </Button>
-            <Button variant="outline" size="medium">
-              Learn More
-            </Button>
-          </div>
-        </div>
-
-        {/* Hero Image Placeholder */}
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '2rem auto 0 auto',
-            padding: '0 2rem',
-            height: '300px',
-            backgroundColor: '#90caf9',
-            borderRadius: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            animation: 'slideUp 0.7s ease-out 0.3s both',
-          }}
-        >
-          <img
-            src="/image3.png"
-            alt="TGPL Team"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: '16px',
-            }}
-          />
-        </div>
-
-        {/* Stats */}
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '3rem auto 0 auto',
-            padding: '0 2rem',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '2rem',
-            textAlign: 'center',
-          }}
-        >
-          {stats.map((stat, index) => (
-            <div
-              key={index}
+          {/* Carousel dots */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
               style={{
-                animation: `slideUp 0.6s ease-out ${0.4 + index * 0.1}s both`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '2rem',
-                  fontWeight: 700,
-                  color: 'var(--primary-500)',
-                }}
-              >
-                {stat.number}
-              </div>
-              <div style={{ fontSize: '0.95rem', color: '#4a4a4a' }}>
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section
-        ref={aboutRef}
-        style={{
-          backgroundColor: 'var(--white)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-          }}
-        >
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <p
-              style={{
-                color: 'var(--primary-500)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginBottom: '1rem',
-              }}
-            >
-              About Us
-            </p>
-            <h2
-              style={{
-                fontSize: '2.5rem',
-                fontWeight: 700,
-                color: 'var(--black)',
-                margin: 0,
-              }}
-            >
-              Who We Are
-            </h2>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '3rem',
-              alignItems: 'center',
-            }}
-            className="grid-cols-1 md:grid-cols-2"
-          >
-            <p
-              style={{
-                fontSize: '1rem',
-                lineHeight: 1.8,
-                color: '#4a4a4a',
-              }}
-            >
-              The Global Project Leaders (TGPL) is a project management agency, training organization, consultancy, and community founded in August 2024. TGPL was created to close the project management gap in Africa by empowering organizations, young professionals, and women with the skills and structure required to deliver successful and sustainable projects.
-            </p>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '1.5rem',
-              }}
-            >
-              <Card variant="default">
-                <CardBody style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <Target size={24} color="var(--primary-500)" />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
-                    Our Mission
-                  </h3>
-                  <p style={{ fontSize: '0.9rem', color: '#4a4a4a', margin: 0 }}>
-                    Close the project management gap in Africa.
-                  </p>
-                </CardBody>
-              </Card>
-
-              <Card variant="default">
-                <CardBody style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <Telescope size={24} color="var(--primary-500)" />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
-                    Our Vision
-                  </h3>
-                  <p style={{ fontSize: '0.9rem', color: '#4a4a4a', margin: 0 }}>
-                    Lead project management excellence in Africa.
-                  </p>
-                </CardBody>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Services Section */}
-      <section
-        ref={servicesRef}
-        style={{
-          backgroundColor: 'var(--white)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-          }}
-        >
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <p
-              style={{
-                color: 'var(--primary-500)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginBottom: '1rem',
-              }}
-            >
-              Our Services
-            </p>
-            <h2
-              style={{
-                fontSize: '2.5rem',
-                fontWeight: 700,
-                color: 'var(--black)',
-                margin: 0,
-              }}
-            >
-              Comprehensive Project Management Solutions
-            </h2>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '2rem',
-            }}
-          >
-            {services.map((service, index) => {
-              const IconComponent = service.icon
-              return (
-                <Card key={index} variant="default">
-                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        backgroundColor: '#e3f2fd',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <IconComponent size={24} color="var(--primary-500)" />
-                    </div>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
-                      {service.title}
-                    </h3>
-                    <p style={{ fontSize: '0.9rem', color: '#4a4a4a', margin: 0 }}>
-                      {service.description}
-                    </p>
-                  </CardBody>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Impact Section */}
-      <section
-        ref={impactRef}
-        style={{
-          backgroundColor: '#2c3e50',
-          color: 'var(--white)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-            textAlign: 'center',
-          }}
-        >
-          <p
-            style={{
-              color: 'var(--primary-500)',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              marginBottom: '1rem',
-            }}
-          >
-            Our Impact
-          </p>
-          <h2
-            style={{
-              fontSize: '2.5rem',
-              fontWeight: 700,
-              margin: '0 0 3rem 0',
-            }}
-          >
-            Transforming Project Management Across Africa
-          </h2>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '2rem',
-            }}
-          >
-            {impactStats.map((stat, index) => (
-              <div key={index}>
-                <div
-                  style={{
-                    fontSize: '2.5rem',
-                    fontWeight: 700,
-                    color: 'var(--primary-500)',
-                  }}
-                >
-                  {stat.number}
-                </div>
-                <div style={{ fontSize: '0.95rem', color: '#b0c4de' }}>
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              marginTop: '2rem',
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center',
-            }}
-          >
-            <Button variant="primary" size="medium">
-              Download our case
-            </Button>
-            <Button variant="outline" size="medium">
-              Learn more
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Founder Section */}
-      <section
-        ref={founderRef}
-        style={{
-          backgroundColor: 'var(--white)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '3rem',
-            alignItems: 'center',
-          }}
-          className="grid-cols-1 md:grid-cols-2"
-        >
-          <div style={{ position: 'relative', height: '300px' }}>
-            <div
-              style={{
-                position: 'absolute',
-                width: '250px',
-                height: '250px',
-                backgroundColor: '#2c3e50',
-                borderRadius: '16px',
-                zIndex: 1,
+                width: 36,
+                height: 8,
+                borderRadius: 4,
+                background: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
               }}
             />
-            <div
+            <button
               style={{
-                position: 'relative',
-                zIndex: 2,
-                width: '250px',
-                height: '250px',
+                width: 10,
+                height: 10,
                 borderRadius: '50%',
-                border: '10px solid var(--primary-500)',
-                overflow: 'hidden',
-                backgroundColor: '#e0e0e0',
-                left: '30px',
+                border: '2px solid rgba(255,255,255,0.6)',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            />
+            <button
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,0.6)',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2.5rem 1.5rem',
+          background: 'var(--grey)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Logo */}
+        <div style={{ marginBottom: '1.75rem' }}>
+          <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
+        </div>
+
+        {/* Error Alert - outside the card */}
+        {error && (
+          <div style={{ width: '100%', maxWidth: '440px', marginBottom: '1rem' }}>
+            <Alert type="error" title="Login failed">{error}</Alert>
+          </div>
+        )}
+
+        {/* White card */}
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '440px',
+            background: 'var(--white)',
+            border: '1px solid #E8E8E8',
+            borderRadius: 'var(--radius-lg)',
+            padding: '2rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          {/* Title */}
+          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+            <h2
+              style={{
+                color: 'var(--black)',
+                fontSize: '1.75rem',
+                lineHeight: 1.1,
+                marginBottom: '0.75rem',
+                fontWeight: 700,
+              }}
+            >
+              Welcome back
+            </h2>
+            <p
+              style={{
+                color: 'var(--black)',
+                opacity: 0.85,
+                fontSize: '1rem',
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Log in to continue learning.
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
+            <Input
+              label="Email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              value={formData.email}
+              onChange={handleInputChange}
+              error={formErrors.email}
+            />
+
+            {/* Password with Forgot Password Link */}
+            <div style={{ marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--black)' }}>
+                  Password
+                </label>
+                <Link
+                  to={ROUTES.FORGOT_PASSWORD}
+                  style={{ fontSize: '0.875rem', color: 'var(--primary-500)', textDecoration: 'none', fontWeight: 500 }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div style={{ position: 'relative', marginTop: '0.75rem' }}>
+                <Input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  error={formErrors.password}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#999999',
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={!isFormFilled || isLoading}
+              style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-              }}
-            >
-              <img
-                src="/ceo.png"
-                alt="Enobong Okposin"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  borderRadius: '50%',
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <p
-              style={{
-                color: 'var(--primary-500)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginBottom: '0.5rem',
-              }}
-            >
-              Leadership
-            </p>
-            <h2
-              style={{
-                fontSize: '1.8rem',
-                fontWeight: 700,
-                color: 'var(--black)',
-                margin: '0 0 0.5rem 0',
-              }}
-            >
-              Enobong Okposin
-            </h2>
-            <p
-              style={{
+                gap: '0.5rem',
+                width: '100%',
+                padding: '0.8125rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '1.55rem',
+                border: 'none',
+                fontFamily: 'inherit',
                 fontSize: '1rem',
-                color: 'var(--primary-500)',
                 fontWeight: 600,
-                marginBottom: '1rem',
+                cursor: isFormFilled && !isLoading ? 'pointer' : 'not-allowed',
+                transition: 'var(--transition)',
+                background: isFormFilled ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
+                color: 'var(--white)',
+                letterSpacing: '0.01em',
               }}
             >
-              Founder & Chief Executive Officer
-            </p>
-            <p
-              style={{
-                fontSize: '0.95rem',
-                lineHeight: 1.8,
-                color: '#4a4a4a',
-                marginBottom: '1.5rem',
-              }}
-            >
-              Enobong is a senior project manager passionate about building systems, people, and results. Under her leadership, TGPL has grown into a platform empowering professionals.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Get Started Paths Section */}
-      <section
-        ref={getStartedRef}
-        style={{
-          backgroundColor: '#f9f9f9',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-          }}
-        >
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <p
-              style={{
-                color: 'var(--primary-500)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginBottom: '1rem',
-              }}
-            >
-              Get Started
-            </p>
-            <h2
-              style={{
-                fontSize: '2.5rem',
-                fontWeight: 700,
-                color: 'var(--black)',
-                margin: 0,
-              }}
-            >
-              Choose Your Path
-            </h2>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '2rem',
-            }}
-          >
-            {paths.map((path, index) => {
-              const IconComponent = path.icon
-              return (
-                <div
-                  key={index}
+              {isLoading ? (
+                <span
                   style={{
-                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: '0.5rem',
                   }}
                 >
-                  {path.featured && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '-16px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 10,
-                      }}
-                    >
-                      <span
-                        style={{
-                          backgroundColor: 'var(--primary-500)',
-                          color: 'var(--white)',
-                          padding: '0.375rem 1rem',
-                          borderRadius: '20px',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        Most Popular
-                      </span>
-                    </div>
-                  )}
+                  <Spinner />
+                  <span>Logging in...</span>
+                </span>
+              ) : (
+                'Log in'
+              )}
+            </Button>
+          </form>
 
-                  <Card
-                    variant="default"
-                    style={{
-                      backgroundColor: path.featured ? '#2c3e50' : 'var(--white)',
-                      border: path.featured ? '2px solid var(--primary-500)' : '1px solid #f0f0f0',
-                    }}
-                  >
-                    <CardBody
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1.5rem',
-                        padding: '2rem',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '48px',
-                          height: '48px',
-                          backgroundColor: path.featured ? 'rgba(0, 102, 204, 0.2)' : '#e3f2fd',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <IconComponent size={24} color="var(--primary-500)" />
-                      </div>
-
-                      <h3
-                        style={{
-                          fontSize: '1.25rem',
-                          fontWeight: 600,
-                          color: path.featured ? 'var(--white)' : 'var(--black)',
-                          margin: 0,
-                        }}
-                      >
-                        {path.title}
-                      </h3>
-
-                      <p
-                        style={{
-                          fontSize: '0.95rem',
-                          lineHeight: 1.7,
-                          color: path.featured ? '#b0c4de' : '#4a4a4a',
-                          margin: 0,
-                          flex: 1,
-                        }}
-                      >
-                        {path.description}
-                      </p>
-
-                      <Button variant="primary" size="medium" style={{ width: '100%' }}>
-                        {path.buttonText}
-                      </Button>
-                    </CardBody>
-                  </Card>
-                </div>
-              )
-            })}
+          {/* Signup Link */}
+          <div className="text-center" style={{ marginTop: '2.5rem' }}>
+            <p style={{ color: 'var(--black)', margin: 0 }}>
+              New here?{' '}
+              <Link
+                to={ROUTES.SIGNUP}
+                className="text-primary-500 hover:text-primary-700 font-medium transition-colors"
+              >
+                Create an account
+              </Link>
+            </p>
           </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section
-        style={{
-          backgroundColor: 'var(--primary-500)',
-          color: 'var(--white)',
-          paddingTop: '3rem',
-          paddingBottom: '3rem',
-          textAlign: 'center',
-        }}
-      >
-        <div
+        {/* Trust badge */}
+        <p
           style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
+            fontSize: '0.875rem',
+            color: '#999999',
+            marginTop: '1.25rem',
+            marginBottom: 0,
+            textAlign: 'center',
           }}
         >
-          <h2
-            style={{
-              fontSize: '2rem',
-              fontWeight: 700,
-              margin: '0 0 1rem 0',
-            }}
-          >
-            Ready to Transform Your Career?
-          </h2>
-          <p
-            style={{
-              fontSize: '1rem',
-             
-              maxWidth: '600px',
-              margin: '0 auto 2rem auto',
-            }}
-          >
-            Join thousands of professionals building the future of project management in Africa.
-          </p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            <Button variant="secondary" size="medium">
-              Get Started Now
-            </Button>
-            <Button variant="outline" size="medium">
-              Request Consultation
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section
-        ref={contactRef}
-        style={{
-          backgroundColor: 'var(--white)',
-          paddingTop: '4rem',
-          paddingBottom: '4rem',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            padding: '0 2rem',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '3rem',
-          }}
-          className="grid-cols-1 md:grid-cols-2"
-        >
-          <div>
-            <p
-              style={{
-                color: 'var(--primary-500)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginBottom: '1rem',
-              }}
-            >
-              Contact
-            </p>
-            <h2
-              style={{
-                fontSize: '2rem',
-                fontWeight: 700,
-                color: 'var(--black)',
-                margin: '0 0 1.5rem 0',
-              }}
-            >
-              Get in Touch
-            </h2>
-            <p
-              style={{
-                fontSize: '0.95rem',
-                color: '#4a4a4a',
-                marginBottom: '2rem',
-              }}
-            >
-              Have questions? We'd love to hear from you.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#999', margin: '0 0 0.25rem 0' }}>
-                  EMAIL
-                </p>
-                <a href="mailto:theglobalprojectleaders@gmail.com" style={{ color: 'var(--black)', textDecoration: 'none' }}>
-                  theglobalprojectleaders@gmail.com
-                </a>
-              </div>
-              <div>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#999', margin: '0 0 0.25rem 0' }}>
-                  PHONE
-                </p>
-                <a href="tel:+2348088044739" style={{ color: 'var(--black)', textDecoration: 'none' }}>
-                  +234 808 804 4739
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <p
-              style={{
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                color: 'var(--black)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              Send us a message
-            </p>
-            <form style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <input
-                type="text"
-                placeholder="Your name"
-                style={{
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <input
-                type="email"
-                placeholder="your@email.com"
-                style={{
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <textarea
-                placeholder="Your message"
-                rows={4}
-                style={{
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  fontFamily: 'inherit',
-                }}
-              />
-              <Button variant="primary" size="medium" style={{ width: '100%' }}>
-                Send Message
-              </Button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
-    </>
+          Trusted by 50,000+ learners across emerging markets
+        </p>
+      </div>
+    </div>
   )
 }
-
-export default LandingPage
