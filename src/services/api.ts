@@ -1,19 +1,36 @@
+/**
+ * services/api.ts — Axios client + all auth API calls
+ *
+ * FLOW:
+ * - ApiClient wraps axios with two interceptors:
+ *     Request:  attaches Bearer token from Zustand store to every request
+ *     Response: on 401, attempts silent token refresh (except on auth endpoints
+ *               which are in SKIP_REFRESH_ROUTES — those let the caller handle it)
+ * - Zustand store is the single source of truth for tokens.
+ *   This file never touches localStorage directly — it calls store.setToken()
+ *   and store.setRefreshToken() which handle localStorage internally.
+ * - authAPI methods map camelCase JS payloads → snake_case for the Django API,
+ *   and parse error responses into a consistent { success, error, statusCode, code } shape.
+ */
+
 import axios from 'axios'
 import type { AxiosInstance, AxiosError } from 'axios'
-import { API_BASE_URL } from '../constants/api'
+import { API_BASE_URL, API_ENDPOINTS } from '../constants/api'
 import { useAuthStore } from '../store/auth'
 
-/**
- * API Response Types
- */
+// ─── Response Types ───────────────────────────────────────────────────────────
+
 export interface ApiErrorResponse {
   detail?: string
+  code?: string
   [key: string]: unknown
 }
 
 export interface UserResponse {
   id: string
   email: string
+  first_name: string
+  last_name: string
   role: 'learner' | 'trainer' | 'admin'
   is_active: boolean
   is_email_verified: boolean
@@ -25,6 +42,9 @@ export interface TokenResponse {
   refresh: string
 }
 
+// ─── Payload Types ────────────────────────────────────────────────────────────
+
+// Internal camelCase shape — mapped to snake_case inside authAPI.signup
 export interface SignupPayload {
   email: string
   password: string
@@ -46,13 +66,27 @@ export interface PasswordResetConfirmPayload {
   new_password: string
 }
 
-export interface RefreshTokenPayload {
-  refresh: string
+export interface EmailVerificationPayload {
+  token: string
 }
 
-/**
- * API Client with Token Management
- */
+export interface EmailVerificationSendPayload {
+  email: string
+}
+
+// ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
+// On these endpoints, a 401/403 is a legitimate auth failure the caller handles.
+const SKIP_REFRESH_ROUTES = [
+  API_ENDPOINTS.LOGIN,
+  API_ENDPOINTS.SIGNUP,
+  API_ENDPOINTS.EMAIL_VERIFICATION_SEND,
+  API_ENDPOINTS.EMAIL_VERIFICATION_CONFIRM,
+  API_ENDPOINTS.PASSWORD_RESET,
+  API_ENDPOINTS.PASSWORD_RESET_CONFIRM,
+]
+
+// ─── API Client ───────────────────────────────────────────────────────────────
+
 class ApiClient {
   private axiosInstance: AxiosInstance
   private refreshTokenPromise: Promise<string> | null = null
@@ -60,35 +94,39 @@ class ApiClient {
   constructor() {
     this.axiosInstance = axios.create({
       baseURL: API_BASE_URL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     })
 
-    // Request interceptor: Add token to headers
+    // Request interceptor — attach token from Zustand (single source of truth)
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        // Get token from localStorage (more reliable than store)
-        const token = localStorage.getItem('token') || useAuthStore.getState().token
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
+        const token = useAuthStore.getState().token
+        if (token) config.headers.Authorization = `Bearer ${token}`
         return config
       },
       (error) => Promise.reject(error),
     )
 
-    // Response interceptor: Handle token expiry and refresh
+    // Response interceptor — handle 401 (expired token) and 403 (forbidden)
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error: AxiosError<ApiErrorResponse>) => {
-        // Handle 401 - Token expired, try to refresh
-        if (error.response?.status === 401) {
+        const url = error.config?.url || ''
+        const status = error.response?.status
+
+        if (status === 401) {
+          // Skip refresh on auth endpoints — let the caller handle the 401
+          if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
+            return Promise.reject(error)
+          }
           return this.handleTokenExpiry(error)
         }
 
-        // Handle 403 - Forbidden (user role doesn't have access)
-        if (error.response?.status === 403) {
+        if (status === 403) {
+          // Also skip on auth endpoints (e.g. email_not_verified returns 403)
+          if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
+            return Promise.reject(error)
+          }
           console.error('Access forbidden - insufficient permissions')
           window.location.href = '/unauthorized'
         }
@@ -98,19 +136,12 @@ class ApiClient {
     )
   }
 
-  /**
-   * Handle token expiry by refreshing
-   */
   private async handleTokenExpiry(error: AxiosError) {
     const config = error.config
 
-    // Prevent multiple refresh attempts
     if (!this.refreshTokenPromise) {
       this.refreshTokenPromise = this.refreshAccessToken()
-        .then((newToken) => {
-          this.refreshTokenPromise = null
-          return newToken
-        })
+        .then((newToken) => { this.refreshTokenPromise = null; return newToken })
         .catch(() => {
           this.refreshTokenPromise = null
           useAuthStore.getState().logout()
@@ -133,231 +164,224 @@ class ApiClient {
     return Promise.reject(error)
   }
 
-  /**
-   * Refresh access token using refresh token
-   */
   private async refreshAccessToken(): Promise<string> {
     const state = useAuthStore.getState()
-    const refreshToken = localStorage.getItem('refreshToken')
-
-    if (!refreshToken) {
-      throw new Error('No refresh token available')
-    }
+    const refreshToken = state.refreshToken
+    if (!refreshToken) throw new Error('No refresh token available')
 
     try {
       const response = await this.axiosInstance.post<TokenResponse>(
-        '/v1/auth/token/refresh/',
+        API_ENDPOINTS.REFRESH_TOKEN,
         { refresh: refreshToken },
       )
-
       const { access, refresh } = response.data
       state.setToken(access)
-      localStorage.setItem('refreshToken', refresh)
-
+      state.setRefreshToken(refresh)
       return access
     } catch (error) {
-      localStorage.removeItem('refreshToken')
+      state.setRefreshToken(null)
       throw error
     }
   }
 
-  /**
-   * Generic request methods
-   */
-  public async get<T>(url: string) {
-    return this.axiosInstance.get<T>(url)
-  }
-
-  public async post<T>(url: string, data?: unknown) {
-    return this.axiosInstance.post<T>(url, data)
-  }
-
-  public async put<T>(url: string, data?: unknown) {
-    return this.axiosInstance.put<T>(url, data)
-  }
-
-  public async patch<T>(url: string, data?: unknown) {
-    return this.axiosInstance.patch<T>(url, data)
-  }
-
-  public async delete<T>(url: string) {
-    return this.axiosInstance.delete<T>(url)
-  }
+  public async get<T>(url: string) { return this.axiosInstance.get<T>(url) }
+  public async post<T>(url: string, data?: unknown) { return this.axiosInstance.post<T>(url, data) }
+  public async put<T>(url: string, data?: unknown) { return this.axiosInstance.put<T>(url, data) }
+  public async patch<T>(url: string, data?: unknown) { return this.axiosInstance.patch<T>(url, data) }
+  public async delete<T>(url: string) { return this.axiosInstance.delete<T>(url) }
 }
 
 export const apiClient = new ApiClient()
 
-/**
- * AUTH API ENDPOINTS
- */
+// ─── Error parser helper ──────────────────────────────────────────────────────
+
+function parseApiError(error: unknown, fallback: string): { message: string; statusCode?: number; code?: string } {
+  const err = error as AxiosError<ApiErrorResponse>
+  const data = err.response?.data
+  const statusCode = err.response?.status
+  const code = data?.code
+
+  let message = fallback
+  if (data) {
+    if (data.detail && typeof data.detail === 'string') {
+      message = data.detail
+    } else {
+      const firstKey = Object.keys(data).find((k) => k !== 'code')
+      if (firstKey) {
+        const val = data[firstKey]
+        if (Array.isArray(val)) message = val[0]
+        else if (typeof val === 'string') message = val
+      }
+    }
+  }
+
+  return { message, statusCode, code }
+}
+
+// ─── Auth API ─────────────────────────────────────────────────────────────────
+
 export const authAPI = {
   /**
-   * Sign up a new learner account
+   * POST /api/v1/auth/signup/
+   * Maps camelCase payload → snake_case for Django.
+   * Returns { success: true } on 201 — no tokens yet (email must be verified first).
    */
   signup: async (payload: SignupPayload) => {
     try {
-      const response = await apiClient.post<UserResponse>(
-        '/v1/auth/signup/',
-        payload,
-      )
+      const response = await apiClient.post<UserResponse>(API_ENDPOINTS.SIGNUP, {
+        email: payload.email,
+        password: payload.password,
+        first_name: payload.firstName,
+        last_name: payload.lastName,
+      })
       return { success: true, data: response.data }
     } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-
-      const data = err.response?.data
-
-      let message = 'Signup failed'
-
-      if (data) {
-        // Handle Django-style field errors
-        const firstKey = Object.keys(data)[0]
-        const firstError = data[firstKey]
-
-        if (Array.isArray(firstError)) {
-          message = firstError[0]
-        } else if (typeof firstError === 'string') {
-          message = firstError
-        } else if (data.detail) {
-          message = data.detail
-        }
-      }
-
-      return {
-        success: false,
-        error: message,
-      }
-    }
-  },
-
-  /**
-   * Log in with email and password
-   */
-  login: async (payload: LoginPayload) => {
-    try {
-      const response = await apiClient.post<TokenResponse & { user: any }>(
-        '/v1/auth/login/',
-        payload,
-      )
-
-      const { access, refresh, user } = response.data
-
-      localStorage.setItem('refreshToken', refresh)
-
-      return {
-        success: true,
-        access,
-        refresh,
-        user,
-      }
-    } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-
-      const message = err.response?.data?.detail || 'Invalid credentials'
-
-      return {
-        success: false,
-        error: message,
-      }
-    }
-  },
-
-  /**
-   * Get current authenticated user
-   */
-  getCurrentUser: async () => {
-    try {
-      const response = await apiClient.get<UserResponse>('/v1/auth/me/')
-      return { success: true, data: response.data }
-    } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-      return {
-        success: false,
-        error: err.response?.data?.detail || 'Failed to get user',
-      }
-    }
-  },
-
-  /**
-   * Log out (blacklist refresh token)
-   */
-  logout: async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken')
-      if (refreshToken) {
-        await apiClient.post('/v1/auth/logout/', { refresh: refreshToken })
-      }
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      return { success: true }
-    } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-      const message = err.response?.data?.detail || 'Logout failed'
+      const { message } = parseApiError(error, 'Signup failed')
       return { success: false, error: message }
     }
   },
 
   /**
-   * Request password reset email
+   * POST /api/v1/auth/email-verification/send/
+   * Sends or resends the verification email.
+   * Used on both the signup confirmation screen and the login page (unverified user).
+   */
+  sendVerificationEmail: async (payload: EmailVerificationSendPayload) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.EMAIL_VERIFICATION_SEND, payload)
+      return { success: true }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to send verification email')
+      return { success: false, error: message }
+    }
+  },
+
+  /**
+   * POST /api/v1/auth/email-verification/confirm/
+   * Called from the email verification page with the token from the link.
+   * On success: API issues JWT tokens — stored in Zustand via store.setToken/setRefreshToken.
+   */
+  verifyEmail: async (payload: EmailVerificationPayload) => {
+    try {
+      const response = await apiClient.post<TokenResponse>(
+        API_ENDPOINTS.EMAIL_VERIFICATION_CONFIRM,
+        payload,
+      )
+      const { access, refresh } = response.data
+      useAuthStore.getState().setToken(access)
+      useAuthStore.getState().setRefreshToken(refresh)
+      return { success: true, access, refresh }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Verification failed. Link may be expired or already used.')
+      return { success: false, error: message }
+    }
+  },
+
+  /**
+   * POST /api/v1/auth/login/
+   * On success: stores tokens in Zustand (store handles localStorage).
+   * Returns statusCode + code so useAuth can detect email_not_verified (403).
+   */
+  login: async (payload: LoginPayload) => {
+    try {
+      const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
+        API_ENDPOINTS.LOGIN,
+        payload,
+      )
+      const { access, refresh, user } = response.data
+      useAuthStore.getState().setToken(access)
+      useAuthStore.getState().setRefreshToken(refresh)
+      return { success: true, access, refresh, user }
+    } catch (error) {
+      const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
+      return { success: false, error: message, statusCode, code }
+    }
+  },
+
+  /**
+   * GET /api/v1/auth/me/
+   * Fetches the currently authenticated user's full profile.
+   * Called after login and on app boot (loadCurrentUser).
+   */
+  getCurrentUser: async () => {
+    try {
+      const response = await apiClient.get<UserResponse>(API_ENDPOINTS.ME)
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to get user')
+      return { success: false, error: message }
+    }
+  },
+
+  /**
+   * POST /api/v1/auth/logout/
+   * Blacklists the refresh token server-side.
+   * Always clears Zustand store (and therefore localStorage) even if API fails.
+   */
+  logout: async () => {
+    try {
+      const refreshToken = useAuthStore.getState().refreshToken
+      if (refreshToken) {
+        await apiClient.post(API_ENDPOINTS.LOGOUT, { refresh: refreshToken })
+      }
+      useAuthStore.getState().logout()
+      return { success: true }
+    } catch (error) {
+      useAuthStore.getState().logout()
+      const { message } = parseApiError(error, 'Logout failed')
+      return { success: false, error: message }
+    }
+  },
+
+  /**
+   * POST /api/v1/auth/password-reset/
+   * Always returns 200 regardless of whether the email exists (anti-enumeration).
    */
   requestPasswordReset: async (payload: PasswordResetPayload) => {
     try {
-      await apiClient.post('/v1/auth/password-reset/', payload)
+      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
       return { success: true }
     } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-      return {
-        success: false,
-        error: err.response?.data?.detail || 'Password reset request failed',
-      }
+      const { message } = parseApiError(error, 'Password reset request failed')
+      return { success: false, error: message }
     }
   },
 
   /**
-   * Confirm password reset with token
+   * POST /api/v1/auth/password-reset/confirm/
+   * Called from the reset password page with token (from link) + new_password.
    */
   confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
     try {
-      await apiClient.post('/v1/auth/password-reset/confirm/', payload)
+      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
       return { success: true }
     } catch (error) {
-      const err = error as AxiosError<ApiErrorResponse>
-      return {
-        success: false,
-        error: err.response?.data?.detail || 'Password reset confirmation failed',
-      }
+      const { message } = parseApiError(error, 'Password reset failed')
+      return { success: false, error: message }
     }
   },
 
-  /**
-   * Test endpoints (for development/debugging)
-   */
-  testLearnerOnly: async () => {
-    try {
-      const response = await apiClient.get('/v1/auth/_test/learner-only/')
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: 'Learner test failed' }
-    }
-  },
-
-  testTrainerOnly: async () => {
-    try {
-      const response = await apiClient.get('/v1/auth/_test/trainer-only/')
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: 'Trainer test failed' }
-    }
-  },
-
-  testAdminOnly: async () => {
-    try {
-      const response = await apiClient.get('/v1/auth/_test/admin-only/')
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: 'Admin test failed' }
-    }
-  },
+  // Dev-only test endpoints
+  ...(import.meta.env.DEV && {
+    testLearnerOnly: async () => {
+      try {
+        const response = await apiClient.get('/v1/auth/_test/learner-only/')
+        return { success: true, data: response.data }
+      } catch { return { success: false, error: 'Learner test failed' } }
+    },
+    testTrainerOnly: async () => {
+      try {
+        const response = await apiClient.get('/v1/auth/_test/trainer-only/')
+        return { success: true, data: response.data }
+      } catch { return { success: false, error: 'Trainer test failed' } }
+    },
+    testAdminOnly: async () => {
+      try {
+        const response = await apiClient.get('/v1/auth/_test/admin-only/')
+        return { success: true, data: response.data }
+      } catch { return { success: false, error: 'Admin test failed' } }
+    },
+  }),
 }
 
 export default apiClient

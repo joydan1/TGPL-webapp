@@ -14,33 +14,25 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
       bgColor: '#EFF6FF',
       borderColor: '#93C5FD',
       textColor: '#1E40AF',
-      icon: <Info size={16} strokeWidth={2.5} />,
-      iconBgColor: '#DBEAFE',
-      iconBorderColor: '#3B82F6',
+      icon: <Info size={18} strokeWidth={2.5} />,
     },
     success: {
       bgColor: '#F0FDF4',
       borderColor: '#86EFAC',
       textColor: '#166534',
-      icon: <CheckCircle size={16} strokeWidth={2.5} />,
-      iconBgColor: '#DCFCE7',
-      iconBorderColor: '#22C55E',
+      icon: <CheckCircle size={18} strokeWidth={2.5} />,
     },
     warning: {
       bgColor: '#FFFBEB',
       borderColor: '#FCD34D',
       textColor: '#92400E',
-      icon: <AlertCircle size={16} strokeWidth={2.5} />,
-      iconBgColor: '#FEF3C7',
-      iconBorderColor: '#F59E0B',
+      icon: <AlertCircle size={18} strokeWidth={2.5} />,
     },
     error: {
       bgColor: '#FEF2F2',
       borderColor: '#FCA5A5',
       textColor: '#991B1B',
-      icon: <XCircle size={16} strokeWidth={2.5} />,
-      iconBgColor: '#FECACA',
-      iconBorderColor: '#DC2626',
+      icon: <XCircle size={18} strokeWidth={2.5} />,
     },
   }
 
@@ -48,25 +40,23 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
 
   return (
     <div
-      className={`rounded-xl p-4 mb-4 ${className}`}
+      className={className}
       style={{
         backgroundColor: colors.bgColor,
         border: `1px solid ${colors.borderColor}`,
+        borderRadius: '12px',
+        padding: '1rem',
+        marginBottom: '1rem',
       }}
     >
-      <div className="flex gap-3 items-flex-start">
-        {/* Circular Icon Badge */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        {/* Icon — no badge, just the icon itself */}
         <div
-          className="shrink-0 flex items-center justify-center"
           style={{
-            width: '28px',
-            height: '28px',
-            minWidth: '28px',
-            borderRadius: '50%',
-            backgroundColor: colors.iconBgColor,
-            border: `2px solid ${colors.iconBorderColor}`,
+            flexShrink: 0,
             color: colors.textColor,
-            marginTop: '2px',
+            marginTop: '1px',
+            display: 'flex',
           }}
         >
           {React.cloneElement(colors.icon as React.ReactElement, {
@@ -74,22 +64,31 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
           })}
         </div>
 
-        {/* Text Content */}
-        <div className="flex-1">
+        {/* Text content */}
+        <div style={{ flex: 1 }}>
           {title && (
             <h4
-              className="font-bold text-sm mb-1"
-              style={{ color: colors.textColor }}
+              style={{
+                color: colors.textColor,
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                margin: '0 0 0.25rem 0',
+                lineHeight: 1.4,
+              }}
             >
               {title}
             </h4>
           )}
-          <p
-            className="text-sm leading-relaxed"
-            style={{ color: colors.textColor, margin: 0 }}
+          <div
+            style={{
+              color: colors.textColor,
+              fontSize: '0.875rem',
+              lineHeight: 1.6,
+              margin: 0,
+            }}
           >
             {children}
-          </p>
+          </div>
         </div>
       </div>
     </div>

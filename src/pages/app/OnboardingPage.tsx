@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { RouteBuilder } from '../../constants/routes'
 import {
   Target, TrendingUp, Briefcase, GraduationCap, Compass,
-  CheckSquare, Wrench, MessageCircle, ChevronDown
+  CheckSquare, ChevronDown
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -304,34 +304,28 @@ export default function OnboardingPage() {
   ]
 
   const interests = [
-    { id: 'pm-all', label: 'Project Management\n(All inclusive)', icon: <CheckSquare size={20} /> },
-    { id: 'pm-only', label: 'Project Management only', icon: <Wrench size={20} /> },
-    { id: 'tools', label: 'Tools (Jira/MS Project)', icon: <Wrench size={20} /> },
-    { id: 'soft-skills', label: 'Soft Skills', icon: <MessageCircle size={20} /> },
+    { id: 'pm-all', label: 'Project Management\n(for Beginners)', icon: <CheckSquare size={20} /> },
+    { id: 'pm-only', label: 'Project Management\n(Intermediate)', icon: <CheckSquare size={20} /> },
+    { id: 'tools', label: 'Project Management\n(Advance Level)', icon: <CheckSquare size={20} /> },
+    { id: 'soft-skills', label: 'Project Management\n(Expert Level)', icon: <CheckSquare size={20} /> },
   ]
 
-  const experienceOptions = [
-    { value: '', label: '(Select level)' },
-    { value: 'beginner', label: 'Beginner- No prior experience' },
-    { value: 'basic', label: 'Basic - Some exposure/training' },
-    { value: 'intermediate', label: 'Intermediate - 1-3 years of experience' },
-  ]
 
   const statusOptions = [
     { value: '', label: '(Select status)' },
     { value: 'student', label: 'Student' },
     { value: 'working', label: 'Working' },
+    { value: 'job-seeking', label: 'Between roles/Job searching' },
     { value: 'freelance', label: 'Freelancer' },
-    { value: 'job-seeking', label: 'Job Seeking' },
     { value: 'career break', label: 'Career break' },
   ]
 
   const hoursOptions = [
     { value: '', label: '(Select hours)' },
-    { value: '1-3', label: '1–3 hours' },
-    { value: '4-6', label: '4–6 hours' },
-    { value: '7-10', label: '7–10 hours' },
-    { value: '10+', label: '10+ hours' },
+    { value: '1-3', label: '1–3 hours weekly' },
+    { value: '4-6', label: '4–6 hours weekly' },
+    { value: '7-10', label: '7–10 hours weekly' },
+    { value: '10+', label: '10+ hours weekly' },
   ]
 
   // ── Shared layout wrapper ────────────────────────────────────────────────
@@ -422,9 +416,9 @@ export default function OnboardingPage() {
           <StepIndicator current={2} total={3} />
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
-              Which areas interest you most?
+              Which PM level applies to you the most?
             </h1>
-            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Choose topics you'd like to focus on in your learning path</p>
+            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Choose your experiene level so we meet you at your exact need</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -487,12 +481,6 @@ export default function OnboardingPage() {
             <p style={{ color: '#6B7280', fontSize: '1rem' }}>Help us tailor your learning experience to your needs</p>
           </div>
 
-          <SelectField
-            label="Project management experience level"
-            value={data.experienceLevel}
-            onChange={(v) => setData((prev) => ({ ...prev, experienceLevel: v }))}
-            options={experienceOptions}
-          />
           <SelectField
             label="Current Status"
             value={data.currentStatus}

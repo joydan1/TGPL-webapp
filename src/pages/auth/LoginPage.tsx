@@ -1,6 +1,34 @@
+/**
+ * LoginPage
+ *
+ * FLOW:
+ * 1. On mount: checks localStorage for a saved email (remember me), pre-fills it.
+ *    clearError() is called once to wipe any stale error from a previous session.
+ *
+ * 2. Form validation: isFormFilled gates the button (requires valid email format +
+ *    non-empty password). validateForm() runs on submit for field-level error messages.
+ *
+ * 3. Submit:
+ *    a. Clears errors + stale formErrors
+ *    b. Calls useAuth.login() → authAPI.login() → POST /api/v1/auth/login/
+ *    c. SUCCESS: saves email if rememberMe, checks onboardingComplete flag,
+ *       navigates to onboarding or dashboard
+ *    d. EMAIL NOT VERIFIED (403 + code='email_not_verified'): shows the
+ *       unverified banner with a resend button instead of navigating
+ *    e. OTHER ERRORS (401 wrong password, 500, etc.): useAuth sets error in store,
+ *       displayed as the red Alert above the card
+ *
+ * 4. Resend verification: calls authAPI.sendVerificationEmail() directly —
+ *    uses axios interceptors + correct base URL (not raw fetch)
+ *
+ * 5. Remember me: stores email in localStorage on successful login,
+ *    removes it if unchecked
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { authAPI } from '../../services/api'
 import { Eye, EyeOff } from 'lucide-react'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
@@ -10,13 +38,7 @@ import { ROUTES, RouteBuilder } from '../../constants/routes'
 function Spinner() {
   return (
     <svg
-      style={{
-        animation: 'spin 0.7s linear infinite',
-        width: 18,
-        height: 18,
-        flexShrink: 0,
-        display: 'block',
-      }}
+      style={{ animation: 'spin 0.7s linear infinite', width: 18, height: 18, flexShrink: 0, display: 'block' }}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -32,43 +54,53 @@ export default function LoginPage() {
   const { login, isLoading, error, clearError } = useAuth()
 
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  })
+  const [formData, setFormData] = useState({ email: '', password: '' })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [rememberMe, setRememberMe] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
-  const isFormFilled = formData.email.trim().length > 0 && formData.password.length > 0
+  // Button only enables when email is valid format + password non-empty
+  const isFormFilled =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) &&
+    formData.password.length > 0
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
-
     if (!formData.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email'
     }
-
-    if (!formData.password) {
-      errors.password = 'Password is required'
-    }
-
+    if (!formData.password) errors.password = 'Password is required'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
+  const handleResendVerificationEmail = async () => {
+    if (!unverifiedEmail) return
+    setResendLoading(true)
+    setResendMessage('')
+    const result = await authAPI.sendVerificationEmail({ email: unverifiedEmail })
+    setResendMessage(
+      result.success
+        ? 'Verification email sent! Check your inbox.'
+        : 'Failed to resend email. Please try again.',
+    )
+    setResendLoading(false)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    clearError()
+    setFormErrors({})
+    setUnverifiedEmail(null)
+    setResendMessage('')
 
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
-    const result = await login({
-      email: formData.email,
-      password: formData.password,
-    })
+    const result = await login({ email: formData.email, password: formData.password })
 
     if (result.success) {
       if (rememberMe) {
@@ -76,342 +108,340 @@ export default function LoginPage() {
       } else {
         localStorage.removeItem('rememberEmail')
       }
-       const onboardingComplete = localStorage.getItem('onboardingComplete')
-  if (!onboardingComplete) {
-    navigate(RouteBuilder.onboarding())
-  } else {
-    navigate(RouteBuilder.dashboard())
+      const onboardingComplete = localStorage.getItem('onboardingComplete')
+      navigate(onboardingComplete ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+    } else if (!result.success && result.statusCode === 403 && result.code === 'email_not_verified') {
+      setUnverifiedEmail(formData.email)
+    }
+    // All other errors already set in store by useAuth.login — shown via {error} Alert
   }
 
-  }
-  }
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: '' }))
+    // Clear unverified banner if user edits their email
+    if (name === 'email' && unverifiedEmail) {
+      setUnverifiedEmail(null)
+      setResendMessage('')
     }
   }
 
+  // Run once on mount — stable clearError() won't cause re-fire loop
   useEffect(() => {
     const rememberEmail = localStorage.getItem('rememberEmail')
     if (rememberEmail) {
-      setFormData((prev) => ({
-        ...prev,
-        email: rememberEmail,
-      }))
+      setFormData((prev) => ({ ...prev, email: rememberEmail }))
       setRememberMe(true)
     }
     clearError()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Hero Section with Gradient */}
-      <div
-        className="hidden lg:flex lg:flex-col"
-        style={{
-          width: '50%',
-          padding: '2.5rem',
-          position: 'relative',
-          overflow: 'hidden',
-          justifyContent: 'flex-end',
-          borderTopRightRadius: '32px',
-          borderBottomRightRadius: '32px',
-        }}
-      >
-        {/* Background image */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: 'url(/image1.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        />
+    <>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
 
-        {/* Dark blue gradient overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%)',
-          }}
-        />
+        .login-page {
+          min-height: 100vh;
+          display: flex;
+          background: var(--white);
+          margin: 0;
+          padding: 0;
+        }
 
-        {/* Content */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 10,
-            marginBottom: '8%',
-            color: 'white',
-            paddingRight: '2rem',
-          }}
-        >
-          <h1
-            style={{
-              fontSize: '3rem',
-              marginBottom: '1rem',
-              lineHeight: 1.15,
-              fontWeight: 800,
-            }}
-          >
-            Master <br />
-            Project Management, <br />
-            Boost Your Career
-          </h1>
+        .login-hero {
+          width: 50%;
+          background-image: url(/image1.png);
+          background-size: cover;
+          background-position: center;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
+          padding: 2.5rem;
+          border-top-right-radius: 32px;
+          border-bottom-right-radius: 32px;
+        }
 
-          <p
-            style={{
-              fontSize: '1.5rem',
-              opacity: 0.82,
-              marginBottom: '2rem',
-              lineHeight: 1.55,
-            }}
-          >
-            Learn the skills to plan, execute, and deliver
-            <br /> successful projects.
-          </p>
+        .login-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(10,42,74,0.55) 0%, rgba(14,74,138,0.75) 50%, rgba(10,42,74,0.92) 100%);
+          z-index: 1;
+        }
 
-          {/* Carousel dots */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={{
-                width: 36,
-                height: 8,
-                borderRadius: 4,
-                background: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            />
-            <button
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.6)',
-                background: 'transparent',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            />
-            <button
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.6)',
-                background: 'transparent',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            />
+        .login-hero-content {
+          position: relative;
+          z-index: 10;
+          color: #fff;
+          margin-bottom: 8%;
+          padding-right: 2rem;
+        }
+
+        .login-hero-content h1 {
+          font-size: 3rem;
+          font-weight: 800;
+          line-height: 1.15;
+          margin: 0 0 1rem 0;
+        }
+
+        .login-hero-content p {
+          font-size: 1.5rem;
+          font-weight: 400;
+          line-height: 1.55;
+          margin: 0 0 2rem 0;
+          opacity: 0.82;
+        }
+
+        .login-hero-dots { display: flex; gap: 8px; }
+        .dot-button { border: none; background: none; cursor: pointer; padding: 0; }
+        .dot-active { width: 36px; height: 8px; border-radius: 4px; background: #fff; display: block; }
+        .dot-inactive { width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.6); background: transparent; display: block; }
+
+        .login-form-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2.5rem 1.5rem;
+          background: var(--grey);
+          overflow: hidden;
+        }
+
+        .login-logo { margin-bottom: 1.75rem; text-align: center; }
+        .login-logo img { height: 2.75rem; }
+
+        .login-card {
+          width: 100%;
+          max-width: 440px;
+          background: var(--white);
+          border: 1px solid #E8E8E8;
+          border-radius: var(--radius-lg);
+          padding: 2rem;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .login-title { text-align: center; margin-bottom: 1.75rem; }
+        .login-title h2 { color: var(--black); font-size: 1.75rem; line-height: 1.1; margin: 0 0 0.75rem; font-weight: 700; }
+        .login-title p { color: var(--black); opacity: 0.85; font-size: 1rem; line-height: 1.6; margin: 0; }
+
+        .login-form { display: flex; flex-direction: column; gap: 1rem; }
+
+        .password-label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.375rem;
+        }
+
+        .password-label-row label { font-size: 0.875rem; font-weight: 500; color: var(--black); }
+
+        .forgot-link { font-size: 0.875rem; color: var(--primary-500); text-decoration: none; font-weight: 500; }
+        .forgot-link:hover { text-decoration: underline; }
+
+        .password-wrapper { position: relative; }
+
+        .eye-button {
+          position: absolute;
+          right: 0.75rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #999;
+          display: flex;
+          align-items: center;
+          padding: 0.25rem;
+          transition: color 200ms ease;
+        }
+
+        .eye-button:hover { color: #666; }
+        .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
+
+        .remember-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+
+        .remember-checkbox {
+          width: 1rem;
+          height: 1rem;
+          cursor: pointer;
+          accent-color: var(--primary-500);
+          flex-shrink: 0;
+        }
+
+        .remember-label { font-size: 0.875rem; color: var(--black); cursor: pointer; user-select: none; margin: 0; }
+
+        .login-footer { text-align: center; margin-top: 2rem; }
+        .login-footer p { color: var(--black); margin: 0; font-size: 0.9375rem; }
+        .login-footer a { color: var(--primary-500); font-weight: 600; text-decoration: none; }
+        .login-footer a:hover { text-decoration: underline; }
+
+        .login-trust-badge { font-size: 0.875rem; color: #999; margin-top: 1.25rem; margin-bottom: 0; text-align: center; }
+
+        @media (max-width: 1024px) {
+          .login-hero { display: none; }
+          .login-form-panel { width: 100%; }
+        }
+
+        @media (max-width: 640px) {
+          .login-form-panel { padding: 1.5rem 1rem; }
+          .login-card { max-width: 100%; }
+          .login-hero-content h1 { font-size: 1.5rem; }
+          .login-hero-content p { font-size: 1rem; }
+        }
+      `}</style>
+
+      <div className="login-page">
+        <div className="login-hero">
+          <div className="login-hero-content">
+            <h1>Master<br />Project Management,<br />Boost Your Career</h1>
+            <p>Learn the skills to plan, execute, and deliver<br /> successful projects.</p>
+            <div className="login-hero-dots">
+              <button className="dot-button" aria-label="Slide 1"><span className="dot-active" /></button>
+              <button className="dot-button" aria-label="Slide 2"><span className="dot-inactive" /></button>
+              <button className="dot-button" aria-label="Slide 3"><span className="dot-inactive" /></button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Right form panel */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2.5rem 1.5rem',
-          background: 'var(--grey)',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Logo */}
-        <div style={{ marginBottom: '1.75rem' }}>
-          <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
-        </div>
-
-        {/* Error Alert - outside the card */}
-        {error && (
-          <div style={{ width: '100%', maxWidth: '440px', marginBottom: '1rem' }}>
-            <Alert type="error" title="Login failed">{error}</Alert>
-          </div>
-        )}
-
-        {/* White card */}
-        <div
-          style={{
-            width: '100%',
-            maxWidth: '440px',
-            background: 'var(--white)',
-            border: '1px solid #E8E8E8',
-            borderRadius: 'var(--radius-lg)',
-            padding: '2rem',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          {/* Title */}
-          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-            <h2
-              style={{
-                color: 'var(--black)',
-                fontSize: '1.75rem',
-                lineHeight: 1.1,
-                marginBottom: '0.75rem',
-                fontWeight: 700,
-              }}
-            >
-              Welcome back
-            </h2>
-            <p
-              style={{
-                color: 'var(--black)',
-                opacity: 0.85,
-                fontSize: '1rem',
-                lineHeight: 1.6,
-                margin: 0,
-              }}
-            >
-              Log in to continue learning.
-            </p>
+        <div className="login-form-panel">
+          <div className="login-logo">
+            <img src="/Logo.png" alt="The Global Project Leaders" />
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
-            <Input
-              label="Email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              value={formData.email}
-              onChange={handleInputChange}
-              error={formErrors.email}
-            />
+          {/* Error alert — outside card, above it, matching the screenshot */}
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{ width: '100%', maxWidth: '440px', marginBottom: error ? '1rem' : 0 }}
+          >
+            {error && <Alert type="error" title="Login failed">{error}</Alert>}
+          </div>
 
-            {/* Password with Forgot Password Link */}
-            <div style={{ marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--black)' }}>
-                  Password
-                </label>
-                <Link
-                  to={ROUTES.FORGOT_PASSWORD}
-                  style={{ fontSize: '0.875rem', color: 'var(--primary-500)', textDecoration: 'none', fontWeight: 500 }}
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div style={{ position: 'relative', marginTop: '0.75rem' }}>
-                <Input
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  error={formErrors.password}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#999999',
-                  }}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+          <div className="login-card">
+            <div className="login-title">
+              <h2>Welcome back</h2>
+              <p>Log in to continue learning.</p>
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={!isFormFilled || isLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                width: '100%',
-                padding: '0.8125rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                marginTop: '1.55rem',
-                border: 'none',
-                fontFamily: 'inherit',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: isFormFilled && !isLoading ? 'pointer' : 'not-allowed',
-                transition: 'var(--transition)',
-                background: isFormFilled ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-                color: 'var(--white)',
-                letterSpacing: '0.01em',
-              }}
-            >
-              {isLoading ? (
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: '0.5rem',
-                  }}
+            {/* Email not verified banner */}
+            {unverifiedEmail && (
+              <div style={{ marginBottom: '1rem' }}>
+                <Alert type="warning" title="Email not verified">
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    Your email hasn't been verified yet. Check your inbox for a verification link.
+                  </div>
+                  <button
+                    onClick={handleResendVerificationEmail}
+                    disabled={resendLoading}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--primary-500)',
+                      fontWeight: 600, cursor: resendLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem', opacity: resendLoading ? 0.6 : 1,
+                      display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0,
+                    }}
+                  >
+                    {resendLoading && <Spinner />}
+                    {resendLoading ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                  {resendMessage && (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: resendMessage.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--success)',
+                      margin: '0.5rem 0 0',
+                    }}>
+                      {resendMessage}
+                    </p>
+                  )}
+                </Alert>
+              </div>
+            )}
+
+            <form className="login-form" onSubmit={handleSubmit}>
+              <Input
+                label="Email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                error={formErrors.email}
+                disabled={unverifiedEmail !== null}
+              />
+
+              <div>
+                <div className="password-label-row">
+                  <label htmlFor="password">Password</label>
+                  <Link to={ROUTES.FORGOT_PASSWORD} className="forgot-link">Forgot password?</Link>
+                </div>
+                <div className="password-wrapper">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    error={formErrors.password}
+                    disabled={unverifiedEmail !== null}
+                  />
+                  {unverifiedEmail === null && (
+                    <button
+                      type="button"
+                      className="eye-button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Remember me */}
+              <div className="remember-row">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  className="remember-checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <label htmlFor="rememberMe" className="remember-label">Remember me</label>
+              </div>
+
+              {unverifiedEmail === null ? (
+                <Button
+                  type="submit"
+                  disabled={!isFormFilled || isLoading}
+                  style={{ width: '100%', padding: '0.8125rem 1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
-                  <Spinner />
-                  <span>Logging in...</span>
-                </span>
+                  {isLoading ? <><Spinner /><span>Logging in...</span></> : 'Log in'}
+                </Button>
               ) : (
-                'Log in'
+                <Button
+                  type="button"
+                  onClick={() => { setUnverifiedEmail(null); setResendMessage('') }}
+                  style={{ width: '100%', padding: '0.8125rem 1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  Try Again
+                </Button>
               )}
-            </Button>
-          </form>
+            </form>
 
-          {/* Signup Link */}
-          <div className="text-center" style={{ marginTop: '2.5rem' }}>
-            <p style={{ color: 'var(--black)', margin: 0 }}>
-              New here?{' '}
-              <Link
-                to={ROUTES.SIGNUP}
-                className="text-primary-500 hover:text-primary-700 font-medium transition-colors"
-              >
-                Create an account
-              </Link>
-            </p>
+            <div className="login-footer">
+              <p>New here? <Link to={ROUTES.SIGNUP}>Create an account</Link></p>
+            </div>
           </div>
-        </div>
 
-        {/* Trust badge */}
-        <p
-          style={{
-            fontSize: '0.875rem',
-            color: '#999999',
-            marginTop: '1.25rem',
-            marginBottom: 0,
-            textAlign: 'center',
-          }}
-        >
-          Trusted by 50,000+ learners across emerging markets
-        </p>
+          <p className="login-trust-badge">Trusted by 50,000+ learners across emerging markets</p>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

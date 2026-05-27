@@ -47,7 +47,7 @@ const LandingPage: React.FC = () => {
     { icon: MapPin, label: 'BASE', value: 'Nigeria — serving Africa & beyond', href: null },
   ]
 
-  const badges = ['Senior Project Manager', 'Women in Leadership Advocate', 'Pan-African Capacity Builder', 'CAC-Registered Organization']
+  const badges = ['Senior Project Manager', 'Women in Leadership Advocate', 'Pan-African Capacity Builder']
 
   const services = [
     { icon: Award, title: 'Project Management Training', description: 'Industry-recognized certification programs including PMP, PRINCE2, and Agile methodologies tailored for African professionals.' },
@@ -297,7 +297,7 @@ const LandingPage: React.FC = () => {
                   transition={{ delay: 0.5, duration: 0.4, type: 'spring', stiffness: 200 }} viewport={vp}
                   style={{ position: 'absolute', bottom: 24, right: 0, backgroundColor: '#2890E4', color: 'white', padding: '0.75rem 1.25rem', borderRadius: 10, zIndex: 3 }}
                 >
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, lineHeight: 1 }}>10+</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, lineHeight: 1 }}>5+</div>
                   <div style={{ fontSize: '0.78rem', marginTop: '0.2rem', opacity: 0.9 }}>Years Experience</div>
                 </motion.div>
               </div>
@@ -309,7 +309,7 @@ const LandingPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.75rem' }}>
                 {[
                   { href: 'https://linkedin.com/in/enobong-okposin', d: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z', extra: <circle cx="4" cy="4" r="2" fill="white" /> },
-                  { href: '#', d: 'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.736-8.849L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z' },
+                  { href: 'https://x.com/OkposinEno', d: 'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.736-8.849L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z' },
                 ].map((icon, i) => (
                   <a key={i} href={icon.href} target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d={icon.d} />{icon.extra}</svg>
