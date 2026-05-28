@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { apiClient } from '../../services/api'
 import { RouteBuilder } from '../../constants/routes'
 import {
   Target, TrendingUp, Briefcase, GraduationCap, Compass,
@@ -27,8 +28,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
           <div
             key={i}
             style={{
-              height: 8,
-              borderRadius: 4,
+              height: 8, borderRadius: 4,
               background: i < current ? 'var(--primary-500)' : '#D1D5DB',
               width: i === current - 1 ? 32 : 10,
               transition: 'all 0.3s ease',
@@ -43,48 +43,29 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 // ── List option (Step 1) ───────────────────────────────────────────────────
 function ListOption({
-  icon,
-  label,
-  selected,
-  onClick,
+  icon, label, selected, onClick,
 }: {
-  icon: React.ReactNode
-  label: string
-  selected: boolean
-  onClick: () => void
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        padding: '1rem 1.25rem',
-        borderRadius: '12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', padding: '1rem 1.25rem', borderRadius: '12px',
         border: selected ? '2px solid var(--primary-500)' : '1.5px solid #E5E7EB',
-        background: selected ? '#EFF6FF' : '#fff',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        marginBottom: '0.75rem',
+        background: selected ? '#EFF6FF' : '#fff', cursor: 'pointer',
+        transition: 'all 0.15s ease', marginBottom: '0.75rem',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: selected ? 'var(--primary-500)' : '#F3F4F6',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: selected ? '#fff' : '#6B7280',
-            flexShrink: 0,
-          }}
-        >
+        <div style={{
+          width: 36, height: 36, borderRadius: 8,
+          background: selected ? 'var(--primary-500)' : '#F3F4F6',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: selected ? '#fff' : '#6B7280', flexShrink: 0,
+        }}>
           {icon}
         </div>
         <span style={{ fontSize: '1rem', fontWeight: 500, color: selected ? 'var(--primary-500)' : '#111827' }}>
@@ -92,18 +73,10 @@ function ListOption({
         </span>
       </div>
       {selected && (
-        <div
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            background: 'var(--primary-500)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%', background: 'var(--primary-500)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -115,79 +88,47 @@ function ListOption({
 
 // ── Grid option (Step 2) ───────────────────────────────────────────────────
 function GridOption({
-  icon,
-  label,
-  selected,
-  onClick,
+  icon, label, selected, onClick,
 }: {
-  icon: React.ReactNode
-  label: string
-  selected: boolean
-  onClick: () => void
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.75rem',
-        padding: '1.5rem 1rem',
-        borderRadius: '12px',
+        position: 'relative', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+        padding: '1.5rem 1rem', borderRadius: '12px',
         border: selected ? '2px solid var(--primary-500)' : '1.5px solid #E5E7EB',
-        background: selected ? '#EFF6FF' : '#fff',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        minHeight: 130,
+        background: selected ? '#EFF6FF' : '#fff', cursor: 'pointer',
+        transition: 'all 0.15s ease', minHeight: 130,
       }}
     >
       {selected && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 10,
-            right: 10,
-            width: 20,
-            height: 20,
-            borderRadius: '50%',
-            background: 'var(--primary-500)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <div style={{
+          position: 'absolute', top: 10, right: 10, width: 20, height: 20,
+          borderRadius: '50%', background: 'var(--primary-500)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       )}
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          background: selected ? 'var(--primary-500)' : '#F3F4F6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: selected ? '#fff' : '#6B7280',
-        }}
-      >
+      <div style={{
+        width: 44, height: 44, borderRadius: 10,
+        background: selected ? 'var(--primary-500)' : '#F3F4F6',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: selected ? '#fff' : '#6B7280',
+      }}>
         {icon}
       </div>
-      <span
-        style={{
-          fontSize: '0.9rem',
-          fontWeight: 500,
-          color: selected ? 'var(--primary-500)' : '#111827',
-          textAlign: 'center',
-          lineHeight: 1.3,
-        }}
-      >
+      <span style={{
+        fontSize: '0.9rem', fontWeight: 500,
+        color: selected ? 'var(--primary-500)' : '#111827',
+        textAlign: 'center', lineHeight: 1.3,
+      }}>
         {label}
       </span>
     </button>
@@ -196,14 +137,9 @@ function GridOption({
 
 // ── Select dropdown ────────────────────────────────────────────────────────
 function SelectField({
-  label,
-  value,
-  onChange,
-  options,
+  label, value, onChange, options,
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
+  label: string; value: string; onChange: (v: string) => void
   options: { value: string; label: string }[]
 }) {
   return (
@@ -216,26 +152,16 @@ function SelectField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           style={{
-            width: '100%',
-            appearance: 'none',
-            padding: '0.875rem 2.5rem 0.875rem 1rem',
-            borderRadius: '12px',
-            border: '1.5px solid #E5E7EB',
-            background: '#fff',
-            fontSize: '1rem',
-            color: value ? '#111827' : '#9CA3AF',
-            cursor: 'pointer',
-            outline: 'none',
-            fontFamily: 'inherit',
+            width: '100%', appearance: 'none',
+            padding: '0.875rem 2.5rem 0.875rem 1rem', borderRadius: '12px',
+            border: '1.5px solid #E5E7EB', background: '#fff', fontSize: '1rem',
+            color: value ? '#111827' : '#9CA3AF', cursor: 'pointer',
+            outline: 'none', fontFamily: 'inherit',
           }}
         >
-          <option value="" disabled>
-            {options[0]?.label}
-          </option>
+          <option value="" disabled>{options[0]?.label}</option>
           {options.slice(1).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <ChevronDown
@@ -265,13 +191,10 @@ export default function OnboardingPage() {
   // ── Check completion status on load ────────────────────────────────────
   useEffect(() => {
     if (!user?.learner_profile) return
-
     const status = user.learner_profile?.completion_status
-
     if (status === 'complete') {
       navigate(RouteBuilder.dashboard())
     } else if (status === 'partial') {
-      // Pre-populate from saved data and go to step 3
       if (user.learner_profile?.goals) {
         setData((prev) => ({
           ...prev,
@@ -281,68 +204,38 @@ export default function OnboardingPage() {
       }
       setStep(3)
     }
-    // If 'incomplete', show step 1 (default)
   }, [user?.learner_profile?.completion_status, navigate, user?.learner_profile])
 
+  // ── Skip / save partial ─────────────────────────────────────────────────
   const skipOrFinish = async () => {
     setLoading(true)
     try {
-      // Save partial progress (skip-for-now flow)
-      const payload = {
+      await apiClient.patch('/v1/users/me/learner-profile/', {
         goals: data.goals,
         experience_level: data.experienceLevel,
-        // Don't include current_status or preferred_learning_hours
-        // This marks completion_status as 'partial'
-      }
-
-      const response = await fetch('/api/v1/users/me/learner-profile/', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-        },
-        body: JSON.stringify(payload),
       })
-
-      if (response.ok) {
-        navigate(RouteBuilder.dashboard())
-      } else {
-        console.error('Failed to save onboarding progress')
-      }
+      navigate(RouteBuilder.dashboard())
     } catch (error) {
-      console.error('Error saving onboarding progress:', error)
+      console.error('Failed to save onboarding progress', error)
     } finally {
       setLoading(false)
     }
   }
 
+  // ── Complete onboarding ─────────────────────────────────────────────────
   const completeOnboarding = async () => {
     setLoading(true)
     try {
-      // Save complete profile
-      const payload = {
+      await apiClient.patch('/v1/users/me/learner-profile/', {
         goals: data.goals,
         experience_level: data.experienceLevel,
         current_status: data.currentStatus,
         preferred_learning_hours: data.learningHours,
-      }
-
-      const response = await fetch('/api/v1/users/me/learner-profile/', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-        },
-        body: JSON.stringify(payload),
       })
-
-      if (response.ok) {
-        setStep(4)
-      } else {
-        console.error('Failed to complete onboarding')
-      }
+      localStorage.setItem('onboardingComplete', 'true')
+      setStep(4)
     } catch (error) {
-      console.error('Error completing onboarding:', error)
+      console.error('Failed to complete onboarding', error)
     } finally {
       setLoading(false)
     }
@@ -358,10 +251,7 @@ export default function OnboardingPage() {
   }
 
   const setExperienceLevel = (level: string) => {
-    setData((prev) => ({
-      ...prev,
-      experienceLevel: level,
-    }))
+    setData((prev) => ({ ...prev, experienceLevel: level }))
   }
 
   const goals = [
@@ -380,6 +270,7 @@ export default function OnboardingPage() {
   ]
 
   const statusOptions = [
+    { value: '', label: '(Select status)' },
     { value: 'student', label: 'Student' },
     { value: 'working', label: 'Working' },
     { value: 'between_roles', label: 'Between roles / Job searching' },
@@ -398,7 +289,6 @@ export default function OnboardingPage() {
   // ── Shared layout wrapper ────────────────────────────────────────────────
   const Layout = ({ children, showSkip = true }: { children: React.ReactNode; showSkip?: boolean }) => (
     <div style={{ minHeight: '100vh', background: 'var(--grey)', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2.5rem' }}>
         <img src="/Logo.png" alt="TGPL" style={{ height: '2.5rem' }} />
         {showSkip && (
@@ -406,19 +296,21 @@ export default function OnboardingPage() {
             type="button"
             onClick={skipOrFinish}
             disabled={loading}
-            style={{ background: 'none', border: 'none', color: 'var(--primary-500)', fontSize: '1rem', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1 }}
+            style={{
+              background: 'none', border: 'none', color: 'var(--primary-500)',
+              fontSize: '1rem', fontWeight: 500,
+              cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1,
+            }}
           >
             {loading ? 'Saving...' : 'Skip for now'}
           </button>
         )}
       </div>
 
-      {/* Body */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1rem 1.5rem 2rem' }}>
         {children}
       </div>
 
-      {/* Footer */}
       <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem', padding: '1.5rem' }}>
         Join 50,000+ learners building their project management careers
       </p>
@@ -453,20 +345,11 @@ export default function OnboardingPage() {
             onClick={() => setStep(2)}
             disabled={data.goals.length === 0 || loading}
             style={{
-              width: '100%',
-              padding: '0.9rem',
-              borderRadius: '12px',
-              border: 'none',
+              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
               background: data.goals.length > 0 && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: 600,
+              color: '#fff', fontSize: '1rem', fontWeight: 600,
               cursor: data.goals.length > 0 && !loading ? 'pointer' : 'not-allowed',
-              marginTop: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
+              marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}
           >
             Continue
@@ -506,19 +389,11 @@ export default function OnboardingPage() {
             onClick={() => setStep(3)}
             disabled={!data.experienceLevel || loading}
             style={{
-              width: '100%',
-              padding: '0.9rem',
-              borderRadius: '12px',
-              border: 'none',
+              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
               background: data.experienceLevel && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: 600,
+              color: '#fff', fontSize: '1rem', fontWeight: 600,
               cursor: data.experienceLevel && !loading ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}
           >
             Continue →
@@ -527,7 +402,11 @@ export default function OnboardingPage() {
             type="button"
             onClick={() => setStep(1)}
             disabled={loading}
-            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1 }}
+            style={{
+              width: '100%', background: 'none', border: 'none', color: '#6B7280',
+              fontSize: '1rem', marginTop: '0.75rem',
+              cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1,
+            }}
           >
             Back
           </button>
@@ -568,16 +447,10 @@ export default function OnboardingPage() {
             onClick={completeOnboarding}
             disabled={!isValid || loading}
             style={{
-              width: '100%',
-              padding: '0.9rem',
-              borderRadius: '12px',
-              border: 'none',
+              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
               background: isValid && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: 600,
-              cursor: isValid && !loading ? 'pointer' : 'not-allowed',
-              marginTop: '0.5rem',
+              color: '#fff', fontSize: '1rem', fontWeight: 600,
+              cursor: isValid && !loading ? 'pointer' : 'not-allowed', marginTop: '0.5rem',
             }}
           >
             {loading ? 'Finishing...' : 'Finish setup'}
@@ -586,7 +459,11 @@ export default function OnboardingPage() {
             type="button"
             onClick={() => setStep(2)}
             disabled={loading}
-            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1 }}
+            style={{
+              width: '100%', background: 'none', border: 'none', color: '#6B7280',
+              fontSize: '1rem', marginTop: '0.75rem',
+              cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1,
+            }}
           >
             Back
           </button>
@@ -598,41 +475,26 @@ export default function OnboardingPage() {
   // ── Step 4 — Success ─────────────────────────────────────────────────────
   return (
     <Layout showSkip={false}>
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '700px',
-          background: '#fff',
-          borderRadius: '20px',
-          padding: '5rem 2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-        }}
-      >
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>cool1.png</div>
+      <div style={{
+        width: '100%', maxWidth: '700px', background: '#fff', borderRadius: '20px',
+        padding: '5rem 2rem', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}></div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
           You are all set!
         </h1>
         <p style={{ color: '#6B7280', fontSize: '1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
           Really glad to have you here!<br />
-          click on the button below to proceed to your dashboard
+          Click on the button below to proceed to your dashboard.
         </p>
         <button
           type="button"
           onClick={() => navigate(RouteBuilder.dashboard())}
           style={{
-            padding: '0.9rem 2.5rem',
-            borderRadius: '12px',
-            border: 'none',
-            background: 'var(--primary-500)',
-            color: '#fff',
-            fontSize: '1rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            minWidth: '260px',
+            padding: '0.9rem 2.5rem', borderRadius: '12px', border: 'none',
+            background: 'var(--primary-500)', color: '#fff', fontSize: '1rem',
+            fontWeight: 600, cursor: 'pointer', minWidth: '260px',
           }}
         >
           Go to dashboard
