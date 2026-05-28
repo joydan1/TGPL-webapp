@@ -13,7 +13,7 @@ export const API_ENDPOINTS = {
   EMAIL_VERIFICATION_CONFIRM: '/v1/auth/email-verification/confirm/',
   PASSWORD_RESET: '/v1/auth/password-reset/',
   PASSWORD_RESET_CONFIRM: '/v1/auth/password-reset/confirm/',
-
+LEARNER_PROFILE: '/v1/users/me/learner-profile/',
   // Test endpoints — dev only
   ...(import.meta.env.DEV && {
     TEST_LEARNER: '/v1/auth/_test/learner-only/',

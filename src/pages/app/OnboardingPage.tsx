@@ -1,5 +1,5 @@
 // OnboardingPage.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { RouteBuilder } from '../../constants/routes'
@@ -13,7 +13,6 @@ type Step = 1 | 2 | 3 | 4
 
 interface OnboardingData {
   goals: string[]
-  interests: string[]
   experienceLevel: string
   currentStatus: string
   learningHours: string
@@ -252,29 +251,101 @@ function SelectField({
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
- const firstName = user?.name?.split(' ')[0] || 'there'
+  const firstName = user?.name?.split(' ')[0] || 'there'
 
   const [step, setStep] = useState<Step>(1)
+  const [loading, setLoading] = useState(false)
   const [data, setData] = useState<OnboardingData>({
     goals: [],
-    interests: [],
     experienceLevel: '',
     currentStatus: '',
     learningHours: '',
   })
 
-  const skipOrFinish = () => {
-    // Mark as skipped (incomplete) so it shows again next login
-    localStorage.setItem('onboardingSkipped', 'true')
-    navigate(RouteBuilder.dashboard())
+  // ── Check completion status on load ────────────────────────────────────
+  useEffect(() => {
+    if (!user?.learner_profile) return
+
+    const status = user.learner_profile?.completion_status
+
+    if (status === 'complete') {
+      navigate(RouteBuilder.dashboard())
+    } else if (status === 'partial') {
+      // Pre-populate from saved data and go to step 3
+      if (user.learner_profile?.goals) {
+        setData((prev) => ({
+          ...prev,
+          goals: user.learner_profile!.goals || [],
+          experienceLevel: user.learner_profile!.experience_level || '',
+        }))
+      }
+      setStep(3)
+    }
+    // If 'incomplete', show step 1 (default)
+  }, [user?.learner_profile?.completion_status, navigate, user?.learner_profile])
+
+  const skipOrFinish = async () => {
+    setLoading(true)
+    try {
+      // Save partial progress (skip-for-now flow)
+      const payload = {
+        goals: data.goals,
+        experience_level: data.experienceLevel,
+        // Don't include current_status or preferred_learning_hours
+        // This marks completion_status as 'partial'
+      }
+
+      const response = await fetch('/api/v1/users/me/learner-profile/', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        navigate(RouteBuilder.dashboard())
+      } else {
+        console.error('Failed to save onboarding progress')
+      }
+    } catch (error) {
+      console.error('Error saving onboarding progress:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const completeOnboarding = () => {
-    // Save answers and mark as complete
-    localStorage.setItem('onboardingComplete', 'true')
-    localStorage.setItem('onboardingData', JSON.stringify(data))
-    localStorage.removeItem('onboardingSkipped')
-    setStep(4)
+  const completeOnboarding = async () => {
+    setLoading(true)
+    try {
+      // Save complete profile
+      const payload = {
+        goals: data.goals,
+        experience_level: data.experienceLevel,
+        current_status: data.currentStatus,
+        preferred_learning_hours: data.learningHours,
+      }
+
+      const response = await fetch('/api/v1/users/me/learner-profile/', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        setStep(4)
+      } else {
+        console.error('Failed to complete onboarding')
+      }
+    } catch (error) {
+      console.error('Error completing onboarding:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const toggleGoal = (goal: string) => {
@@ -286,38 +357,34 @@ export default function OnboardingPage() {
     }))
   }
 
-  const toggleInterest = (interest: string) => {
+  const setExperienceLevel = (level: string) => {
     setData((prev) => ({
       ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter((i) => i !== interest)
-        : [...prev.interests, interest],
+      experienceLevel: level,
     }))
   }
 
   const goals = [
-    { id: 'land-pm', label: 'Land a PM role', icon: <Target size={18} /> },
-    { id: 'switch-careers', label: 'Switch careers', icon: <TrendingUp size={18} /> },
-    { id: 'upskill', label: 'Upskill in current role', icon: <Briefcase size={18} /> },
-    { id: 'academic', label: 'Academic learning', icon: <GraduationCap size={18} /> },
-    { id: 'explore', label: 'Explore the field', icon: <Compass size={18} /> },
+    { id: 'land_pm_role', label: 'Land a PM role', icon: <Target size={18} /> },
+    { id: 'switch_careers', label: 'Switch careers', icon: <TrendingUp size={18} /> },
+    { id: 'upskill_current_role', label: 'Upskill in current role', icon: <Briefcase size={18} /> },
+    { id: 'academic_learning', label: 'Academic learning', icon: <GraduationCap size={18} /> },
+    { id: 'explore_field', label: 'Explore the field', icon: <Compass size={18} /> },
   ]
 
-  const interests = [
-    { id: 'pm-all', label: 'Project Management\n(for Beginners)', icon: <CheckSquare size={20} /> },
-    { id: 'pm-only', label: 'Project Management\n(Intermediate)', icon: <CheckSquare size={20} /> },
-    { id: 'tools', label: 'Project Management\n(Advance Level)', icon: <CheckSquare size={20} /> },
-    { id: 'soft-skills', label: 'Project Management\n(Expert Level)', icon: <CheckSquare size={20} /> },
+  const experienceLevels = [
+    { id: 'beginner', label: 'Project Management\n(for Beginners)', icon: <CheckSquare size={20} /> },
+    { id: 'intermediate', label: 'Project Management\n(Intermediate)', icon: <CheckSquare size={20} /> },
+    { id: 'advanced', label: 'Project Management\n(Advance Level)', icon: <CheckSquare size={20} /> },
+    { id: 'expert', label: 'Project Management\n(Expert Level)', icon: <CheckSquare size={20} /> },
   ]
-
 
   const statusOptions = [
-    { value: '', label: '(Select status)' },
     { value: 'student', label: 'Student' },
     { value: 'working', label: 'Working' },
-    { value: 'job-seeking', label: 'Between roles/Job searching' },
-    { value: 'freelance', label: 'Freelancer' },
-    { value: 'career break', label: 'Career break' },
+    { value: 'between_roles', label: 'Between roles / Job searching' },
+    { value: 'freelancer', label: 'Freelancer' },
+    { value: 'career_break', label: 'Career break' },
   ]
 
   const hoursOptions = [
@@ -338,9 +405,10 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={skipOrFinish}
-            style={{ background: 'none', border: 'none', color: 'var(--primary-500)', fontSize: '1rem', fontWeight: 500, cursor: 'pointer' }}
+            disabled={loading}
+            style={{ background: 'none', border: 'none', color: 'var(--primary-500)', fontSize: '1rem', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1 }}
           >
-            Skip for now
+            {loading ? 'Saving...' : 'Skip for now'}
           </button>
         )}
       </div>
@@ -383,17 +451,17 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={() => setStep(2)}
-            disabled={data.goals.length === 0}
+            disabled={data.goals.length === 0 || loading}
             style={{
               width: '100%',
               padding: '0.9rem',
               borderRadius: '12px',
               border: 'none',
-              background: data.goals.length > 0 ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
+              background: data.goals.length > 0 && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
               color: '#fff',
               fontSize: '1rem',
               fontWeight: 600,
-              cursor: data.goals.length > 0 ? 'pointer' : 'not-allowed',
+              cursor: data.goals.length > 0 && !loading ? 'pointer' : 'not-allowed',
               marginTop: '0.5rem',
               display: 'flex',
               alignItems: 'center',
@@ -401,7 +469,7 @@ export default function OnboardingPage() {
               gap: '0.5rem',
             }}
           >
-            Continue 
+            Continue
           </button>
         </div>
       </Layout>
@@ -418,17 +486,17 @@ export default function OnboardingPage() {
             <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
               Which PM level applies to you the most?
             </h1>
-            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Choose your experiene level so we meet you at your exact need</p>
+            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Choose your experience level so we meet you at your exact need</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            {interests.map((item) => (
+            {experienceLevels.map((item) => (
               <GridOption
                 key={item.id}
                 icon={item.icon}
                 label={item.label}
-                selected={data.interests.includes(item.id)}
-                onClick={() => toggleInterest(item.id)}
+                selected={data.experienceLevel === item.id}
+                onClick={() => setExperienceLevel(item.id)}
               />
             ))}
           </div>
@@ -436,17 +504,17 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={() => setStep(3)}
-            disabled={data.interests.length === 0}
+            disabled={!data.experienceLevel || loading}
             style={{
               width: '100%',
               padding: '0.9rem',
               borderRadius: '12px',
               border: 'none',
-              background: data.interests.length > 0 ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
+              background: data.experienceLevel && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
               color: '#fff',
               fontSize: '1rem',
               fontWeight: 600,
-              cursor: data.interests.length > 0 ? 'pointer' : 'not-allowed',
+              cursor: data.experienceLevel && !loading ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -458,7 +526,8 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={() => setStep(1)}
-            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: 'pointer', padding: '0.5rem' }}
+            disabled={loading}
+            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1 }}
           >
             Back
           </button>
@@ -469,7 +538,7 @@ export default function OnboardingPage() {
 
   // ── Step 3 ───────────────────────────────────────────────────────────────
   if (step === 3) {
-    const isValid = data.experienceLevel && data.currentStatus && data.learningHours
+    const isValid = data.currentStatus && data.learningHours
     return (
       <Layout>
         <div style={{ width: '100%', maxWidth: '560px' }}>
@@ -497,26 +566,27 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={completeOnboarding}
-            disabled={!isValid}
+            disabled={!isValid || loading}
             style={{
               width: '100%',
               padding: '0.9rem',
               borderRadius: '12px',
               border: 'none',
-              background: isValid ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
+              background: isValid && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
               color: '#fff',
               fontSize: '1rem',
               fontWeight: 600,
-              cursor: isValid ? 'pointer' : 'not-allowed',
+              cursor: isValid && !loading ? 'pointer' : 'not-allowed',
               marginTop: '0.5rem',
             }}
           >
-            Finish setup
+            {loading ? 'Finishing...' : 'Finish setup'}
           </button>
           <button
             type="button"
             onClick={() => setStep(2)}
-            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: 'pointer', padding: '0.5rem' }}
+            disabled={loading}
+            style={{ width: '100%', background: 'none', border: 'none', color: '#6B7280', fontSize: '1rem', marginTop: '0.75rem', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1 }}
           >
             Back
           </button>

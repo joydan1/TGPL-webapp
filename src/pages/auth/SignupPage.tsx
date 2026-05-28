@@ -223,7 +223,7 @@ export default function SignupPage() {
     )
   }
 
-  // ── Signup form ────────────────────────────────────────────────────────────
+  // ── Signup form ──────────
   return (
     <>
       <style>{`
@@ -328,7 +328,7 @@ export default function SignupPage() {
             <img src="/Logo.png" alt="The Global Project Leaders" />
           </div>
 
-          {/* Error alerts — outside and above the card, matching login page */}
+          {/* Error alerts */}
           <div role="alert" aria-live="polite" className="signup-error-alert">
             {error && <Alert type="error" title="Signup failed">{error}</Alert>}
             {formErrors.submit && <Alert type="error" title="Signup failed">{formErrors.submit}</Alert>}
@@ -402,8 +402,11 @@ export default function SignupPage() {
                     }}
                   />
                   <label htmlFor="terms" className="terms-label">
-                    I agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>
-                  </label>
+  I agree to the{' '}
+  <a href={ROUTES.TERMS} target="_blank" rel="noopener noreferrer">Terms of Service</a>
+  {' '}and{' '}
+  <a href={ROUTES.PRIVACY} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+</label>
                 </div>
                 {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}
               </div>

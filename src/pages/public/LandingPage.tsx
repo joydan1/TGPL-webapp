@@ -25,13 +25,30 @@ const vp = { once: true, amount: 0.2 }
 
 const LandingPage: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' })
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    console.log('Form submitted:', formData)
-    setFormData({ name: '', email: '', message: '' })
+    setFormStatus('sending')
+    try {
+      const res = await fetch('https://formspree.io/f/YOUR_FORMSPREE_ID', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (res.ok) {
+        setFormStatus('success')
+        setFormData({ name: '', email: '', message: '' })
+      } else {
+        setFormStatus('error')
+      }
+    } catch {
+      setFormStatus('error')
+    }
   }
 
   const aboutRef = useRef<HTMLDivElement>(null)
@@ -59,8 +76,8 @@ const LandingPage: React.FC = () => {
   ]
 
   const paths = [
-    { title: 'Join a Training Cohort', description: 'Learn practical project management skills and earn your certification through our structured, expert-led programs.', icon: BookOpen, buttonText: 'Explore Training' },
-    { title: 'Hire TGPL for a Project', description: "Need structure, strategy, or project delivery support? We're ready to help your team execute with clarity.", icon: Building2, buttonText: 'Request Consultation', featured: true },
+    { title: 'Hire TGPL for a Project', description: "Need structure, strategy, or project delivery support? We're ready to help your team execute with clarity.", icon: Building2, buttonText: 'Request Consultation' },
+    { title: 'Join a Training Cohort', description: 'Learn practical project management skills and earn your certification through our structured, expert-led programs.', icon: BookOpen, buttonText: 'Explore Training', featured: true },
     { title: 'Join Our Community', description: "Stay updated on programs, opportunities, and upcoming cohorts. Connect with Africa's growing PM network.", icon: Users, buttonText: 'Stay Connected' },
   ]
 
@@ -97,89 +114,75 @@ const LandingPage: React.FC = () => {
   @media (max-width: 600px) {
     .lp-grid-4 { grid-template-columns: 1fr !important; }
     .hero-badges { display: none; }
+    .hero-image { width: 80% !important; }
+    .founder-img-wrap { overflow: visible; margin: 0 auto; }
   }
 `}</style>
 
       {/* Hero */}
-      {/* Hero */}
-<section id="home" style={{ position: 'relative', minHeight: '85vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', backgroundColor: '#2890E4', paddingTop: '5rem' }}>
-  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,#D9D9D9, #90C3EB, #D9D9D9)', zIndex: 0 }} />
+      <section id="home" style={{ position: 'relative', minHeight: '85vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', backgroundColor: '#2890E4', paddingTop: '5rem' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,#D9D9D9, #90C3EB, #D9D9D9)', zIndex: 0 }} />
 
-  {/* Image — plain div wrapper, no y animation */}
-  <motion.div
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
-    style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '55%', maxWidth: '680px', zIndex: 1 }}
-  >
-    <img src="/Image4.png" alt="TGPL Hero" style={{ width: '100%', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }} />
-  </motion.div>
+        <motion.div
+          className="hero-image"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
+          style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '55%', maxWidth: '680px', zIndex: 1 }}
+        >
+          <img src="/Image4.png" alt="TGPL Hero" width={680} height={600} style={{ width: '100%', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }} />
+        </motion.div>
 
-  {/* Diamonds — no x/y, only opacity + scale */}
-  {[
-    { left: '28%', top: '52%', size: 22 }, { left: '32%', bottom: '22%', size: 16 },
-    { right: '28%', top: '48%', size: 20 }, { right: '25%', bottom: '30%', size: 13 },
-  ].map((d, i) => (
-    <motion.div
-      key={i} className="hero-badges"
-      initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 0.75, scale: 1 }}
-      transition={{ delay: 0.4 + i * 0.1, duration: 0.4 }}
-      style={{ position: 'absolute', left: d.left, right: (d as any).right, top: d.top, bottom: (d as any).bottom, width: d.size, height: d.size, backgroundColor: '#D9D9D9', borderRadius: '3px', transform: 'rotate(45deg)', zIndex: 3 }}
-    />
-  ))}
+        {[
+          { left: '28%', top: '52%', size: 22 }, { left: '32%', bottom: '22%', size: 16 },
+          { right: '28%', top: '48%', size: 20 }, { right: '25%', bottom: '30%', size: 13 },
+        ].map((d, i) => (
+          <motion.div
+            key={i} className="hero-badges"
+            initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 0.75, scale: 1 }}
+            transition={{ delay: 0.4 + i * 0.1, duration: 0.4 }}
+            style={{ position: 'absolute', left: d.left, right: (d as any).right, top: d.top, bottom: (d as any).bottom, width: d.size, height: d.size, backgroundColor: '#D9D9D9', borderRadius: '3px', transform: 'rotate(45deg)', zIndex: 3 }}
+          />
+        ))}
 
-  {/* Badges */}
-  <motion.div
-    className="hero-badges"
-    initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.5 }}
-    style={{ position: 'absolute', left: '30%', bottom: '15%', backgroundColor: '#2f80ed', color: 'white', padding: '0.75rem 1.1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem', zIndex: 4, maxWidth: '318px' }}
-  >
-    <div style={{ width: 36, height: 36, backgroundColor: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2890E4" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" /></svg>
-    </div>
-    <div><div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Hands on Learning</div><div style={{ fontSize: '0.73rem', opacity: 0.85 }}>Easy lessons, active live sessions</div></div>
-  </motion.div>
+        <motion.div
+          className="hero-badges"
+          initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.5 }}
+          style={{ position: 'absolute', left: '30%', bottom: '15%', backgroundColor: '#2f80ed', color: 'white', padding: '0.75rem 1.1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem', zIndex: 4, maxWidth: '318px' }}
+        >
+          <div style={{ width: 36, height: 36, backgroundColor: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2890E4" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" /></svg>
+          </div>
+          <div><div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Hands on Learning</div><div style={{ fontSize: '0.73rem', opacity: 0.85 }}>Easy lessons, active live sessions</div></div>
+        </motion.div>
 
-  <motion.div
-    className="hero-badges"
-    initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7, duration: 0.5 }}
-    style={{ position: 'absolute', right: '20%', bottom: '10%', backgroundColor: 'rgba(20,30,45,0.93)', color: 'white', padding: '0.75rem 1.1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem', zIndex: 4, maxWidth: '318px' }}
-  >
-    <div style={{ width: 36, height: 36, backgroundColor: '#2f80ed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" /></svg>
-    </div>
-    <div><div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Certified Excellence</div><div style={{ fontSize: '0.73rem', opacity: 0.7 }}>Industry-recognized training</div></div>
-  </motion.div>
+        <motion.div
+          className="hero-badges"
+          initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7, duration: 0.5 }}
+          style={{ position: 'absolute', right: '20%', bottom: '10%', backgroundColor: 'rgba(20,30,45,0.93)', color: 'white', padding: '0.75rem 1.1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem', zIndex: 4, maxWidth: '318px' }}
+        >
+          <div style={{ width: 36, height: 36, backgroundColor: '#2f80ed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" /></svg>
+          </div>
+          <div><div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Certified Excellence</div><div style={{ fontSize: '0.73rem', opacity: 0.7 }}>Industry-recognized training</div></div>
+        </motion.div>
 
-  {/* Text */}
-  <div style={{ position: 'relative', zIndex: 5, textAlign: 'center', padding: '0 2rem', maxWidth: '780px', margin: '0 auto' }}>
-    <motion.h1
-      initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-      style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 700, color: '#2C3C45', margin: '0 0 1.25rem 0', lineHeight: 1.2 }}
-    >
-      Building Africa's Next Generation of Project Leaders
-    </motion.h1>
-    <motion.p
-      initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}
-      style={{ fontSize: '1.05rem', color: '#2C3C45', maxWidth: '600px', margin: '0 auto 2rem auto', lineHeight: 1.8 }}
-    >
-      We train, consult, and manage projects that drive real impact. From skill development to project delivery, TGPL equips individuals and organizations to execute with structure, strategy, and confidence.
-    </motion.p>
-    <motion.div
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
-      style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}
-    >
-      <Button variant="primary" size="medium">Get Started</Button>
-      <Button variant="outline" size="medium" style={{ borderColor: '#ffffff', color: '#2C3C45' }}>Learn More</Button>
-    </motion.div>
-  </div>
-  <div style={{ height: '440px', width: '100%', zIndex: 0 }} />
-</section>
+        <div style={{ position: 'relative', zIndex: 5, textAlign: 'center', padding: '0 2rem', maxWidth: '780px', margin: '0 auto' }}>
+          <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 700, color: '#2C3C45', margin: '0 0 1.25rem 0', lineHeight: 1.2 }}>
+            Building Africa's Next Generation of Project Leaders
+          </motion.h1>
+          <motion.p initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }} style={{ fontSize: '1.05rem', color: '#2C3C45', maxWidth: '600px', margin: '0 auto 2rem auto', lineHeight: 1.8 }}>
+            We train, consult, and manage projects that drive real impact. From skill development to project delivery, TGPL equips individuals and organizations to execute with structure, strategy, and confidence.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button variant="primary" size="medium">Get Started</Button>
+            <Button variant="outline" size="medium" style={{ borderColor: '#ffffff', color: '#2C3C45' }}>Learn More</Button>
+          </motion.div>
+        </div>
+        <div style={{ height: '440px', width: '100%', zIndex: 0 }} />
+      </section>
 
       {/* Stats bar */}
       <section style={{ backgroundColor: 'white', borderBottom: '1px solid #e8ecf0', padding: '1.75rem 2rem' }}>
-        <motion.div
-          variants={stagger} initial="hidden" whileInView="show" viewport={vp}
-          style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', textAlign: 'center' }}
-        >
+        <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={vp} style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', textAlign: 'center' }}>
           {[{ number: '5000+', label: 'Trained' }, { number: '150+', label: 'Clients' }, { number: '95%', label: 'Success Rate' }].map((s, i) => (
             <motion.div key={i} variants={fadeUp} style={{ borderRight: i < 2 ? '1px solid #e8ecf0' : 'none', padding: '0 1rem' }}>
               <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2890E4' }}>{s.number}</div>
@@ -195,8 +198,8 @@ const LandingPage: React.FC = () => {
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={vp} style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <p style={{ color: '#2890E4', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>About TGPL</p>
             <h2 style={{ fontSize: '2.5rem', fontWeight: 700, color: '#1a2e3d', margin: 0 }}>Who We Are</h2>
+            <p style={{ fontSize: '1.1rem', color: '#4a4a4a', maxWidth: '700px', margin: '0 auto 2.5rem auto', lineHeight: 1.7 }}>From blueprint to reality, we lead the way.</p>
           </motion.div>
-
           <div className="lp-grid-2" style={{ marginBottom: '4rem', alignItems: 'center' }}>
             <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={vp}>
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', marginBottom: '1.5rem' }}>The Global Project Leaders (TGPL) is a project management agency, training organization, consultancy, and community founded in August 2024 and registered with the Corporate Affairs Commission (CAC), Nigeria.</p>
@@ -205,10 +208,9 @@ const LandingPage: React.FC = () => {
             <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} style={{ position: 'relative', width: '100%', height: '400px' }}>
               <div style={{ position: 'absolute', top: 58, left: 0, width: 199, height: 199, backgroundColor: '#2890E4', borderRadius: 26, zIndex: 3, transform: 'rotate(-26.94deg)' }} />
               <div style={{ position: 'absolute', top: 80, left: 350, width: 166, height: 166, backgroundColor: '#1e2d3d', borderRadius: 22, zIndex: 1, transform: 'rotate(-26.94deg)' }} />
-              <img src="/image6.png" alt="TGPL Team" style={{ position: 'absolute', left: 131, top: 20, width: 327, height: 384, objectFit: 'cover', borderRadius: 16, zIndex: 2 }} />
+              <img src="/image6.png" alt="TGPL Team" width={327} height={384} style={{ position: 'absolute', left: 131, top: 20, width: 327, height: 384, objectFit: 'cover', borderRadius: 16, zIndex: 2 }} />
             </motion.div>
           </div>
-
           <motion.div className="lp-grid-2" variants={stagger} initial="hidden" whileInView="show" viewport={vp}>
             {[
               { icon: <Target size={26} color="#2890E4" />, title: 'Our Mission', text: 'To close the effective project management gap in Africa by equipping a new generation of organizations, young people and women with the skills, structure, and resilience to deliver impactful projects across industries.' },
@@ -231,9 +233,7 @@ const LandingPage: React.FC = () => {
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={vp} style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <p style={{ color: '#2890E4', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Our Services</p>
             <h2 style={{ fontSize: '2.5rem', fontWeight: 700, color: '#1a2e3d', margin: 0 }}>Comprehensive Project Management Solutions</h2>
-            <p style={{ fontSize: '1.1rem', color: '#4a4a4a', maxWidth: '700px', margin: '0 auto 2.5rem auto', lineHeight: 1.7 }}>
-              From strategic consulting to professional certification, we provide everything you need to excel in project management.
-            </p>
+            <p style={{ fontSize: '1.1rem', color: '#4a4a4a', maxWidth: '700px', margin: '0 auto 2.5rem auto', lineHeight: 1.7 }}>From strategic consulting to professional certification, we provide everything you need to excel in project management.</p>
           </motion.div>
           <motion.div className="lp-grid-3" variants={stagger} initial="hidden" whileInView="show" viewport={vp}>
             {services.map((s, i) => (
@@ -257,9 +257,7 @@ const LandingPage: React.FC = () => {
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={vp}>
             <p style={{ color: '#2890E4', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>Measurable Results</p>
             <h2 style={{ fontSize: '2.5rem', fontWeight: 700, color: 'white', margin: '0 0 1.25rem 0' }}>Our Impact</h2>
-            <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.75)', maxWidth: '680px', margin: '0 auto 3.5rem auto', lineHeight: 1.7 }}>
-              From strategic consulting to professional certification, we provide everything you need to excel in project management.
-            </p>
+            <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.75)', maxWidth: '680px', margin: '0 auto 3.5rem auto', lineHeight: 1.7 }}>From strategic consulting to professional certification, we provide everything you need to excel in project management.</p>
           </motion.div>
           <motion.div className="lp-grid-4" variants={stagger} initial="hidden" whileInView="show" viewport={vp}
             style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', marginBottom: '3rem' }}>
@@ -289,32 +287,30 @@ const LandingPage: React.FC = () => {
           </motion.div>
           <div className="lp-grid-2" style={{ alignItems: 'center' }}>
             <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={vp}>
-              <div className="founder-img-wrap" style={{ position: 'relative', height: 451, width: 347, maxWidth: '100%' }}>
-                <div style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 340, backgroundColor: '#2B3942', borderRadius: 20, zIndex: 1 }} />
-                <img src="/ceo.png" alt="Enobong Okposin" style={{ position: 'absolute', bottom: 0, left: 16, width: 331, height: 451, objectFit: 'cover', objectPosition: 'top', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }} />
+              <div className="founder-img-wrap" style={{ position: 'relative', height: 460, width: 360, maxWidth: '100%' }}>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 360, backgroundColor: '#2B3942', borderRadius: 20, zIndex: 1 }} />
+                <img src="/ceo.png" alt="Enobong Okposin" width={340} height={460} style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 460, objectFit: 'cover', objectPosition: 'top center', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }} />
                 <motion.div
                   initial={{ opacity: 0, scale: 0.5 }} whileInView={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5, duration: 0.4, type: 'spring', stiffness: 200 }} viewport={vp}
-                  style={{ position: 'absolute', bottom: 24, right: 0, backgroundColor: '#2890E4', color: 'white', padding: '0.75rem 1.25rem', borderRadius: 10, zIndex: 3 }}
+                  style={{ position: 'absolute', bottom: 40, right: -20, backgroundColor: '#2890E4', color: 'white', padding: '1rem 1.5rem', borderRadius: 14, zIndex: 3, boxShadow: '0 8px 24px rgba(40,144,228,0.35)' }}
                 >
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, lineHeight: 1 }}>5+</div>
-                  <div style={{ fontSize: '0.78rem', marginTop: '0.2rem', opacity: 0.9 }}>Years Experience</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>5+</div>
+                  <div style={{ fontSize: '0.85rem', marginTop: '0.3rem', opacity: 0.9, fontWeight: 500 }}>Years Experience</div>
                 </motion.div>
               </div>
             </motion.div>
-
             <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp}>
               <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#1a2e3d', margin: '0 0 0.4rem 0' }}>Enobong Okposin</h2>
               <p style={{ fontSize: '1rem', color: '#2890E4', fontWeight: 600, margin: '0 0 1rem 0' }}>Founder & Chief Executive Officer</p>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.75rem' }}>
-                {[
-                  { href: 'https://linkedin.com/in/enobong-okposin', d: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z', extra: <circle cx="4" cy="4" r="2" fill="white" /> },
-                  { href: 'https://x.com/OkposinEno', d: 'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.736-8.849L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z' },
-                ].map((icon, i) => (
-                  <a key={i} href={icon.href} target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d={icon.d} />{icon.extra}</svg>
-                  </a>
-                ))}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.75rem' }}>
+                <a href="https://linkedin.com/in/enobong-okposin" target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z" /><circle cx="4" cy="4" r="2" fill="white" /></svg>
+                </a>
+                <a href="https://your-portfolio-url.com" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', fontWeight: 600, color: '#1a2e3d', textDecoration: 'none', borderBottom: '1.5px solid #1a2e3d', paddingBottom: '1px' }}>
+                  Portfolio
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a2e3d" strokeWidth="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" /></svg>
+                </a>
               </div>
               <p style={{ fontSize: '0.97rem', lineHeight: 1.85, color: '#3a4a5a', marginBottom: '1.75rem' }}>Enobong Okposin is a senior project manager passionate about building systems, people, and results. Under her leadership, TGPL has grown into a platform empowering emerging professionals to bridge the gap between knowledge and execution.</p>
               <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={vp} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -344,7 +340,7 @@ const LandingPage: React.FC = () => {
                 <motion.div key={i} variants={fadeUp} whileHover={{ y: -6 }} transition={{ duration: 0.25 }} style={{ position: 'relative' }}>
                   {f && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}><span style={{ backgroundColor: '#2890E4', color: 'white', padding: '0.35rem 1.25rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Most Popular</span></div>}
                   <div style={{ backgroundColor: f ? '#1e2d3d' : 'white', border: f ? '2px solid #2890E4' : '1px solid #e8ecf0', borderRadius: 20, width: '100%', height: f ? 420 : 390, padding: '48px 24px', display: 'flex', flexDirection: 'column', gap: 24, boxSizing: 'border-box', boxShadow: f ? '0 20px 40px rgba(0,0,0,0.15)' : '0 4px 20px rgba(0,0,0,0.06)' }}>
-                    <div style={{ width: 56, height: 56, backgroundColor: f ? 'rgba(40,144,228,0.2)' : '#EBF5FF', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon size={26} color="#2890E4" /></div>
+                    <div style={{ width: 56, height: 56, backgroundColor: f ? 'rgba(40,144,228,0.2)' : '#EBF5FF', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}><Icon size={26} color="#2890E4" /></div>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: f ? 'white' : '#1a2e3d', margin: 0 }}>{path.title}</h3>
                     <p style={{ fontSize: '0.93rem', lineHeight: 1.7, color: f ? 'rgba(255,255,255,0.7)' : '#4a5a6a', margin: 0, flex: 1, textAlign: f ? 'center' : 'left' }}>{path.description}</p>
                     <Button variant="primary" size="medium" style={{ width: '100%', borderRadius: 10 }}>{path.buttonText}</Button>
@@ -421,7 +417,15 @@ const LandingPage: React.FC = () => {
                   onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.boxShadow = 'none' }}
                 />
               </div>
-              <Button variant="primary" size="medium" icon={<Send size={18} />} style={{ width: '100%', marginTop: '0.5rem' }}>Send Message</Button>
+              {formStatus === 'success' && (
+                <p style={{ fontSize: '0.9rem', color: '#2890E4', fontWeight: 500, margin: 0 }}>✓ Message sent! We'll be in touch shortly.</p>
+              )}
+              {formStatus === 'error' && (
+                <p style={{ fontSize: '0.9rem', color: '#e53e3e', fontWeight: 500, margin: 0 }}>Something went wrong. Please try again or email us directly.</p>
+              )}
+              <Button variant="primary" size="medium" icon={<Send size={18} />} style={{ width: '100%', marginTop: '0.5rem' }} disabled={formStatus === 'sending'}>
+                {formStatus === 'sending' ? 'Sending…' : 'Send Message'}
+              </Button>
             </form>
           </motion.div>
         </div>

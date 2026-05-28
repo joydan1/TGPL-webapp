@@ -5,19 +5,20 @@ import { ROUTES } from './constants/routes'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
 
-// Public Pages
 import LandingPage from './pages/public/LandingPage'
-
 
 // Auth Pages (no header/footer)
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+import TermsPage from './pages/auth/TermsPage'
+import PrivacyPage from './pages/auth/PrivacyPage'
 
 // App Pages (protected, no public layout)
 import OnboardingPage from './pages/app/OnboardingPage'
 import DashboardPage from './pages/app/DashboardPage'
+import CourseCatalogPage from './pages/app/CourseCatalgue'
 
 // Error Pages
 import NotFoundPage from './pages/NotFoundPage'
@@ -60,7 +61,6 @@ function App() {
               )
             }
           />
-          
         </Route>
 
         {/* ===== AUTH ROUTES (no header/footer) ===== */}
@@ -78,6 +78,8 @@ function App() {
         />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
+        <Route path={ROUTES.TERMS} element={<TermsPage />} />
+        <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
 
         {/* ===== PROTECTED APP ROUTES (no header/footer) ===== */}
         <Route
@@ -96,7 +98,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+<Route
+  path={ROUTES.COURSES}
+  element={
+    <ProtectedRoute requiredRole="learner">
+      <CourseCatalogPage />
+    </ProtectedRoute>
+  }
+/>
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

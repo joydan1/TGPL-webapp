@@ -1,29 +1,3 @@
-/**
- * LoginPage
- *
- * FLOW:
- * 1. On mount: checks localStorage for a saved email (remember me), pre-fills it.
- *    clearError() is called once to wipe any stale error from a previous session.
- *
- * 2. Form validation: isFormFilled gates the button (requires valid email format +
- *    non-empty password). validateForm() runs on submit for field-level error messages.
- *
- * 3. Submit:
- *    a. Clears errors + stale formErrors
- *    b. Calls useAuth.login() → authAPI.login() → POST /api/v1/auth/login/
- *    c. SUCCESS: saves email if rememberMe, checks onboardingComplete flag,
- *       navigates to onboarding or dashboard
- *    d. EMAIL NOT VERIFIED (403 + code='email_not_verified'): shows the
- *       unverified banner with a resend button instead of navigating
- *    e. OTHER ERRORS (401 wrong password, 500, etc.): useAuth sets error in store,
- *       displayed as the red Alert above the card
- *
- * 4. Resend verification: calls authAPI.sendVerificationEmail() directly —
- *    uses axios interceptors + correct base URL (not raw fetch)
- *
- * 5. Remember me: stores email in localStorage on successful login,
- *    removes it if unchecked
- */
 
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
@@ -102,20 +76,22 @@ export default function LoginPage() {
 
     const result = await login({ email: formData.email, password: formData.password })
 
-    if (result.success) {
-      if (rememberMe) {
-        localStorage.setItem('rememberEmail', formData.email)
-      } else {
-        localStorage.removeItem('rememberEmail')
-      }
-      const onboardingComplete = localStorage.getItem('onboardingComplete')
-      navigate(onboardingComplete ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
-    } else if (!result.success && result.statusCode === 403 && result.code === 'email_not_verified') {
-      setUnverifiedEmail(formData.email)
-    }
-    // All other errors already set in store by useAuth.login — shown via {error} Alert
+   if (result.success) {
+  if (rememberMe) {
+    localStorage.setItem('rememberEmail', formData.email)
+  } else {
+    localStorage.removeItem('rememberEmail')
   }
-
+  const onboardingComplete = localStorage.getItem('onboardingComplete')
+  navigate(onboardingComplete ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+}  else {
+  const failed = result as { success: false; error?: string; statusCode?: number; code?: string }
+  if (failed.statusCode === 403 && failed.code === 'email_not_verified') {
+    setUnverifiedEmail(formData.email)
+  }
+}
+  
+  }
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -127,7 +103,7 @@ export default function LoginPage() {
     }
   }
 
-  // Run once on mount — stable clearError() won't cause re-fire loop
+  // Run once on mount 
   useEffect(() => {
     const rememberEmail = localStorage.getItem('rememberEmail')
     if (rememberEmail) {
@@ -314,7 +290,7 @@ export default function LoginPage() {
             <img src="/Logo.png" alt="The Global Project Leaders" />
           </div>
 
-          {/* Error alert — outside card, above it, matching the screenshot */}
+          {/* Error alert */}
           <div
             role="alert"
             aria-live="polite"

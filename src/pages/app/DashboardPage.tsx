@@ -108,6 +108,16 @@ export default function DashboardPage() {
           padding: 1.5rem;
           border-radius: var(--radius-lg);
           box-shadow: var(--shadow-sm);
+          transition: box-shadow 0.2s, transform 0.2s;
+        }
+
+        .dashboard-card.clickable {
+          cursor: pointer;
+        }
+
+        .dashboard-card.clickable:hover {
+          box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+          transform: translateY(-2px);
         }
 
         .dashboard-card h3 {
@@ -132,9 +142,19 @@ export default function DashboardPage() {
           font-weight: 700;
         }
 
-        .logout-button {
+        .card-arrow {
           display: flex;
-          gap: 0.5rem;
+          justify-content: flex-end;
+          color: var(--primary-500);
+          font-size: 0.8125rem;
+          font-weight: 600;
+          margin-top: 0.5rem;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        .dashboard-card.clickable:hover .card-arrow {
+          opacity: 1;
         }
       `}</style>
 
@@ -166,10 +186,14 @@ export default function DashboardPage() {
 
           {/* Quick Stats */}
           <div className="dashboard-grid">
-            <div className="dashboard-card">
+            <div
+              className="dashboard-card clickable"
+              onClick={() => navigate(ROUTES.COURSES)}
+            >
               <h3>Courses</h3>
               <p>Explore and enroll in courses</p>
               <div className="dashboard-card-content">0</div>
+              <div className="card-arrow">Browse courses →</div>
             </div>
 
             <div className="dashboard-card">

@@ -1,18 +1,3 @@
-/**
- * services/api.ts — Axios client + all auth API calls
- *
- * FLOW:
- * - ApiClient wraps axios with two interceptors:
- *     Request:  attaches Bearer token from Zustand store to every request
- *     Response: on 401, attempts silent token refresh (except on auth endpoints
- *               which are in SKIP_REFRESH_ROUTES — those let the caller handle it)
- * - Zustand store is the single source of truth for tokens.
- *   This file never touches localStorage directly — it calls store.setToken()
- *   and store.setRefreshToken() which handle localStorage internally.
- * - authAPI methods map camelCase JS payloads → snake_case for the Django API,
- *   and parse error responses into a consistent { success, error, statusCode, code } shape.
- */
-
 import axios from 'axios'
 import type { AxiosInstance, AxiosError } from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api'
@@ -35,6 +20,18 @@ export interface UserResponse {
   is_active: boolean
   is_email_verified: boolean
   created_at: string
+  learner_profile?: LearnerProfile | null   
+}
+
+export interface LearnerProfile {
+  id?: string
+  goals?: string[]
+  experience_level?: string
+  current_status?: string
+  preferred_learning_hours?: string
+  completion_status?: 'incomplete' | 'partial' | 'complete'
+  created_at?: string
+  updated_at?: string
 }
 
 export interface TokenResponse {
@@ -44,7 +41,6 @@ export interface TokenResponse {
 
 // ─── Payload Types ────────────────────────────────────────────────────────────
 
-// Internal camelCase shape — mapped to snake_case inside authAPI.signup
 export interface SignupPayload {
   email: string
   password: string
@@ -74,8 +70,14 @@ export interface EmailVerificationSendPayload {
   email: string
 }
 
+export interface LearnerProfilePayload {
+  goals?: string[]
+  experience_level?: string
+  current_status?: string
+  preferred_learning_hours?: string
+}
+
 // ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
-// On these endpoints, a 401/403 is a legitimate auth failure the caller handles.
 const SKIP_REFRESH_ROUTES = [
   API_ENDPOINTS.LOGIN,
   API_ENDPOINTS.SIGNUP,
@@ -97,7 +99,7 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
     })
 
-    // Request interceptor — attach token from Zustand (single source of truth)
+    // Request interceptor
     this.axiosInstance.interceptors.request.use(
       (config) => {
         const token = useAuthStore.getState().token
@@ -107,7 +109,7 @@ class ApiClient {
       (error) => Promise.reject(error),
     )
 
-    // Response interceptor — handle 401 (expired token) and 403 (forbidden)
+    // Response interceptor
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error: AxiosError<ApiErrorResponse>) => {
@@ -115,7 +117,6 @@ class ApiClient {
         const status = error.response?.status
 
         if (status === 401) {
-          // Skip refresh on auth endpoints — let the caller handle the 401
           if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
             return Promise.reject(error)
           }
@@ -123,7 +124,6 @@ class ApiClient {
         }
 
         if (status === 403) {
-          // Also skip on auth endpoints (e.g. email_not_verified returns 403)
           if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
             return Promise.reject(error)
           }
@@ -141,7 +141,10 @@ class ApiClient {
 
     if (!this.refreshTokenPromise) {
       this.refreshTokenPromise = this.refreshAccessToken()
-        .then((newToken) => { this.refreshTokenPromise = null; return newToken })
+        .then((newToken) => { 
+          this.refreshTokenPromise = null
+          return newToken 
+        })
         .catch(() => {
           this.refreshTokenPromise = null
           useAuthStore.getState().logout()
@@ -221,11 +224,6 @@ function parseApiError(error: unknown, fallback: string): { message: string; sta
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const authAPI = {
-  /**
-   * POST /api/v1/auth/signup/
-   * Maps camelCase payload → snake_case for Django.
-   * Returns { success: true } on 201 — no tokens yet (email must be verified first).
-   */
   signup: async (payload: SignupPayload) => {
     try {
       const response = await apiClient.post<UserResponse>(API_ENDPOINTS.SIGNUP, {
@@ -241,11 +239,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/email-verification/send/
-   * Sends or resends the verification email.
-   * Used on both the signup confirmation screen and the login page (unverified user).
-   */
   sendVerificationEmail: async (payload: EmailVerificationSendPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.EMAIL_VERIFICATION_SEND, payload)
@@ -256,11 +249,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/email-verification/confirm/
-   * Called from the email verification page with the token from the link.
-   * On success: API issues JWT tokens — stored in Zustand via store.setToken/setRefreshToken.
-   */
   verifyEmail: async (payload: EmailVerificationPayload) => {
     try {
       const response = await apiClient.post<TokenResponse>(
@@ -277,11 +265,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/login/
-   * On success: stores tokens in Zustand (store handles localStorage).
-   * Returns statusCode + code so useAuth can detect email_not_verified (403).
-   */
   login: async (payload: LoginPayload) => {
     try {
       const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
@@ -298,11 +281,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * GET /api/v1/auth/me/
-   * Fetches the currently authenticated user's full profile.
-   * Called after login and on app boot (loadCurrentUser).
-   */
   getCurrentUser: async () => {
     try {
       const response = await apiClient.get<UserResponse>(API_ENDPOINTS.ME)
@@ -313,11 +291,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/logout/
-   * Blacklists the refresh token server-side.
-   * Always clears Zustand store (and therefore localStorage) even if API fails.
-   */
   logout: async () => {
     try {
       const refreshToken = useAuthStore.getState().refreshToken
@@ -333,10 +306,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/password-reset/
-   * Always returns 200 regardless of whether the email exists (anti-enumeration).
-   */
   requestPasswordReset: async (payload: PasswordResetPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
@@ -347,10 +316,6 @@ export const authAPI = {
     }
   },
 
-  /**
-   * POST /api/v1/auth/password-reset/confirm/
-   * Called from the reset password page with token (from link) + new_password.
-   */
   confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
@@ -361,7 +326,6 @@ export const authAPI = {
     }
   },
 
-  // Dev-only test endpoints
   ...(import.meta.env.DEV && {
     testLearnerOnly: async () => {
       try {
@@ -382,6 +346,31 @@ export const authAPI = {
       } catch { return { success: false, error: 'Admin test failed' } }
     },
   }),
+}
+
+export const learnerProfileAPI = {
+  getLearnerProfile: async () => {
+    try {
+      const response = await apiClient.get<LearnerProfile>('/api/v1/users/me/learner-profile/')
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to get learner profile')
+      return { success: false, error: message }
+    }
+  },
+
+  updateLearnerProfile: async (payload: LearnerProfilePayload) => {
+    try {
+      const response = await apiClient.patch<LearnerProfile>(
+        '/api/v1/users/me/learner-profile/',
+        payload,
+      )
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to update learner profile')
+      return { success: false, error: message }
+    }
+  },
 }
 
 export default apiClient

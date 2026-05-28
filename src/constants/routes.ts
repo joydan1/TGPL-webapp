@@ -17,6 +17,8 @@ export const ROUTES = {
   ABOUT: '/about',
   SERVICES: '/services',
   FOUNDER: '/founder',
+  TERMS: '/terms',
+  PRIVACY: '/privacy',
 
   // ===========================
   // LEARNER ROUTES (Authenticated learners only)
@@ -24,6 +26,7 @@ export const ROUTES = {
   ONBOARDING: '/onboarding',
   DASHBOARD: '/dashboard',
   COURSES: '/courses',
+
   COURSE_DETAIL: '/courses/:id',
   COURSE_LEARN: '/courses/:id/learn/:lessonId',
   COURSE_ASSIGNMENTS: '/courses/:id/assignments',
@@ -98,11 +101,6 @@ export const ROUTES = {
   ERROR: '/error',
 } as const
 
-/**
- * Helper function to get route with dynamic parameters
- * Example: getRoute(ROUTES.COURSE_DETAIL, { id: '123' })
- * Returns: '/courses/123'
- */
 export const getRoute = (
   route: string,
   params?: Record<string, string | number>,
@@ -117,7 +115,7 @@ export const getRoute = (
 }
 
 /**
- * Route Groups - useful for checking route types
+ * Route Groups 
  */
 export const ROUTE_GROUPS = {
   PUBLIC: [ROUTES.LOGIN, ROUTES.SIGNUP, ROUTES.FORGOT_PASSWORD, ROUTES.RESET_PASSWORD],
@@ -260,12 +258,7 @@ export const ROUTE_METADATA: Record<
   },
 } as const
 
-/**
- * Type-safe route navigation
- * Usage:
- * const to = RouteBuilder.course(123)
- * const to = RouteBuilder.profile()
- */
+
 export const RouteBuilder = {
   login: () => ROUTES.LOGIN,
   signup: () => ROUTES.SIGNUP,
