@@ -17,6 +17,7 @@ import PrivacyPage from './pages/auth/PrivacyPage'
 
 // App Pages (protected, no public layout)
 import OnboardingPage from './pages/app/OnboardingPage'
+import EmailVerificationPage from './pages/auth/EmailVerificationPage'
 import DashboardPage from './pages/app/DashboardPage'
 import CourseCatalogPage from './pages/app/CourseCatalgue'
 
@@ -78,6 +79,7 @@ function App() {
         />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<EmailVerificationPage />} />
         <Route path={ROUTES.TERMS} element={<TermsPage />} />
         <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
 

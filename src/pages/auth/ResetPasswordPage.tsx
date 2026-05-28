@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
@@ -22,7 +22,8 @@ function Spinner() {
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
-  const { token } = useParams<{ token: string }>()
+ const [searchParams] = useSearchParams()
+const token = searchParams.get('token') ?? ''
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
