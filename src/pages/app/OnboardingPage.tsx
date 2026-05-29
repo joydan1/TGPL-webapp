@@ -232,7 +232,7 @@ export default function OnboardingPage() {
         current_status: data.currentStatus,
         preferred_learning_hours: data.learningHours,
       })
-      localStorage.setItem('onboardingComplete', 'true')
+    
       setStep(4)
     } catch (error) {
       console.error('Failed to complete onboarding', error)

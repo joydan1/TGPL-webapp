@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useAuthStore } from '../../store/auth'
 import { authAPI } from '../../services/api'
 import { Eye, EyeOff } from 'lucide-react'
 import Input from '../../components/Input'
@@ -76,15 +77,17 @@ export default function LoginPage() {
 
     const result = await login({ email: formData.email, password: formData.password })
 
-   if (result.success) {
+ if (result.success) {
   if (rememberMe) {
     localStorage.setItem('rememberEmail', formData.email)
   } else {
     localStorage.removeItem('rememberEmail')
   }
-  const onboardingComplete = localStorage.getItem('onboardingComplete')
-  navigate(onboardingComplete ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
-}  else {
+  const user = useAuthStore.getState().user
+  const status = user?.learner_profile?.completion_status
+  navigate(status === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+}
+ else {
   const failed = result as { success: false; error?: string; statusCode?: number; code?: string }
   if (failed.statusCode === 403 && failed.code === 'email_not_verified') {
     setUnverifiedEmail(formData.email)

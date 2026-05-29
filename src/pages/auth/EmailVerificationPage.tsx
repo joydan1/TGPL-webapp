@@ -80,9 +80,10 @@ export default function EmailVerificationPage() {
   }
 
   const handleContinue = () => {
-    const onboardingComplete = localStorage.getItem('onboardingComplete')
-    navigate(onboardingComplete ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
-  }
+  const user = useAuthStore.getState().user
+  const status = user?.learner_profile?.completion_status
+  navigate(status === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+}
 
   return (
     <>
