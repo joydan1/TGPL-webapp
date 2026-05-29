@@ -20,6 +20,9 @@ import OnboardingPage from './pages/app/OnboardingPage'
 import EmailVerificationPage from './pages/auth/EmailVerificationPage'
 import DashboardPage from './pages/app/DashboardPage'
 import CourseCatalogPage from './pages/app/CourseCatalgue'
+import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
+import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
+
 
 // Error Pages
 import NotFoundPage from './pages/NotFoundPage'
@@ -108,6 +111,8 @@ function App() {
     </ProtectedRoute>
   }
 />
+<Route path="/courses/:id" element={<ProtectedRoute requiredRole="learner"><CourseDetailPage /></ProtectedRoute>} />
+<Route path="/courses/:id/preview" element={<ProtectedRoute requiredRole="learner"><CoursePlayerPage /></ProtectedRoute>} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
