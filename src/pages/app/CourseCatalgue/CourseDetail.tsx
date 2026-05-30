@@ -269,7 +269,7 @@ export default function CourseDetailPage() {
                 <p className="enroll-price">{COURSE.price}</p>
                 <p className="enroll-sub">{COURSE.enrolledCount} learners enrolled</p>
               </div>
-              <button className="enroll-btn">Pay to Enroll</button>
+              <button className="enroll-btn" onClick={() => navigate(ROUTES.CHECKOUT)}>Pay to Enroll</button>
             </div>
           </div>
         </div>

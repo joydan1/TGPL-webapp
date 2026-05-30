@@ -68,7 +68,7 @@ const LandingPage: React.FC = () => {
 
   const stats = [
     { number: '15+', label: 'Projects delivered', sub: 'across 7 industries' },
-    { number: '200+', label: 'People trained', sub: 'in project management' },
+    { number: '2000+', label: 'People trained', sub: 'in project management' },
     { number: '60%', label: 'Female participation', sub: 'in training programs' },
     { number: '7', label: 'Industries served', sub: 'with cross-industry experience' },
   ]
@@ -95,19 +95,26 @@ const navigate = useNavigate()
     .cta-section { padding: 60px 2rem !important; }
     .contact-section { padding: 60px 2rem !important; }
     .founder-img-wrap { width: 100% !important; height: 380px !important; }
+    .hero-image-wrap { width: 80% !important; }
+  .hero-spacer { height: 300px !important; }
+  .hero-badges { display: none !important; }
+  .hero-mobile-badges { display: flex !important; }
+  .hero-spacer { height: 0px !important; }
   }
   @media (max-width: 600px) {
     .lp-grid-4 { grid-template-columns: 1fr !important; }
     .hero-badges { display: none; }
+    .hero-image-wrap { width: 95% !important; }
+  .hero-spacer { height: 0px !important; }
   }
 `}</style>
 
     
-      {/* Hero */}
+{/* Hero */}
 <section id="home" style={{ position: 'relative', minHeight: '85vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', backgroundColor: '#2890E4', paddingTop: '5rem' }}>
   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,#D9D9D9, #90C3EB, #D9D9D9)', zIndex: 0 }} />
 
-  {/* Image — plain div wrapper, no y animation */}
+  {/* Image */}
   <motion.div
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
     style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '55%', maxWidth: '680px', zIndex: 1 }}
@@ -115,7 +122,7 @@ const navigate = useNavigate()
     <img src="/Image4.png" alt="TGPL Hero" style={{ width: '100%', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }} />
   </motion.div>
 
-  {/* Diamonds — no x/y, only opacity + scale */}
+  {/* Diamonds */}
   {[
     { left: '28%', top: '52%', size: 22 }, { left: '32%', bottom: '22%', size: 16 },
     { right: '28%', top: '48%', size: 20 }, { right: '25%', bottom: '30%', size: 13 },
@@ -128,7 +135,7 @@ const navigate = useNavigate()
     />
   ))}
 
-  {/* Badges */}
+  {/* Desktop floating badges */}
   <motion.div
     className="hero-badges"
     initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.5 }}
@@ -169,14 +176,43 @@ const navigate = useNavigate()
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
       style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}
     >
-      <Button variant="primary" size="medium" onClick={() => navigate(ROUTES.SIGNUP)}>
-  Get Started
-</Button>
-<Button variant="outline" size="medium" onClick={() => aboutRef.current?.scrollIntoView({ behavior: 'smooth' })} style={{ borderColor: '#ffffff', color: '#2C3C45' }}>
-  Learn More
-</Button>
+      <Button variant="primary" size="medium" onClick={() => navigate(ROUTES.SIGNUP)}>Get Started</Button>
+      <Button variant="outline" size="medium" onClick={() => aboutRef.current?.scrollIntoView({ behavior: 'smooth' })} style={{ borderColor: '#ffffff', color: '#2C3C45' }}>Learn More</Button>
     </motion.div>
+
+   <div className="hero-mobile-badges" style={{
+  display: 'none',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  width: '90%',
+  maxWidth: '380px',
+  position: 'absolute',
+  bottom: '-240px',   
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 6,
+}}>
+      <div style={{ backgroundColor: '#2f80ed', color: 'white', padding: '0.75rem 1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ width: 36, height: 36, backgroundColor: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2890E4" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Hands on Learning</div>
+          <div style={{ fontSize: '0.73rem', opacity: 0.85 }}>Easy lessons, active live sessions</div>
+        </div>
+      </div>
+      <div style={{ backgroundColor: 'rgba(20,30,45,0.93)', color: 'white', padding: '0.75rem 1rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ width: 36, height: 36, backgroundColor: '#2f80ed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Certified Excellence</div>
+          <div style={{ fontSize: '0.73rem', opacity: 0.7 }}>Industry-recognized training</div>
+        </div>
+      </div>
+    </div>
   </div>
+
   <div style={{ height: '440px', width: '100%', zIndex: 0 }} />
 </section>
 
@@ -186,7 +222,7 @@ const navigate = useNavigate()
           variants={stagger} initial="hidden" whileInView="show" viewport={vp}
           style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', textAlign: 'center' }}
         >
-          {[{ number: '5000+', label: 'Trained' }, { number: '150+', label: 'Clients' }, { number: '95%', label: 'Success Rate' }].map((s, i) => (
+          {[{ number: '2000+', label: 'Trained' }, { number: '150+', label: 'Clients' }, { number: '95%', label: 'Success Rate' }].map((s, i) => (
             <motion.div key={i} variants={fadeUp} style={{ borderRight: i < 2 ? '1px solid #e8ecf0' : 'none', padding: '0 1rem' }}>
               <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2890E4' }}>{s.number}</div>
               <div style={{ fontSize: '0.85rem', color: '#6b7a8d' }}>{s.label}</div>
@@ -212,7 +248,7 @@ const navigate = useNavigate()
             </motion.div>
             <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} style={{ position: 'relative', width: '100%', height: '400px' }}>
               <div style={{ position: 'absolute', top: 58, left: 0, width: 199, height: 199, backgroundColor: '#2890E4', borderRadius: 26, zIndex: 3, transform: 'rotate(-26.94deg)' }} />
-              <div style={{ position: 'absolute', top: 80, left: 350, width: 166, height: 166, backgroundColor: '#1e2d3d', borderRadius: 22, zIndex: 1, transform: 'rotate(-26.94deg)' }} />
+              <div style={{ position: 'absolute', top: 80, right: 0, width: 166, height: 166, backgroundColor: '#1e2d3d', borderRadius: 22, zIndex: 1, transform: 'rotate(-26.94deg)' }} />
               <img src="/image6.png" alt="TGPL Team" style={{ position: 'absolute', left: 131, top: 20, width: 327, height: 384, objectFit: 'cover', borderRadius: 16, zIndex: 2 }} />
             </motion.div>
           </div>

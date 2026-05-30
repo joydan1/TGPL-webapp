@@ -29,6 +29,7 @@ export const ROUTES = {
   COURSES: '/courses',
 
   COURSE_DETAIL: '/courses/:id',
+  CHECKOUT: '/checkout',
   COURSE_LEARN: '/courses/:id/learn/:lessonId',
   COURSE_ASSIGNMENTS: '/courses/:id/assignments',
   ASSIGNMENT_DETAIL: '/assignments/:id',
@@ -162,6 +163,12 @@ export const ROUTE_METADATA: Record<
     description: 'Create a new TGPL account',
     requiresAuth: false,
   },
+  [ROUTES.CHECKOUT]: {
+    title: 'Checkout',
+    description: 'Complete your purchase',
+    requiresAuth: true,
+    requiredRole: 'learner',
+  },
 
   // Learner routes
   [ROUTES.DASHBOARD]: {
@@ -291,6 +298,8 @@ export const RouteBuilder = {
   certificates: () => ROUTES.CERTIFICATES,
   certificateDetail: (id: string | number) =>
     getRoute(ROUTES.CERTIFICATE_DETAIL, { id }),
+  checkout: () => ROUTES.CHECKOUT,
+  
 
   // Trainer routes
   trainerDashboard: () => ROUTES.TRAINER_DASHBOARD,

@@ -23,9 +23,8 @@ import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
 
-
-// Error Pages
 import NotFoundPage from './pages/NotFoundPage'
+import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -95,6 +94,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path={ROUTES.CHECKOUT} element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
         <Route
           path={ROUTES.DASHBOARD}
           element={

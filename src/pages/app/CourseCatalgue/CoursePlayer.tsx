@@ -278,7 +278,7 @@ export default function CoursePlayerPage() {
                 <p className="enroll-label">Ready to enrol?</p>
                 <p className="enroll-price">₦49,999.99</p>
               </div>
-              <button className="enroll-btn">Enrol now</button>
+              <button className="enroll-btn" onClick={() => navigate(ROUTES.CHECKOUT)}>Pay to Enroll</button>
             </div>
           </div>
         </div>
