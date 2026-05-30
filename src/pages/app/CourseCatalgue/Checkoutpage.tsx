@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, BookOpen, Shield, Zap, Tag, CreditCard, Building2, Smartphone, Mail } from 'lucide-react'
-import { ROUTES } from '../../../constants/routes'
+//import { ROUTES } from '../../../constants/routes'
 
 const COURSE = {
   title: 'Project Management Course',
@@ -532,7 +532,7 @@ export default function CheckoutPage() {
             <button
               className={`co-cta-btn${isReady ? ' ready' : ''}`}
               disabled={!isReady}
-              onClick={() => isReady && navigate(ROUTES.CHECKOUT_PAY ?? '/checkout/pay')}
+             // onClick={() => isReady && navigate(ROUTES.CHECKOUT_PAY ?? '/checkout/pay')}
             >
               {selectedMethod ? `Pay with ${PAYMENT_METHODS.find(m => m.id === selectedMethod)?.label}` : 'Select payment method'}
             </button>
