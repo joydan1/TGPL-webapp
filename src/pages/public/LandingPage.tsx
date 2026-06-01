@@ -354,7 +354,7 @@ const navigate = useNavigate()
           <a href="https://linkedin.com/in/enobong-okposin" target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z" /><circle cx="4" cy="4" r="2" fill="white" /></svg>
           </a>
-          <a href="https://your-portfolio-url.com" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', fontWeight: 600, color: '#1a2e3d', textDecoration: 'none', borderBottom: '1.5px solid #1a2e3d', paddingBottom: '1px' }}>
+          <a href="https://enobong.theglobalprojectleaders.com/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', fontWeight: 600, color: '#1a2e3d', textDecoration: 'none', borderBottom: '1.5px solid #1a2e3d', paddingBottom: '1px' }}>
             Portfolio
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a2e3d" strokeWidth="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" /></svg>
           </a>
