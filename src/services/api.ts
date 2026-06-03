@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosError } from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api'
 import { useAuthStore } from '../store/auth'
-
+import type { PaymentMethod } from '../types'
 // ─── Response Types ───────────────────────────────────────────────────────────
 
 export interface ApiErrorResponse {
@@ -346,6 +346,45 @@ export const authAPI = {
       } catch { return { success: false, error: 'Admin test failed' } }
     },
   }),
+}
+
+// ── Payment API ─────────────────────────────
+export interface InitiatePaymentPayload {
+  courseId: string
+  method: PaymentMethod
+  email: string
+  promoCode?: string
+}
+
+export interface VerifyPaymentPayload {
+  referenceId: string
+  method: PaymentMethod
+}
+
+export const paymentAPI = {
+  initiate: async (payload: InitiatePaymentPayload) => {
+    try {
+      const response = await apiClient.post<{ orderId: string; referenceId: string }>(
+        '/api/v1/payments/initiate/', payload
+      )
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to initiate payment')
+      return { success: false, error: message }
+    }
+  },
+
+  verify: async (payload: VerifyPaymentPayload) => {
+    try {
+      const response = await apiClient.post<{ status: 'success' | 'failed' | 'pending' }>(
+        '/api/v1/payments/verify/', payload
+      )
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Payment verification failed')
+      return { success: false, error: message }
+    }
+  },
 }
 
 export const learnerProfileAPI = {

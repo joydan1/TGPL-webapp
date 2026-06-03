@@ -6,8 +6,20 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(), // ← add this
+    tailwindcss(),
   ],
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['lucide-react'],
+        },
+      },
+    },
+  },
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -23,6 +35,7 @@ export default defineConfig({
       '@assets': path.resolve(__dirname, 'src/assets'),
     },
   },
+
   server: {
     proxy: {
       '/api': {

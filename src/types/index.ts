@@ -24,3 +24,34 @@ export interface LearnerProfile {
   completion_status?: 'incomplete' | 'partial' | 'complete'
   // add other fields as needed
 }
+
+// ── Payment Types ─────────────────────────────
+export type PaymentMethod = 'card' | 'bank' | 'ussd'
+export type CheckoutScreen =
+  | 'checkout'
+  | 'card-details' | 'card-pin' | 'card-otp'
+  | 'bank-details' | 'ussd-details'
+  | 'processing' | 'success' | 'failed'
+
+export interface CardDetails {
+  number: string
+  name: string
+  expiry: string
+  cvv: string
+}
+
+export interface PaymentOrder {
+  courseId: string
+  courseTitle: string
+  amount: number
+  method: PaymentMethod
+  email: string
+  promoCode?: string
+}
+
+export interface PaymentResult {
+  success: boolean
+  orderId?: string
+  referenceId?: string
+  error?: string
+}
