@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext, useRef } from 'react'
+import { useState, useCallback, createContext, useContext } from 'react'
 import { paymentAPI } from '../services/api'
 import { useAuthStore } from '../store/auth'
 import type { PaymentMethod, CheckoutScreen, CardDetails, PaymentResult } from '../types'
