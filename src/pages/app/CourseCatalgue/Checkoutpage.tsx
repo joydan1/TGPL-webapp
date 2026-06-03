@@ -5,7 +5,7 @@ import Alert from '../../../components/Alert'
 import Button from '../../../components/Button'
 import { Card, CardBody } from '../../../components/Card'
 import Input from '../../../components/Input'
-import { useCheckout } from '../../../hooks/useCheckout'
+import { useCheckout, CheckoutProvider } from '../../../hooks/useCheckout'
 import { ROUTES } from '../../../constants/routes'
 import type { PaymentMethod } from '../../../types'
 
@@ -545,8 +545,8 @@ function FailedScreen() {
     </div>
   )
 }
-// ── Root ───────────────────────
-export default function CheckoutPage() {
+
+function CheckoutPageInner() {
   const navigate = useNavigate()
   const { screen } = useCheckout()
 
@@ -566,5 +566,13 @@ export default function CheckoutPage() {
     <div style={{ minHeight: '100vh', background: '#F5F5F5' }}>
       {screens[screen]}
     </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <CheckoutProvider>
+      <CheckoutPageInner />
+    </CheckoutProvider>
   )
 }
