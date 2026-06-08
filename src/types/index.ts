@@ -12,7 +12,7 @@ export interface User {
   name: string
   role: 'learner' | 'trainer' | 'admin'
   createdAt: string
-  learner_profile?: LearnerProfile | null   // ← Must match
+  learner_profile?: LearnerProfile | null
 }
 
 export interface LearnerProfile {
@@ -22,36 +22,49 @@ export interface LearnerProfile {
   current_status?: string
   preferred_learning_hours?: string
   completion_status?: 'incomplete' | 'partial' | 'complete'
-  // add other fields as needed
 }
 
-// ── Payment Types ─────────────────────────────
-export type PaymentMethod = 'card' | 'bank' | 'ussd'
-export type CheckoutScreen =
-  | 'checkout'
-  | 'card-details' | 'card-pin' | 'card-otp'
-  | 'bank-details' | 'ussd-details'
-  | 'processing' | 'success' | 'failed'
+// ── Payment Types ──────────────────────────────────────────────────────────
 
-export interface CardDetails {
-  number: string
-  name: string
-  expiry: string
-  cvv: string
-}
+// Checkout now has 4 screens only; Paystack modal handles the payment sub-screens
+export type CheckoutScreen = 'checkout' | 'processing' | 'success' | 'failed'
 
-export interface PaymentOrder {
-  courseId: string
-  courseTitle: string
-  amount: number
-  method: PaymentMethod
-  email: string
-  promoCode?: string
-}
-
+// Matches GET /api/v1/payments/{reference}/ response
 export interface PaymentResult {
-  success: boolean
-  orderId?: string
-  referenceId?: string
-  error?: string
+  reference: string
+  status: 'pending' | 'succeeded' | 'failed'
+  amount_kobo: number
+  amount_naira: string
+  paid_at: string | null
+  is_terminal: boolean
+  failure_reason: string | null
+  course: {
+    slug: string
+    title: string
+    trainer_name: string
+  }
+  created_at: string
+}
+
+// Matches POST /api/v1/payments/checkout/ response
+export interface CheckoutResponse {
+  is_free: false
+  reference: string
+  payment_id: string
+  access_code: string
+  authorization_url: string
+  amount_kobo: number
+}
+
+// /payments/checkout/ response for free courses
+export interface FreeCourseCheckoutResponse {
+  is_free: true
+  reference: string
+  payment_id: string
+}
+
+//payments/config/ response
+export interface PaymentConfig {
+  public_key: string
+  callback_url_pattern: string
 }

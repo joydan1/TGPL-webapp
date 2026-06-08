@@ -1,53 +1,81 @@
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Clock, BookOpen, BarChart2, Award, Users } from 'lucide-react'
 import { ROUTES } from '../../../constants/routes'
+import { apiClient } from '../../../services/api'
 
-const COURSE = {
-  title: 'Project Management Course',
-  category: 'MANAGEMENT',
-  rating: 4.8,
-  reviews: 234,
-  thumbnail: '/intro.png',
-  instructor: { name: 'Amara Osei', title: 'PMP-certified Project Manager', avatar: '/ceo.png' },
-  stats: [
-    { icon: Clock, value: '20h 30m', label: 'Duration' },
-    { icon: BookOpen, value: '8 modules', label: 'Content' },
-    { icon: BarChart2, value: 'Beginner', label: 'Level' },
-    { icon: Award, value: 'Included', label: 'Certificate' },
-  ],
-  learningOutcomes: [
-    'Create and manage a full project plan from initiation to closure',
-    'Build and use Work Breakdown Structures (WBS) confidently',
-    'Apply Gantt charts and Critical Path Method to real projects',
-    'Identify, assess, and mitigate project risks systematically',
-    'Communicate effectively with stakeholders at all levels',
-    'Prepare a strong foundation for the PMP certification exam',
-  ],
-  prerequisites: [
-    'No prior project management experience required',
-    'Basic computer literacy and internet access',
-    'Commitment to completing the weekly exercises',
-  ],
-  audience: ['Graduate students', 'Entrepreneurs', 'Junior project coordinators', 'NGO professionals'],
-  price: '₦49,999.99',
-  enrolledCount: '1,842',
+// ─── API types ────────────────────────────────────────────────────────────────
+interface Trainer {
+  id: string
+  name: string
+  credential: string
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} width="15" height="15" viewBox="0 0 24 24" fill={i <= Math.floor(rating) ? '#F59E0B' : '#D1D5DB'}>
-          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-        </svg>
-      ))}
-      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', marginLeft: '0.25rem' }}>
-        {rating} ({COURSE.reviews} reviews)
-      </span>
-    </div>
-  )
+interface Lesson {
+  id: string
+  title: string
+  order: number
+  duration_seconds: number
+  duration_display: string
 }
 
+interface Module {
+  id: string
+  title: string
+  description: string
+  order: number
+  lessons: Lesson[]
+}
+
+interface CourseDetail {
+  id: string
+  slug: string
+  title: string
+  category: string
+  level: 'beginner' | 'intermediate' | 'advanced' | 'expert'
+  price_kobo: number
+  price_naira: string
+  description: string
+  duration_weeks: number
+  expected_outcomes: string[]
+  prerequisites: string[]
+  target_audience: string[]
+  audience_description: string
+  has_certificate: boolean
+  has_live_support: boolean
+  module_count: number
+  total_duration_seconds: number
+  total_duration_display: string
+  enrolled_count: number
+  trainer: Trainer
+  modules: Module[]
+  created_at: string
+  updated_at: string
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function fetchCourse(slug: string): Promise<CourseDetail> {
+  try {
+    const response = await apiClient.get<CourseDetail>(`/v1/courses/${slug}/`)
+    return response.data
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status
+    if (status === 404) throw new Error('not_found')
+    throw new Error('fetch_failed')
+  }
+}
+
+function formatNaira(raw: string): string {
+  const num = parseFloat(raw)
+  if (isNaN(num)) return `₦${raw}`
+  return `₦${num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
     <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
@@ -60,6 +88,7 @@ const ChevronLeft = () => (
   </svg>
 )
 
+// ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -89,7 +118,6 @@ const CSS = `
 
   .outer-title { font-size: 1.625rem; font-weight: 700; color: #111; }
 
-  /* Card */
   .card {
     width: 100%;
     background: #fff;
@@ -100,9 +128,15 @@ const CSS = `
     flex-direction: column;
   }
 
-  /* Hero */
-  .hero { position: relative; width: 100%; aspect-ratio: 16/7; overflow: hidden; }
+  .state-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 320px; gap: 0.75rem; color: #9CA3AF; font-size: 0.9375rem;
+  }
+  .state-screen.error { color: #EF4444; }
+
+  .hero { position: relative; width: 100%; aspect-ratio: 16/7; overflow: hidden; background: #D0D0D0; }
   .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #c8c8c8 0%, #a0a0a0 100%); }
   .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 25%, rgba(0,0,0,0.7) 100%); }
   .hero-back {
     position: absolute; top: 1rem; left: 1rem;
@@ -116,23 +150,19 @@ const CSS = `
   .badge { display: inline-block; background: #2563EB; color: #fff; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 2rem; width: fit-content; }
   .hero-title { font-size: 1.3rem; font-weight: 700; color: #fff; line-height: 1.25; }
 
-  /* Body */
   .body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.75rem; }
 
-  /* Instructor */
   .instructor { display: flex; align-items: center; gap: 0.75rem; }
-  .instructor img { width: 2.5rem; height: 2.5rem; border-radius: 50%; object-fit: cover; border: 2px solid #E8E8E8; flex-shrink: 0; }
+  .instructor-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2563EB; font-size: 1rem; flex-shrink: 0; border: 2px solid #E8E8E8; }
   .instructor-name { font-size: 0.9375rem; font-weight: 600; color: #111; }
   .instructor-role { font-size: 0.8rem; color: #6B7280; }
 
-  /* Stats */
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #F3F4F6; border-radius: 0.75rem; overflow: hidden; }
   .stat { display: flex; flex-direction: column; align-items: center; padding: 1rem 0.5rem; gap: 0.3rem; border-right: 1px solid #F3F4F6; }
   .stat:last-child { border-right: none; }
   .stat-value { font-size: 0.875rem; font-weight: 700; color: #111; }
   .stat-label { font-size: 0.72rem; color: #9CA3AF; }
 
-  /* Sections */
   .section { display: flex; flex-direction: column; gap: 0.625rem; }
   .section h2 { font-size: 0.9375rem; font-weight: 700; color: #111; }
 
@@ -147,19 +177,12 @@ const CSS = `
 
   .who-text { font-size: 0.875rem; color: #374151; line-height: 1.7; }
 
-  /* Enroll bar — sticky so card height is natural */
   .enroll-bar {
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-    border-top: 1px solid #F3F4F6;
+    position: sticky; bottom: 0;
+    background: #fff; border-top: 1px solid #F3F4F6;
     padding: 1rem 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    border-radius: 0 0 1.25rem 1.25rem;
-    z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    border-radius: 0 0 1.25rem 1.25rem; z-index: 10;
   }
   .enroll-label { font-size: 0.65rem; color: #9CA3AF; }
   .enroll-price { font-size: 1.3rem; font-weight: 700; color: #111; }
@@ -169,7 +192,6 @@ const CSS = `
 
   .footer { font-size: 0.85rem; color: #ABABAB; text-align: center; }
 
-  /* Responsive */
   @media (max-width: 768px) {
     .page { padding: 1.5rem 0.75rem 2.5rem; }
     .outer { padding: 1.25rem; border-radius: 1.25rem; }
@@ -189,8 +211,40 @@ const CSS = `
   }
 `
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function CourseDetailPage() {
   const navigate = useNavigate()
+  const { slug } = useParams<{ slug: string }>()
+
+  const [course, setCourse] = useState<CourseDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!slug) return
+    setLoading(true)
+    setError(null)
+    fetchCourse(slug)
+      .then(setCourse)
+      .catch((e: Error) => {
+        setError(e.message === 'not_found' ? 'Course not found.' : 'Failed to load course.')
+      })
+      .finally(() => setLoading(false))
+  }, [slug])
+
+  const stats = course
+    ? [
+        { icon: Clock,     value: course.total_duration_display || `${course.duration_weeks}w`, label: 'Duration' },
+        { icon: BookOpen,  value: `${course.module_count} module${course.module_count !== 1 ? 's' : ''}`, label: 'Content' },
+        { icon: BarChart2, value: capitalize(course.level), label: 'Level' },
+        { icon: Award,     value: course.has_certificate ? 'Included' : 'None', label: 'Certificate' },
+      ]
+    : []
+
+  // Pass slug via route state so CheckoutPage knows which course to purchase
+  const goToCheckout = () => {
+    navigate(ROUTES.CHECKOUT, { state: { courseSlug: slug } })
+  }
 
   return (
     <>
@@ -202,75 +256,94 @@ export default function CourseDetailPage() {
           <h1 className="outer-title">Course Overview</h1>
 
           <div className="card">
-            {/* Hero */}
-            <div className="hero">
-              <img src={COURSE.thumbnail} alt={COURSE.title} />
-              <div className="hero-overlay" />
-              <button className="hero-back" onClick={() => navigate(ROUTES.COURSES)}><ChevronLeft /></button>
-              <div className="hero-content">
-                <span className="badge">{COURSE.category}</span>
-                <h1 className="hero-title">{COURSE.title}</h1>
-                <Stars rating={COURSE.rating} />
-              </div>
-            </div>
+            {loading && <div className="state-screen">Loading course…</div>}
+            {error && !loading && <div className="state-screen error">{error}</div>}
 
-            {/* Body */}
-            <div className="body">
-              <div className="instructor">
-                <img src={COURSE.instructor.avatar} alt={COURSE.instructor.name} />
-                <div>
-                  <p className="instructor-name">{COURSE.instructor.name}</p>
-                  <p className="instructor-role">{COURSE.instructor.title}</p>
-                </div>
-              </div>
-
-              <div className="stats">
-                {COURSE.stats.map(({ icon: Icon, value, label }, i) => (
-                  <div key={i} className="stat">
-                    <Icon size={18} color="#2563EB" />
-                    <span className="stat-value">{value}</span>
-                    <span className="stat-label">{label}</span>
+            {!loading && !error && course && (
+              <>
+                <div className="hero">
+                  <div className="hero-placeholder" />
+                  <div className="hero-overlay" />
+                  <button className="hero-back" onClick={() => navigate(ROUTES.COURSES)}>
+                    <ChevronLeft />
+                  </button>
+                  <div className="hero-content">
+                    <span className="badge">{course.category}</span>
+                    <h1 className="hero-title">{course.title}</h1>
                   </div>
-                ))}
-              </div>
-
-              <div className="section">
-                <h2>What you'll learn</h2>
-                {COURSE.learningOutcomes.map((item, i) => (
-                  <div key={i} className="outcome"><CheckIcon /><p>{item}</p></div>
-                ))}
-              </div>
-
-              <div className="section">
-                <h2>Prerequisites</h2>
-                {COURSE.prerequisites.map((item, i) => (
-                  <div key={i} className="prereq"><div className="dot" />{item}</div>
-                ))}
-              </div>
-
-              <div className="section">
-                <h2>Who this is for</h2>
-                <p className="who-text">
-                  Built for early-career professionals (0–2 years) who work on or aspire to lead projects.
-                  Especially valuable for professionals in emerging markets seeking internationally recognised skills.
-                </p>
-                <div className="audience-grid">
-                  {COURSE.audience.map((item, i) => (
-                    <div key={i} className="chip"><Users size={13} color="#2563EB" />{item}</div>
-                  ))}
                 </div>
-              </div>
-            </div>
 
-            {/* Enroll bar */}
-            <div className="enroll-bar">
-              <div>
-                <p className="enroll-label">Course price</p>
-                <p className="enroll-price">{COURSE.price}</p>
-                <p className="enroll-sub">{COURSE.enrolledCount} learners enrolled</p>
-              </div>
-              <button className="enroll-btn" onClick={() => navigate(ROUTES.CHECKOUT)}>Pay to Enroll</button>
-            </div>
+                <div className="body">
+                  <div className="instructor">
+                    <div className="instructor-avatar">
+                      {course.trainer.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="instructor-name">{course.trainer.name}</p>
+                      <p className="instructor-role">{course.trainer.credential}</p>
+                    </div>
+                  </div>
+
+                  <div className="stats">
+                    {stats.map(({ icon: Icon, value, label }, i) => (
+                      <div key={i} className="stat">
+                        <Icon size={18} color="#2563EB" />
+                        <span className="stat-value">{value}</span>
+                        <span className="stat-label">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {course.expected_outcomes.length > 0 && (
+                    <div className="section">
+                      <h2>What you'll learn</h2>
+                      {course.expected_outcomes.map((item, i) => (
+                        <div key={i} className="outcome"><CheckIcon /><p>{item}</p></div>
+                      ))}
+                    </div>
+                  )}
+
+                  {course.prerequisites.length > 0 && (
+                    <div className="section">
+                      <h2>Prerequisites</h2>
+                      {course.prerequisites.map((item, i) => (
+                        <div key={i} className="prereq"><div className="dot" />{item}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(course.audience_description || course.target_audience.length > 0) && (
+                    <div className="section">
+                      <h2>Who this is for</h2>
+                      {course.audience_description && (
+                        <p className="who-text">{course.audience_description}</p>
+                      )}
+                      {course.target_audience.length > 0 && (
+                        <div className="audience-grid">
+                          {course.target_audience.map((item, i) => (
+                            <div key={i} className="chip">
+                              <Users size={13} color="#2563EB" />
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="enroll-bar">
+                  <div>
+                    <p className="enroll-label">Course price</p>
+                    <p className="enroll-price">{formatNaira(course.price_naira)}</p>
+                    <p className="enroll-sub">{course.enrolled_count.toLocaleString()} learners enrolled</p>
+                  </div>
+                  <button className="enroll-btn" onClick={goToCheckout}>
+                    Pay to Enroll
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

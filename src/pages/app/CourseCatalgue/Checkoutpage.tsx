@@ -1,13 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, BookOpen, CreditCard, Building2, Smartphone, Tag, Shield, Lock, MessageSquare, Play, Download, RotateCcw, Mail } from 'lucide-react'
+import { Clock, BookOpen, CreditCard, Tag, Shield, MessageSquare, Play, Download } from 'lucide-react'
 import Alert from '../../../components/Alert'
 import Button from '../../../components/Button'
 import { Card, CardBody } from '../../../components/Card'
 import Input from '../../../components/Input'
-import { useCheckout, CheckoutProvider } from '../../../hooks/useCheckout'
 import { ROUTES } from '../../../constants/routes'
-import type { PaymentMethod } from '../../../types'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const COURSE = {
@@ -16,24 +14,202 @@ const COURSE = {
   duration: '4h 30m',
   modules: '8 modules',
   thumbnail: '/intro.png',
-  price: 40992,
+  slug: 'project-management-course', // replace with real slug
 }
-
-const BANK = {
-  number: '8929374625',
-  name: 'TGPL Education Ltd',
-  bankName: 'Guaranty Trust Bank (GTBank)',
-}
-
-const USSD_CODE = '*737*40992*89282937291#'
 
 const fmt = (n: number) => '₦' + n.toLocaleString('en-NG')
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; sub: string; icon: React.ReactNode }[] = [
-  { id: 'card', label: 'Debit / Credit Card', sub: 'Visa, Mastercard, Verve', icon: <CreditCard size={18} color="#6B7280" /> },
-  { id: 'bank', label: 'Bank Transfer', sub: 'Instant verification', icon: <Building2 size={18} color="#6B7280" /> },
-  { id: 'ussd', label: 'USSD', sub: 'Dial *737# to pay', icon: <Smartphone size={18} color="#6B7280" /> },
-]
+// ── Types ──────────────────────────────────────────────────────────────────
+type Screen = 'checkout' | 'processing' | 'success' | 'failed'
+
+interface PaymentResult {
+  reference: string
+  status: 'pending' | 'succeeded' | 'failed'
+  amount_kobo: number
+  amount_naira: string
+  paid_at: string | null
+  is_terminal: boolean
+  failure_reason: string | null
+  course: { slug: string; title: string; trainer_name: string }
+  created_at: string
+}
+
+interface CheckoutCtx {
+  screen: Screen
+  go: (s: Screen) => void
+  email: string
+  setEmail: (v: string) => void
+  promoCode: string
+  setPromoCode: (v: string) => void
+  reference: string | null
+  result: PaymentResult | null
+  initiatePayment: () => Promise<void>
+  retryPayment: () => void
+  isLoading: boolean
+  error: string | null
+}
+
+// ── Context ────────────────────────────────────────────────────────────────
+const CheckoutContext = createContext<CheckoutCtx | null>(null)
+
+const useCheckout = () => {
+  const ctx = useContext(CheckoutContext)
+  if (!ctx) throw new Error('useCheckout must be used within CheckoutProvider')
+  return ctx
+}
+
+// ── Paystack inline loader ─────────────────────────────────────────────────
+declare global {
+  interface Window {
+    PaystackPop: {
+      setup: (opts: {
+        key: string
+        email: string
+        amount: number
+        ref: string
+        access_code?: string
+        onClose: () => void
+        callback: (response: { reference: string }) => void
+      }) => { openIframe: () => void }
+    }
+  }
+}
+
+function loadPaystackScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.PaystackPop) return resolve()
+    const s = document.createElement('script')
+    s.src = 'https://js.paystack.co/v1/inline.js'
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error('Failed to load Paystack'))
+    document.head.appendChild(s)
+  })
+}
+
+// ── Provider ───────────────────────────────────────────────────────────────
+function CheckoutProvider({ children }: { children: React.ReactNode }) {
+  const [screen, setScreen] = useState<Screen>('checkout')
+  const [email, setEmail] = useState('')
+  const [promoCode, setPromoCode] = useState('')
+  const [reference, setReference] = useState<string | null>(null)
+  const [result, setResult] = useState<PaymentResult | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
+
+  const pollStatus = useCallback((ref: string) => {
+    stopPolling()
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/payments/${ref}/`, {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        })
+        if (!res.ok) return
+        const data: PaymentResult = await res.json()
+        if (data.is_terminal) {
+          stopPolling()
+          setResult(data)
+          setScreen(data.status === 'succeeded' ? 'success' : 'failed')
+        }
+      } catch {
+        // keep polling on network hiccups
+      }
+    }, 3000)
+  }, [stopPolling])
+
+  // Stop polling on unmount
+  useEffect(() => () => stopPolling(), [stopPolling])
+
+  const initiatePayment = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      // 1. Get public key
+      const configRes = await fetch('/api/v1/payments/config/', { credentials: 'include' })
+      const { public_key } = await configRes.json()
+
+      // 2. Create/reuse transaction
+      const checkoutRes = await fetch('/api/v1/payments/checkout/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ course_slug: COURSE.slug }),
+      })
+
+      if (!checkoutRes.ok) {
+        const err = await checkoutRes.json()
+        throw new Error(err?.detail || 'Failed to initiate payment')
+      }
+
+      const checkoutData = await checkoutRes.json()
+
+      // 3. Free course — skip Paystack entirely
+      if (checkoutData.is_free) {
+        setResult({ ...checkoutData, status: 'succeeded', is_terminal: true, failure_reason: null })
+        setScreen('success')
+        setIsLoading(false)
+        return
+      }
+
+      const { reference: ref, access_code, amount_kobo } = checkoutData
+      setReference(ref)
+
+      // 4. Load Paystack and open modal
+      await loadPaystackScript()
+      setIsLoading(false)
+
+      const handler = window.PaystackPop.setup({
+        key: public_key,
+        email,
+        amount: amount_kobo,
+        ref,
+        access_code,
+        onClose: () => {
+          // User closed modal — go to processing and poll; they may have paid
+          setScreen('processing')
+          pollStatus(ref)
+        },
+        callback: () => {
+          // Paystack signals success — poll to verify
+          setScreen('processing')
+          pollStatus(ref)
+        },
+      })
+      handler.openIframe()
+    } catch (e: unknown) {
+      setIsLoading(false)
+      setError(e instanceof Error ? e.message : 'Something went wrong')
+    }
+  }, [email, pollStatus])
+
+  const retryPayment = useCallback(() => {
+    setResult(null)
+    setReference(null)
+    setError(null)
+    setScreen('checkout')
+  }, [])
+
+  return (
+    <CheckoutContext.Provider value={{
+      screen, go: setScreen,
+      email, setEmail,
+      promoCode, setPromoCode,
+      reference, result,
+      initiatePayment, retryPayment,
+      isLoading, error,
+    }}>
+      {children}
+    </CheckoutContext.Provider>
+  )
+}
 
 // ── Shared UI ──────────────────────────────────────────────────────────────
 const ChevronLeft = () => (
@@ -74,16 +250,6 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
   )
 }
 
-function AmountBanner() {
-  return (
-    <div style={{ background: 'linear-gradient(135deg, #2563EB, #1d4ed8)', borderRadius: '1rem', padding: '1.5rem' }}>
-      <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem', margin: '0 0 0.25rem' }}>Total amount</p>
-      <p style={{ color: '#fff', fontSize: '2rem', fontWeight: 800, margin: '0 0 0.25rem' }}>{fmt(COURSE.price)}</p>
-      <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.875rem', margin: 0 }}>{COURSE.title}</p>
-    </div>
-  )
-}
-
 function CourseSummary() {
   return (
     <Card variant="elevated">
@@ -103,22 +269,15 @@ function CourseSummary() {
   )
 }
 
-function SecureBadge() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#6B7280', fontSize: '0.8rem' }}>
-      <Shield size={14} color="#22C55E" /><span>Secure payment</span>
-      <span style={{ color: '#D1D5DB' }}>|</span>
-      <Lock size={14} color="#6B7280" /><span>256-bit SSL</span>
-    </div>
-  )
-}
-
 const wrap: React.CSSProperties = { maxWidth: 600, margin: '1.25rem auto 0', padding: '0 1.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }
+
 // ── Checkout Screen ────────────────────────────────────────────────────────
-function CheckoutScreen({ onBack }: { onBack: () => void }) {
-  const { proceed, email, setEmail, promoCode, setPromoCode } = useCheckout()
-  const [localMethod, setLocalMethod] = useState<PaymentMethod | null>(null)
+function CheckoutScreen({ onBack, price }: { onBack: () => void; price?: number }) {
+  const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error } = useCheckout()
   const [promoOpen, setPromoOpen] = useState(false)
+  const displayPrice = price ?? 40992
+
+  const canPay = email.includes('@') && !isLoading
 
   return (
     <>
@@ -127,19 +286,21 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
       <div style={wrap}>
         <CourseSummary />
 
+        {/* Order summary */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Order summary</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: '#374151' }}>
-              <span>Course price</span><span>{fmt(COURSE.price)}</span>
+              <span>Course price</span><span>{fmt(displayPrice)}</span>
             </div>
             <div style={{ height: 1, background: '#F3F4F6' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111' }}>Total</span>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2563EB' }}>{fmt(COURSE.price)}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2563EB' }}>{fmt(displayPrice)}</span>
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
+          {/* Promo code */}
           <div>
             <div onClick={() => setPromoOpen(o => !o)} style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>
@@ -158,6 +319,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Card>
 
+        {/* Email */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Email address</p>
@@ -165,29 +327,28 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
           </CardBody>
         </Card>
 
-        <Card variant="elevated">
-          <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Payment method</p>
-            {PAYMENT_METHODS.map(({ id, label, sub, icon }) => (
-              <div key={id} onClick={() => setLocalMethod(id)} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '1rem 1.1rem', border: `1.5px solid ${localMethod === id ? '#2563EB' : '#E5E7EB'}`, borderRadius: '0.75rem', cursor: 'pointer', background: localMethod === id ? '#EFF6FF' : '#fff' }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${localMethod === id ? '#2563EB' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {localMethod === id && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563EB' }} />}
-                </div>
-                <div style={{ width: 36, height: 36, background: '#F3F4F6', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111', margin: 0 }}>{label}</p>
-                  <p style={{ fontSize: '0.78rem', color: '#9CA3AF', margin: 0 }}>{sub}</p>
-                </div>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
+        {error && <Alert type="error">{error}</Alert>}
 
-        <Button size="large" disabled={!localMethod || !email.includes('@')} onClick={() => localMethod && proceed(localMethod)} style={{ width: '100%', borderRadius: '0.75rem' }}>
-          {localMethod ? `Pay with ${PAYMENT_METHODS.find(m => m.id === localMethod)?.label}` : 'Select payment method'}
-        </Button>
+        {/* Paystack badge + Pay Now */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {/* Powered by Paystack */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem 0' }}>
+            <span style={{ fontSize: '0.875rem', color: '#6B7280', fontWeight: 500 }}>Powered by</span>
+            <PaystackLogo />
+          </div>
+          <Button
+            size="large"
+            disabled={!canPay}
+            onClick={initiatePayment}
+            style={{ width: '100%', borderRadius: '0.75rem' }}
+          >
+            {isLoading ? 'Please wait…' : 'Pay Now'}
+          </Button>
+        </div>
+
         <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#9CA3AF', margin: 0 }}>By continuing, you agree to our Terms of Service</p>
 
+        {/* Trust badges */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingBottom: '1rem' }}>
           {[
             { bg: '#EFF6FF', icon: <Shield size={18} color="#2563EB" />, label: 'Secure payment', sub: '256-bit SSL' },
@@ -209,243 +370,24 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
   )
 }
 
-
-// ── Bank Transfer Screen ───────────────────────────────────────────────────
-function BankTransferScreen() {
-  const { go, processPayment } = useCheckout()
-  const [copied, setCopied] = useState(false)
-  const copy = (text: string) => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }
-
+// ── Paystack Logo SVG ──────────────────────────────────────────────────────
+function PaystackLogo() {
   return (
-    <>
-      <Header title="Bank Transfer" onBack={() => go('checkout')} />
-      <Stepper step={2} />
-      <div style={wrap}>
-        <AmountBanner />
-        <Card variant="elevated">
-          <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: '0 0 0.25rem' }}>Transfer to this account</p>
-              <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>Use the details below to complete your payment</p>
-            </div>
-            {[
-              { label: 'Account number', value: BANK.number, copyable: true },
-              { label: 'Account name', value: BANK.name },
-              { label: 'Bank name', value: BANK.bankName },
-            ].map(({ label, value, copyable }) => (
-              <div key={label} style={{ background: '#F9FAFB', borderRadius: '0.75rem', padding: '0.875rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>{label}</p>
-                  <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{value}</p>
-                </div>
-                {copyable && (
-                  <button onClick={() => copy(value)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', fontWeight: 600, fontSize: '0.875rem' }}>
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                )}
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-        <Alert type="info" title="Important">Your enrollment will be activated within 5 minutes of payment confirmation. Keep your transaction receipt.</Alert>
-        <Button size="large" onClick={processPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>I have paid</Button>
-      </div>
-    </>
-  )
-}
-
-// ── USSD Screen ────────────────────────────────────────────────────────────
-function USSDScreen() {
-  const { go, processPayment } = useCheckout()
-  const [copied, setCopied] = useState(false)
-  const copy = () => { navigator.clipboard.writeText(USSD_CODE); setCopied(true); setTimeout(() => setCopied(false), 2000) }
-
-  return (
-    <>
-      <Header title="USSD Payment" onBack={() => go('checkout')} />
-      <Stepper step={2} />
-      <div style={wrap}>
-        <AmountBanner />
-        <Card variant="elevated">
-          <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: '0 0 0.25rem' }}>Dial this USSD code</p>
-              <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>Use your phone to complete the payment</p>
-            </div>
-            <div style={{ background: '#1F2937', borderRadius: '0.75rem', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.375rem' }}>Dial on your phone</p>
-                <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#fff', margin: 0 }}>{USSD_CODE}</p>
-              </div>
-              <button onClick={copy} style={{ background: '#374151', border: 'none', color: '#fff', borderRadius: '0.5rem', padding: '0.4rem 0.875rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-            <div>
-              <p style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111', margin: '0 0 0.75rem' }}>How to pay:</p>
-              {['Dial the USSD code on your phone', 'Follow the prompts to complete payment', 'Click "I have paid" below once done'].map((step, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.625rem' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#EFF6FF', border: '1.5px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563EB' }}>{i + 1}</span>
-                  </div>
-                  <p style={{ fontSize: '0.875rem', color: '#374151', margin: 0, paddingTop: 2 }}>{step}</p>
-                </div>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-        <Alert type="info">This USSD code works with GTBank. You'll receive an SMS confirmation once payment is successful.</Alert>
-        <Button size="large" onClick={processPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>I have paid</Button>
-      </div>
-    </>
-  )
-}
-
-// ── Card Details Screen ────────────────────────────────────────────────────
-function CardDetailsScreen() {
-  const { go, cardDetails, setCardDetails } = useCheckout()
-  const ready = cardDetails.number.replace(/\s/g, '').length === 16 && cardDetails.name && cardDetails.expiry.length === 5 && cardDetails.cvv.length === 3
-
-  const fmtCard = (v: string) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
-  const fmtExpiry = (v: string) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 2 ? d.slice(0, 2) + '/' + d.slice(2) : d }
-
-  return (
-    <>
-      <Header title="Checkout" onBack={() => go('checkout')} />
-      <Stepper step={2} />
-      <div style={wrap}>
-        <CourseSummary />
-        <AmountBanner />
-        <Card variant="elevated">
-          <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>Card details</p>
-            <Input label="Card number" placeholder="1234 5678 9012 3456" value={cardDetails.number} onChange={e => setCardDetails(d => ({ ...d, number: fmtCard(e.target.value) }))} style={{ padding: '0.75rem 1rem', fontFamily: 'monospace' }} />
-            <Input label="Cardholder name" placeholder="Name on card" value={cardDetails.name} onChange={e => setCardDetails(d => ({ ...d, name: e.target.value }))} style={{ padding: '0.75rem 1rem' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <Input label="Expiry date" placeholder="MM/YY" value={cardDetails.expiry} onChange={e => setCardDetails(d => ({ ...d, expiry: fmtExpiry(e.target.value) }))} style={{ padding: '0.75rem 1rem' }} />
-              <Input label="CVV" placeholder="123" type="password" maxLength={3} value={cardDetails.cvv} onChange={e => setCardDetails(d => ({ ...d, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) }))} style={{ padding: '0.75rem 1rem' }} />
-            </div>
-            <SecureBadge />
-          </CardBody>
-        </Card>
-        {ready && <Button size="large" onClick={() => go('card-pin')} style={{ width: '100%', borderRadius: '0.75rem' }}>Pay Now</Button>}
-      </div>
-    </>
-  )
-}
-
-// ── Card PIN Screen ────────────────────────────────────────────────────────
-function CardPinScreen() {
-  const { go } = useCheckout()
-  const [pin, setPin] = useState(['', '', '', ''])
-  const r0 = useRef<HTMLInputElement>(null)
-  const r1 = useRef<HTMLInputElement>(null)
-  const r2 = useRef<HTMLInputElement>(null)
-  const r3 = useRef<HTMLInputElement>(null)
-  const refs = [r0, r1, r2, r3]
-
-  const handlePin = (i: number, v: string) => {
-    const d = v.replace(/\D/g, '').slice(-1)
-    const next = [...pin]; next[i] = d; setPin(next)
-    if (d && i < 3) refs[i + 1].current?.focus()
-  }
-  const handleKey = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !pin[i] && i > 0) refs[i - 1].current?.focus()
-  }
-
-  return (
-    <>
-      <Header title="Checkout" onBack={() => go('card-details')} />
-      <Stepper step={2} />
-      <div style={wrap}>
-        <CourseSummary />
-        <AmountBanner />
-        <Card variant="elevated">
-          <CardBody style={{ padding: '2rem 1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Lock size={24} color="#2563EB" />
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111', margin: '0 0 0.375rem' }}>Enter your card PIN</p>
-              <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>Enter the 4-digit PIN for card ending in 1121</p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              {pin.map((d, i) => (
-                <input key={i} ref={refs[i]} type="password" inputMode="numeric" maxLength={1} value={d}
-                  onChange={e => handlePin(i, e.target.value)} onKeyDown={e => handleKey(i, e)}
-                  style={{ width: 52, height: 60, textAlign: 'center', fontSize: '1.5rem', fontWeight: 700, border: `1.5px solid ${d ? '#2563EB' : '#E5E7EB'}`, borderRadius: '0.75rem', outline: 'none', background: '#fff', color: '#111' }}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#9CA3AF', fontSize: '0.8rem' }}>
-              <Shield size={14} /><span>Your PIN is encrypted and secure</span>
-            </div>
-          </CardBody>
-        </Card>
-        <Button size="large" disabled={!pin.every(d => d !== '')} onClick={() => go('card-otp')} style={{ width: '100%', borderRadius: '0.75rem' }}>Continue</Button>
-      </div>
-    </>
-  )
-}
-
-// ── Card OTP Screen ────────────────────────────────────────────────────────
-function CardOTPScreen() {
-  const { go, processPayment } = useCheckout()
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const r0 = useRef<HTMLInputElement>(null)
-  const r1 = useRef<HTMLInputElement>(null)
-  const r2 = useRef<HTMLInputElement>(null)
-  const r3 = useRef<HTMLInputElement>(null)
-  const r4 = useRef<HTMLInputElement>(null)
-  const r5 = useRef<HTMLInputElement>(null)
-  const refs = [r0, r1, r2, r3, r4, r5]
-
-  const handleOtp = (i: number, v: string) => {
-    const d = v.replace(/\D/g, '').slice(-1)
-    const next = [...otp]; next[i] = d; setOtp(next)
-    if (d && i < 5) refs[i + 1].current?.focus()
-  }
-  const handleKey = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[i] && i > 0) refs[i - 1].current?.focus()
-  }
-
-  return (
-    <>
-      <Header title="Checkout" onBack={() => go('card-pin')} />
-      <Stepper step={2} />
-      <div style={wrap}>
-        <CourseSummary />
-        <AmountBanner />
-        <Card variant="elevated">
-          <CardBody style={{ padding: '2rem 1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Mail size={24} color="#22C55E" />
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111', margin: '0 0 0.375rem' }}>Enter OTP</p>
-              <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>A 6-digit code was sent to learner@example.com</p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.625rem' }}>
-              {otp.map((d, i) => (
-                <input key={i} ref={refs[i]} type="text" inputMode="numeric" maxLength={1} value={d}
-                  onChange={e => handleOtp(i, e.target.value)} onKeyDown={e => handleKey(i, e)}
-                  style={{ width: 48, height: 56, textAlign: 'center', fontSize: '1.25rem', fontWeight: 700, border: `1.5px solid ${d ? '#2563EB' : '#E5E7EB'}`, borderRadius: '0.75rem', outline: 'none', background: '#fff', color: '#111' }}
-                />
-              ))}
-            </div>
-            <button style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>Resend OTP</button>
-          </CardBody>
-        </Card>
-        <Alert type="info">The OTP is valid for 10 minutes. Check your spam folder if you don't see it.</Alert>
-        <Button size="large" disabled={!otp.every(d => d !== '')} onClick={processPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Complete Payment</Button>
-      </div>
-    </>
+    <svg width="90" height="20" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Paystack stack icon */}
+      <rect x="0" y="2" width="18" height="5" rx="1.5" fill="#00C3F7" />
+      <rect x="0" y="8.5" width="18" height="5" rx="1.5" fill="#011B33" />
+      <rect x="0" y="15" width="18" height="5" rx="1.5" fill="#011B33" opacity="0.4" />
+      {/* Paystack wordmark */}
+      <text x="23" y="15" fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="13" fill="#011B33">Paystack</text>
+    </svg>
   )
 }
 
 // ── Processing Screen ──────────────────────────────────────────────────────
 function ProcessingScreen() {
-  const { go, orderRef } = useCheckout()
+  const { reference, go } = useCheckout()
+
   return (
     <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '2rem' }}>
       <div style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -456,47 +398,71 @@ function ProcessingScreen() {
         <p style={{ fontSize: '1rem', color: '#6B7280', margin: '0 0 0.5rem', lineHeight: 1.6 }}>Don't close this page. We're confirming your payment.</p>
         <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>This usually takes 5–30 seconds</p>
       </div>
-      <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Order reference</p>
-        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{orderRef}</p>
-      </div>
-      <button onClick={() => go('checkout')} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}>Cancel</button>
+      {reference && (
+        <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Order reference</p>
+          <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{reference}</p>
+        </div>
+      )}
+      <button
+        onClick={() => go('checkout')}
+        style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}
+      >
+        Cancel
+      </button>
     </div>
   )
 }
 
 // ── Success Screen ─────────────────────────────────────────────────────────
 function SuccessScreen() {
-  const { method, orderRef } = useCheckout()
+  const { result } = useCheckout()
   const navigate = useNavigate()
-  const methodLabel = method === 'card' ? 'Debit Card' : method === 'bank' ? 'Bank Transfer' : 'USSD'
+
+  const amountDisplay = result?.amount_naira ?? fmt(40992)
+  const dateDisplay = result?.paid_at
+    ? new Date(result.paid_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const courseTitle = result?.course?.title ?? COURSE.title
+  const trainerName = result?.course?.trainer_name ?? COURSE.instructor
+  const ref = result?.reference ?? '—'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F5F5F5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '2rem' }}>
-      <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 12px rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
+      {/* Green circle */}
+      <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 16px rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
       </div>
+
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.5rem' }}>Payment successful</p>
-        <p style={{ fontSize: '0.9rem', color: '#6B7280', margin: 0 }}>You now have full access to <strong>{COURSE.title}</strong></p>
+        <p style={{ fontSize: '0.9rem', color: '#6B7280', margin: 0 }}>You now have full access to <strong>{courseTitle}</strong></p>
       </div>
+
+      {/* Receipt card */}
       <Card variant="elevated" style={{ width: '100%', maxWidth: 480 }}>
+        {/* Order ID header row — blue tint */}
+        <div style={{ background: 'linear-gradient(135deg, #EFF6FF, #F0F9FF)', borderRadius: '0.75rem 0.75rem 0 0', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>Order ID</span>
+          <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>{ref}</span>
+        </div>
         <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>Order ID</span>
-            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>{orderRef}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 0', borderTop: '1px solid #F3F4F6', borderBottom: '1px solid #F3F4F6' }}>
-            <img src={COURSE.thumbnail} alt={COURSE.title} style={{ width: 56, height: 42, borderRadius: '0.5rem', objectFit: 'cover' }} />
+          {/* Course row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #F3F4F6' }}>
+            <img src={COURSE.thumbnail} alt={courseTitle} style={{ width: 56, height: 42, borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
             <div>
-              <p style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111', margin: 0 }}>{COURSE.title}</p>
-              <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: 0 }}>{COURSE.instructor}</p>
+              <p style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111', margin: 0 }}>{courseTitle}</p>
+              <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: 0 }}>{trainerName}</p>
             </div>
           </div>
+          {/* Details */}
           {[
-            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Amount paid', value: fmt(COURSE.price) },
-            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Date', value: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) },
-            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Payment method', value: methodLabel },
+            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Amount paid', value: amountDisplay },
+            {
+              icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
+              label: 'Date', value: dateDisplay,
+            },
+            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Payment method', value: 'Paystack' },
           ].map(({ icon, label, value }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#6B7280' }}>{icon}{label}</span>
@@ -505,6 +471,8 @@ function SuccessScreen() {
           ))}
         </CardBody>
       </Card>
+
+      {/* Actions */}
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <Button size="large" icon={<Play size={16} />} onClick={() => navigate(ROUTES.COURSES)} style={{ width: '100%', borderRadius: '0.75rem' }}>Start learning</Button>
         <Button size="large" variant="outline" icon={<Download size={16} />} style={{ width: '100%', borderRadius: '0.75rem' }}>Download receipt</Button>
@@ -516,27 +484,42 @@ function SuccessScreen() {
 
 // ── Failed Screen ──────────────────────────────────────────────────────────
 function FailedScreen() {
-  const { result, retry, reset } = useCheckout()
+  const { result, retryPayment } = useCheckout()
+
+  // Use dynamic failure reason from API, fall back to a generic message
+  const failureTitle = result?.failure_reason ?? 'Your card was declined'
+  const ref = result?.reference ?? '—'
+
   return (
-    <div style={{ minHeight: '100vh', background: '#F5F5F5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
+      {/* Orange warning circle */}
       <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#F59E0B" stroke="none" />
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+          <line x1="12" y1="9" x2="12" y2="13" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="12" cy="17" r="1" fill="#fff" />
         </svg>
       </div>
+
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.375rem' }}>Payment didn't go through</p>
-        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#374151', margin: '0 0 0.75rem' }}>Your card was declined</p>
-        <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, maxWidth: 360, lineHeight: 1.6 }}>This could be due to incorrect card details, expired card, or your bank blocking the transaction for security reasons.</p>
+        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#374151', margin: '0 0 0.75rem' }}>{failureTitle}</p>
+        <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, maxWidth: 360, lineHeight: 1.6 }}>
+          This could be due to incorrect card details, expired card, or your bank blocking the transaction for security reasons.
+        </p>
       </div>
+
+      {/* Reference */}
       <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
         <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Reference ID</p>
-        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{result?.referenceId}</p>
+        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{ref}</p>
       </div>
+
+      {/* Actions */}
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <Button size="large" icon={<RotateCcw size={16} />} onClick={retry} style={{ width: '100%', borderRadius: '0.75rem' }}>Try again</Button>
-        <Button size="large" variant="outline" onClick={reset} style={{ width: '100%', borderRadius: '0.75rem' }}>Use a different method</Button>
+        <Button size="large" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Try again</Button>
+        <Button size="large" variant="outline" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Use a different method</Button>
         <button style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
           <MessageSquare size={16} />Contact support
         </button>
@@ -546,20 +529,16 @@ function FailedScreen() {
   )
 }
 
+// ── Root ───────────────────────────────────────────────────────────────────
 function CheckoutPageInner() {
   const navigate = useNavigate()
   const { screen } = useCheckout()
 
-  const screens: Record<string, React.ReactNode> = {
-    'checkout': <CheckoutScreen onBack={() => navigate(ROUTES.COURSES)} />,
-    'bank-details': <BankTransferScreen />,
-    'ussd-details': <USSDScreen />,
-    'card-details': <CardDetailsScreen />,
-    'card-pin': <CardPinScreen />,
-    'card-otp': <CardOTPScreen />,
-    'processing': <ProcessingScreen />,
-    'success': <SuccessScreen />,
-    'failed': <FailedScreen />,
+  const screens: Record<Screen, React.ReactNode> = {
+    checkout: <CheckoutScreen onBack={() => navigate(ROUTES.COURSES)} />,
+    processing: <ProcessingScreen />,
+    success: <SuccessScreen />,
+    failed: <FailedScreen />,
   }
 
   return (

@@ -1,30 +1,74 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { RouteBuilder } from '../../../constants/routes'
+import { apiClient } from '../../../services/api'
 
-interface Course {
-  id: number
-  tag: string
+// ─── API types ────────────────────────────────────────────────────────────────
+interface CourseListItem {
+  id: string
+  slug: string
   title: string
-  type: 'video' | 'course'
-  thumbnail: string | null
-  instructor?: string
+  category: string
+  level: 'beginner' | 'intermediate' | 'advanced' | 'expert'
+  price_kobo: number
+  price_naira: string
+  trainer_name: string
 }
 
-const MOCK_COURSES: Course[] = [
-  { id: 1, tag: 'PROJECT MANAGEMENT', title: 'Introductory Video', type: 'video', thumbnail: '/imagee2.png' },
-  { id: 2, tag: 'COURSE', title: 'Project Management Course', instructor: 'Enobong Okposin', type: 'course', thumbnail: '/intro.png' },
-]
+interface PaginatedCourses {
+  count: number
+  next: string | null
+  previous: string | null
+  results: CourseListItem[]
+}
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Courses whose title starts with "introductory" (case-insensitive) get the
+ * video-card treatment (play overlay, navigates to /preview instead of detail).
+ * Adjust this heuristic if your backend adds a dedicated type field later.
+ */
+function isIntroVideo(course: CourseListItem) {
+  return course.title.toLowerCase().startsWith('introductory')
+}
+
+async function fetchCatalogue(search: string): Promise<CourseListItem[]> {
+  const params = new URLSearchParams()
+  if (search.trim()) params.set('search', search.trim())
+  const response = await apiClient.get<PaginatedCourses>(`/v1/courses/?${params}`)
+  return response.data.results
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function CourseCatalogPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState<string>('')
+  const [search, setSearch] = useState('')
+  const [courses, setCourses] = useState<CourseListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filtered = MOCK_COURSES.filter((c) =>
-    c.title.toLowerCase().includes(search.toLowerCase()) ||
-    c.tag.toLowerCase().includes(search.toLowerCase()) ||
-    (c.instructor && c.instructor.toLowerCase().includes(search.toLowerCase()))
-  )
+  const load = useCallback(async (q: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const results = await fetchCatalogue(q)
+      setCourses(results)
+    } catch {
+      setError('Failed to load courses. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Initial load
+  useEffect(() => { load('') }, [load])
+
+  // Debounced search — re-query the API so server-side search runs
+  useEffect(() => {
+    const id = setTimeout(() => load(search), 350)
+    return () => clearTimeout(id)
+  }, [search, load])
 
   return (
     <>
@@ -55,7 +99,8 @@ export default function CourseCatalogPage() {
         .course-tag { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; color: var(--primary-500, #2563EB); text-transform: uppercase; margin: 0; }
         .course-title { font-size: 0.9375rem; font-weight: 700; color: var(--black, #111); margin: 0; line-height: 1.35; }
         .course-instructor { font-size: 0.8125rem; color: #999; margin: 0; }
-        .catalog-empty { text-align: center; padding: 3rem 1rem; color: #ABABAB; font-size: 0.9375rem; }
+        .catalog-state { text-align: center; padding: 3rem 1rem; color: #ABABAB; font-size: 0.9375rem; }
+        .catalog-state.error { color: #EF4444; }
         .catalog-footer { margin-top: 2.5rem; font-size: 0.875rem; color: #ABABAB; text-align: center; }
         @media (max-width: 600px) { .catalog-card { padding: 1.5rem 1rem 1.75rem; } .catalog-card h1 { font-size: 1.375rem; } .catalog-grid { grid-template-columns: 1fr 1fr; gap: 0.875rem; } }
         @media (max-width: 400px) { .catalog-grid { grid-template-columns: 1fr; } }
@@ -78,7 +123,7 @@ export default function CourseCatalogPage() {
 
           <div className="catalog-search-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               className="catalog-search"
@@ -89,39 +134,46 @@ export default function CourseCatalogPage() {
             />
           </div>
 
-          {filtered.length === 0 ? (
-            <div className="catalog-empty">No courses match your search.</div>
-          ) : (
+          {loading && <div className="catalog-state">Loading courses…</div>}
+
+          {error && !loading && <div className="catalog-state error">{error}</div>}
+
+          {!loading && !error && courses.length === 0 && (
+            <div className="catalog-state">No courses match your search.</div>
+          )}
+
+          {!loading && !error && courses.length > 0 && (
             <div className="catalog-grid">
-              {filtered.map((course) => (
-                <Link
-                  key={course.id}
-                  className="course-card"
-                  to={course.type === 'video' ? `/courses/${course.id}/preview` : RouteBuilder.course(course.id)}
-                >
-                  <div className="course-thumb">
-                    {course.thumbnail ? (
-                      <img src={course.thumbnail} alt={course.title} />
-                    ) : (
+              {courses.map((course) => {
+                const video = isIntroVideo(course)
+                const to = video
+                  ? `/courses/${course.slug}/preview`
+                  : RouteBuilder.course(course.slug)
+
+                return (
+                  <Link key={course.id} className="course-card" to={to}>
+                    <div className="course-thumb">
                       <div className="course-thumb-placeholder" />
-                    )}
-                    {course.type === 'video' && (
-                      <div className="play-overlay">
-                        <div className="play-btn">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5,3 19,12 5,21"/>
-                          </svg>
+                      {video && (
+                        <div className="play-overlay">
+                          <div className="play-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <polygon points="5,3 19,12 5,21" />
+                            </svg>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="course-body">
-                    <p className="course-tag">{course.tag}</p>
-                    <p className="course-title">{course.title}</p>
-                    {course.instructor && <p className="course-instructor">{course.instructor}</p>}
-                  </div>
-                </Link>
-              ))}
+                      )}
+                    </div>
+                    <div className="course-body">
+                      <p className="course-tag">{course.category}</p>
+                      <p className="course-title">{course.title}</p>
+                      {course.trainer_name && (
+                        <p className="course-instructor">{course.trainer_name}</p>
+                      )}
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>

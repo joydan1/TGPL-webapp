@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosError } from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api'
 import { useAuthStore } from '../store/auth'
-import type { PaymentMethod } from '../types'
+
 // ─── Response Types ───────────────────────────────────────────────────────────
 
 export interface ApiErrorResponse {
@@ -20,7 +20,7 @@ export interface UserResponse {
   is_active: boolean
   is_email_verified: boolean
   created_at: string
-  learner_profile?: LearnerProfile | null   
+  learner_profile?: LearnerProfile | null
 }
 
 export interface LearnerProfile {
@@ -77,7 +77,46 @@ export interface LearnerProfilePayload {
   preferred_learning_hours?: string
 }
 
+// ─── Payment Types ────────────────────────────────────────────────────────────
+
+export interface CheckoutResponse {
+  is_free: false
+  reference: string
+  payment_id: string
+  access_code: string
+  authorization_url: string
+  amount_kobo: number
+}
+
+export interface FreeCourseCheckoutResponse {
+  is_free: true
+  reference: string
+  payment_id: string
+}
+
+export interface PaymentStatusResponse {
+  reference: string
+  status: 'pending' | 'succeeded' | 'failed'
+  amount_kobo: number
+  amount_naira: string
+  paid_at: string | null
+  is_terminal: boolean
+  failure_reason: string | null
+  course: {
+    slug: string
+    title: string
+    trainer_name: string
+  }
+  created_at: string
+}
+
+export interface PaymentConfigResponse {
+  public_key: string
+  callback_url_pattern: string
+}
+
 // ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
+
 const SKIP_REFRESH_ROUTES = [
   API_ENDPOINTS.LOGIN,
   API_ENDPOINTS.SIGNUP,
@@ -141,9 +180,9 @@ class ApiClient {
 
     if (!this.refreshTokenPromise) {
       this.refreshTokenPromise = this.refreshAccessToken()
-        .then((newToken) => { 
+        .then((newToken) => {
           this.refreshTokenPromise = null
-          return newToken 
+          return newToken
         })
         .catch(() => {
           this.refreshTokenPromise = null
@@ -348,49 +387,54 @@ export const authAPI = {
   }),
 }
 
-// ── Payment API ─────────────────────────────
-export interface InitiatePaymentPayload {
-  courseId: string
-  method: PaymentMethod
-  email: string
-  promoCode?: string
-}
-
-export interface VerifyPaymentPayload {
-  referenceId: string
-  method: PaymentMethod
-}
+// ─── Payment API ──────────────────────────────────────────────────────────────
 
 export const paymentAPI = {
-  initiate: async (payload: InitiatePaymentPayload) => {
+  // GET /api/v1/payments/config/
+  getConfig: async () => {
     try {
-      const response = await apiClient.post<{ orderId: string; referenceId: string }>(
-        '/api/v1/payments/initiate/', payload
-      )
+      const response = await apiClient.get<PaymentConfigResponse>('/v1/payments/config/')
       return { success: true, data: response.data }
     } catch (error) {
-      const { message } = parseApiError(error, 'Failed to initiate payment')
+      const { message } = parseApiError(error, 'Failed to load payment configuration')
       return { success: false, error: message }
     }
   },
 
-  verify: async (payload: VerifyPaymentPayload) => {
+  // POST /api/v1/payments/checkout/
+  checkout: async (courseSlug: string) => {
     try {
-      const response = await apiClient.post<{ status: 'success' | 'failed' | 'pending' }>(
-        '/api/v1/payments/verify/', payload
+      const response = await apiClient.post<CheckoutResponse | FreeCourseCheckoutResponse>(
+        '/v1/payments/checkout/',
+        { course_slug: courseSlug },
       )
       return { success: true, data: response.data }
     } catch (error) {
-      const { message } = parseApiError(error, 'Payment verification failed')
+      const { message, statusCode } = parseApiError(error, 'Failed to initiate payment')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  // GET /api/v1/payments/{reference}/
+  getStatus: async (reference: string) => {
+    try {
+      const response = await apiClient.get<PaymentStatusResponse>(
+        `/v1/payments/${reference}/`,
+      )
+      return { success: true, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to get payment status')
       return { success: false, error: message }
     }
   },
 }
+
+// ─── Learner Profile API ──────────────────────────────────────────────────────
 
 export const learnerProfileAPI = {
   getLearnerProfile: async () => {
     try {
-      const response = await apiClient.get<LearnerProfile>('/api/v1/users/me/learner-profile/')
+      const response = await apiClient.get<LearnerProfile>('/v1/users/me/learner-profile/')
       return { success: true, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to get learner profile')
@@ -401,7 +445,7 @@ export const learnerProfileAPI = {
   updateLearnerProfile: async (payload: LearnerProfilePayload) => {
     try {
       const response = await apiClient.patch<LearnerProfile>(
-        '/api/v1/users/me/learner-profile/',
+        '/v1/users/me/learner-profile/',
         payload,
       )
       return { success: true, data: response.data }
