@@ -4,18 +4,7 @@ import { useAuthStore } from '../../store/auth'
 import { authAPI } from '../../services/api'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
 import type { User } from '../../types/index'
-
-function Spinner() {
-  return (
-    <svg
-      style={{ animation: 'spin 0.7s linear infinite', width: 24, height: 24 }}
-      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-    >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} />
-      <path fill="currentColor" style={{ opacity: 0.8 }} d="M4 12a8 8 0 018-8v8H4z" />
-    </svg>
-  )
-}
+import Spinner from '../../components/Spinner'
 
 type State = 'verifying' | 'success' | 'error'
 
@@ -30,6 +19,10 @@ export default function EmailVerificationPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
+  // Store profile completion status in local state so handleContinue
+  // never reads stale Zustand state — the value is captured at verify time
+  const [profileStatus, setProfileStatus] = useState<string | null>(null)
+
   useEffect(() => {
     if (!token) {
       setState('error')
@@ -41,7 +34,6 @@ export default function EmailVerificationPage() {
       const result = await authAPI.verifyEmail({ token })
 
       if (result.success) {
-        // Backend returns tokens on success — log the user in
         const userResult = await authAPI.getCurrentUser()
         if (userResult.success && userResult.data) {
           const userData = userResult.data
@@ -54,6 +46,8 @@ export default function EmailVerificationPage() {
             learner_profile: userData.learner_profile || null,
           }
           useAuthStore.getState().setUser(user)
+          // Capture status into local state — safe to read synchronously in handleContinue
+          setProfileStatus(userData.learner_profile?.completion_status ?? null)
           setResendEmail(userData.email)
         }
         setState('success')
@@ -79,26 +73,18 @@ export default function EmailVerificationPage() {
     setResendLoading(false)
   }
 
+  // Reads from local state — no stale Zustand access risk
   const handleContinue = () => {
-  const user = useAuthStore.getState().user
-  const status = user?.learner_profile?.completion_status
-  navigate(status === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
-}
+    navigate(profileStatus === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+  }
 
   return (
     <>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } * { box-sizing: border-box; }`}</style>
 
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: 'var(--grey)', padding: '1rem',
-      }}>
-        <div style={{
-          background: 'var(--white)', borderRadius: 'var(--radius-lg)',
-          padding: '3rem 2.5rem', maxWidth: 440, width: '100%',
-          textAlign: 'center', boxShadow: 'var(--shadow-sm)',
-        }}>
-          {/* Logo */}
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--grey)', padding: '1rem' }}>
+        <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', padding: '3rem 2.5rem', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: 'var(--shadow-sm)' }}>
+
           <div style={{ marginBottom: '1.5rem' }}>
             <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
           </div>
@@ -107,7 +93,7 @@ export default function EmailVerificationPage() {
           {state === 'verifying' && (
             <>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', color: 'var(--primary-500)' }}>
-                <Spinner />
+                <Spinner size={24} />
               </div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--black)', margin: '0 0 0.75rem' }}>
                 Verifying your email...
@@ -121,12 +107,7 @@ export default function EmailVerificationPage() {
           {/* ── Success ── */}
           {state === 'success' && (
             <>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(34,197,94,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1.5rem',
-              }}>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />
                   <path d="M8 12l3 3 5-5" />
@@ -141,12 +122,7 @@ export default function EmailVerificationPage() {
               <button
                 type="button"
                 onClick={handleContinue}
-                style={{
-                  width: '100%', padding: '0.875rem 1rem', borderRadius: 'var(--radius-md)',
-                  border: 'none', background: 'var(--primary-500)', color: '#fff',
-                  fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
-                  transition: 'opacity 0.2s',
-                }}
+                style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--primary-500)', color: '#fff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' }}
               >
                 Continue to dashboard
               </button>
@@ -156,12 +132,7 @@ export default function EmailVerificationPage() {
           {/* ── Error ── */}
           {state === 'error' && (
             <>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(239,68,68,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1.5rem',
-              }}>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
@@ -175,11 +146,7 @@ export default function EmailVerificationPage() {
                 {errorMessage}
               </p>
 
-              {/* Resend option */}
-              <div style={{
-                padding: '1rem', background: '#F9F9F9',
-                borderRadius: 'var(--radius-md)', marginBottom: '1.5rem',
-              }}>
+              <div style={{ padding: '1rem', background: '#F9F9F9', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
                 <p style={{ fontSize: '0.875rem', color: '#666', margin: '0 0 0.5rem' }}>
                   Need a new verification link?
                 </p>
@@ -189,22 +156,13 @@ export default function EmailVerificationPage() {
                       type="email"
                       placeholder="Enter your email"
                       onChange={(e) => setResendEmail(e.target.value)}
-                      style={{
-                        width: '100%', padding: '0.625rem 0.875rem',
-                        border: '1px solid #E8E8E8', borderRadius: 'var(--radius-md)',
-                        fontSize: '0.875rem', marginBottom: '0.5rem',
-                        outline: 'none', fontFamily: 'inherit',
-                      }}
+                      style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1px solid #E8E8E8', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', marginBottom: '0.5rem', outline: 'none', fontFamily: 'inherit' }}
                     />
                     <button
                       type="button"
                       onClick={handleResend}
                       disabled={resendLoading || !resendEmail}
-                      style={{
-                        background: 'none', border: 'none', color: 'var(--primary-500)',
-                        fontWeight: 600, cursor: resendLoading ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem', opacity: resendLoading ? 0.6 : 1,
-                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary-500)', fontWeight: 600, cursor: resendLoading ? 'not-allowed' : 'pointer', fontSize: '0.875rem', opacity: resendLoading ? 0.6 : 1 }}
                     >
                       {resendLoading ? 'Sending...' : 'Resend verification email'}
                     </button>
@@ -214,30 +172,20 @@ export default function EmailVerificationPage() {
                     type="button"
                     onClick={handleResend}
                     disabled={resendLoading}
-                    style={{
-                      background: 'none', border: 'none', color: 'var(--primary-500)',
-                      fontWeight: 600, cursor: resendLoading ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem', opacity: resendLoading ? 0.6 : 1,
-                      display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 auto',
-                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--primary-500)', fontWeight: 600, cursor: resendLoading ? 'not-allowed' : 'pointer', fontSize: '0.875rem', opacity: resendLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 auto' }}
                   >
+                    {resendLoading && <Spinner size={16} />}
                     {resendLoading ? 'Sending...' : 'Resend verification email'}
                   </button>
                 )}
                 {resendMessage && (
-                  <p style={{
-                    fontSize: '0.8125rem', margin: '0.5rem 0 0',
-                    color: resendMessage.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--success)',
-                  }}>
+                  <p style={{ fontSize: '0.8125rem', margin: '0.5rem 0 0', color: resendMessage.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--success)' }}>
                     {resendMessage}
                   </p>
                 )}
               </div>
 
-              <Link
-                to={ROUTES.LOGIN}
-                style={{ color: 'var(--primary-500)', fontWeight: 600, textDecoration: 'none', fontSize: '0.9rem' }}
-              >
+              <Link to={ROUTES.LOGIN} style={{ color: 'var(--primary-500)', fontWeight: 600, textDecoration: 'none', fontSize: '0.9rem' }}>
                 Back to login
               </Link>
             </>

@@ -1,7 +1,6 @@
 export const API_BASE_URL = import.meta.env.DEV
   ? '/api'
-  : import.meta.env.VITE_API_BASE_URL || 'https://tgpl-backend-staging.onrender.com/api'
-
+  : import.meta.env.VITE_API_BASE_URL || 'https://tgpl-webapp-backend-staging.up.railway.app/api'
 export const API_ENDPOINTS = {
   // Auth
   SIGNUP: '/v1/auth/signup/',

@@ -88,7 +88,7 @@ const ChevronLeft = () => (
   </svg>
 )
 
-// ─── CSS ──────────────────────────────────────────────────────────────────────
+// ─── CSS ───────────────────
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

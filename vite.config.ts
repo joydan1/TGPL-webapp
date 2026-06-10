@@ -39,7 +39,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://tgpl-backend-staging.onrender.com',
+         target: 'https://tgpl-webapp-backend-staging.up.railway.app',
         changeOrigin: true,
         secure: true,
       },

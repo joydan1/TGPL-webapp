@@ -28,10 +28,10 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   COURSES: '/courses',
 
-  COURSE_DETAIL: '/courses/:id',
+  COURSE_DETAIL: '/courses/:slug',
   CHECKOUT: '/checkout',
-  COURSE_LEARN: '/courses/:id/learn/:lessonId',
-  COURSE_ASSIGNMENTS: '/courses/:id/assignments',
+  COURSE_LEARN: '/courses/:slug/learn/:lessonId',
+  COURSE_ASSIGNMENTS: '/courses/:slug/assignments',
   ASSIGNMENT_DETAIL: '/assignments/:id',
   ASSIGNMENT_SUBMIT: '/assignments/:id/submit',
   ASSIGNMENT_FEEDBACK: '/assignments/:id/feedback',
@@ -272,12 +272,11 @@ export const RouteBuilder = {
   signup: () => ROUTES.SIGNUP,
   onboarding: () => ROUTES.ONBOARDING,
   dashboard: () => ROUTES.DASHBOARD,
-  courses: () => ROUTES.COURSES,
-  course: (id: string | number) => getRoute(ROUTES.COURSE_DETAIL, { id }),
-  courseLearn: (courseId: string | number, lessonId: string | number) =>
-    getRoute(ROUTES.COURSE_LEARN, { id: courseId, lessonId }),
-  courseAssignments: (courseId: string | number) =>
-    getRoute(ROUTES.COURSE_ASSIGNMENTS, { id: courseId }),
+  course: (slug: string) => getRoute(ROUTES.COURSE_DETAIL, { slug }),
+courseLearn: (slug: string, lessonId: string | number) =>
+  getRoute(ROUTES.COURSE_LEARN, { slug, lessonId }),
+courseAssignments: (slug: string) =>
+  getRoute(ROUTES.COURSE_ASSIGNMENTS, { slug }),
   assignmentDetail: (id: string | number) =>
     getRoute(ROUTES.ASSIGNMENT_DETAIL, { id }),
   assignmentSubmit: (id: string | number) =>

@@ -85,7 +85,7 @@ function App() {
         <Route path={ROUTES.TERMS} element={<TermsPage />} />
         <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
 
-        {/* ===== PROTECTED APP ROUTES (no header/footer) ===== */}
+        {/* ===== PROTECTED APP ROUTES */}
         <Route
           path={ROUTES.ONBOARDING}
           element={
@@ -111,8 +111,8 @@ function App() {
     </ProtectedRoute>
   }
 />
-<Route path="/courses/:id" element={<ProtectedRoute requiredRole="learner"><CourseDetailPage /></ProtectedRoute>} />
-<Route path="/courses/:id/preview" element={<ProtectedRoute requiredRole="learner"><CoursePlayerPage /></ProtectedRoute>} />
+<Route path="/courses/:slug" element={<ProtectedRoute requiredRole="learner"><CourseDetailPage /></ProtectedRoute>} />
+<Route path="/courses/:slug/preview" element={<ProtectedRoute requiredRole="learner"><CoursePlayerPage /></ProtectedRoute>} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
