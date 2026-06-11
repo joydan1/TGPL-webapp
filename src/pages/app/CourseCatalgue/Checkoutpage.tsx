@@ -84,9 +84,12 @@ function loadPaystackScript(): Promise<void> {
 }
 
 function fmtNaira(raw: string): string {
-  const num = parseFloat(raw)
-  if (isNaN(num)) return `â‚¦${raw}`
-  return 'â‚¦' + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const num = Number(raw)
+  if (isNaN(num)) return `₦${raw}`
+  return `₦${num.toLocaleString('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 }
 
 function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
