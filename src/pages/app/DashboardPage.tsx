@@ -205,14 +205,40 @@ const CSS = `
   .cert-view { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; }
   .cert-right { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
+  /* ── Mobile tab bar ──────────────────────────────────────────────────── */
+  .mobile-tabbar {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 60px; background: #fff; border-top: 1px solid #F3F4F6;
+    z-index: 300;
+  }
+  .mobile-tabbar-inner {
+    display: flex; height: 100%;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; cursor: pointer;
+    color: #9CA3AF; font-size: 0.65rem; font-weight: 600;
+    border: none; background: none; padding: 0;
+  }
+  .tab-item.active { color: #2563EB; }
+  .tab-item span { font-size: 0.65rem; }
+
+  /* ── Responsive ──────────────────────────────────────────────────────── */
   @media (max-width: 900px) {
     .sessions-row { grid-template-columns: 1fr; }
     .content { padding: 1.5rem 1.25rem 2.5rem; }
   }
+
   @media (max-width: 640px) {
     .sidebar { display: none; }
-    .content { padding: 1.25rem 1rem 2rem; }
+    .search-wrap { display: none; }
+    .content { padding: 1.25rem 1rem 5rem; }
     .navbar { padding: 0 1rem; }
+    .mobile-tabbar { display: block; }
+    .resume-banner { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .resume-btn { align-self: flex-start; }
+    .course-card { width: 100%; }
   }
 `
 
@@ -230,6 +256,13 @@ const CERT_ITEMS = [
   { label: 'Submit stakeholder map project', done: false },
   { label: 'Attend 1 live session',          done: false },
   { label: 'Final assessment',               done: false },
+]
+
+const NAV_ITEMS = [
+  { key: 'home',     label: 'Home',         Icon: Home     },
+  { key: 'courses',  label: 'Courses',      Icon: BookOpen },
+  { key: 'live',     label: 'Live Classes', Icon: Radio    },
+  { key: 'settings', label: 'Settings',     Icon: Settings },
 ]
 
 export default function DashboardPage() {
@@ -256,12 +289,10 @@ export default function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  const navItems = [
-    { key: 'home',     label: 'Home',         Icon: Home,     action: () => setActiveNav('home') },
-    { key: 'courses',  label: 'Courses',      Icon: BookOpen, action: () => { setActiveNav('courses'); navigate(ROUTES.COURSES) } },
-    { key: 'live',     label: 'Live Classes', Icon: Radio,    action: () => setActiveNav('live') },
-    { key: 'settings', label: 'Settings',     Icon: Settings, action: () => setActiveNav('settings'), chevron: true },
-  ]
+  function handleNav(key: string) {
+    setActiveNav(key)
+    if (key === 'courses') navigate(ROUTES.COURSES)
+  }
 
   return (
     <>
@@ -289,27 +320,24 @@ export default function DashboardPage() {
         {/* Body */}
         <div className="db-body">
 
-          {/* Sidebar */}
+          {/* Sidebar — hidden on mobile */}
           <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
             <div className="sidebar-top">
               <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-                {collapsed
-                  ? <PanelLeftOpen size={16} />
-                  : <PanelLeftClose size={16} />
-                }
+                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
               </button>
             </div>
 
             <nav className="sidebar-nav">
-              {navItems.map(({ key, label, Icon, action, chevron }) => (
+              {NAV_ITEMS.map(({ key, label, Icon }) => (
                 <div
                   key={key}
                   className={`nav-item${activeNav === key ? ' active' : ''}`}
-                  onClick={action}
+                  onClick={() => handleNav(key)}
                 >
                   <Icon size={18} />
                   <span className="nav-label">{label}</span>
-                  {chevron && !collapsed && (
+                  {key === 'settings' && !collapsed && (
                     <span style={{ marginLeft: 'auto', opacity: 0.5 }}>
                       <ChevronDown size={14} />
                     </span>
@@ -468,6 +496,23 @@ export default function DashboardPage() {
             </div>
           </main>
         </div>
+
+        {/* Mobile bottom tab bar  */}
+        <div className="mobile-tabbar">
+          <div className="mobile-tabbar-inner">
+            {NAV_ITEMS.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                className={`tab-item${activeNav === key ? ' active' : ''}`}
+                onClick={() => handleNav(key)}
+              >
+                <Icon size={20} />
+                <span>{label === 'Live Classes' ? 'Live' : label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </>
   )

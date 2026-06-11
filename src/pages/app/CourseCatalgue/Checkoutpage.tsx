@@ -133,15 +133,23 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
     setIsLoading(true)
     setError(null)
     try {
+      // Validate price before hitting the API
+      if (!courseInfo.priceKobo || courseInfo.priceKobo <= 0) {
+        throw new Error('Invalid course price. Please go back and try again.')
+      }
+
       const configRes = await paymentAPI.getConfig()
       if (!configRes.success || !configRes.data) throw new Error('Failed to load payment configuration')
       const { public_key } = configRes.data
+
+      if (!public_key) throw new Error('Payment is not configured yet. Please try again later.')
 
       const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
       if (!checkoutRes.success || !checkoutRes.data) throw new Error(checkoutRes.error || 'Failed to initiate payment')
 
       const checkoutData = checkoutRes.data
 
+      // Free course — backend skips Paystack entirely
       if (checkoutData.is_free) {
         setResult({
           reference: checkoutData.reference,
@@ -159,7 +167,9 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         return
       }
 
-      const { reference: ref, access_code, amount_kobo } = checkoutData
+      // Checkout response shape: { is_free, reference, payment_id, access_code, authorization_url }
+      // Note: amount_kobo is NOT in the checkout response — we use courseInfo.priceKobo instead
+      const { reference: ref, access_code } = checkoutData
       setReference(ref)
 
       await loadPaystackScript()
@@ -168,7 +178,7 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       const handler = window.PaystackPop.setup({
         key: public_key,
         email,
-        amount: amount_kobo,
+        amount: courseInfo.priceKobo, // from location.state passed by course pages
         ref,
         access_code,
         onClose: () => { setScreen('processing'); pollStatus(ref) },

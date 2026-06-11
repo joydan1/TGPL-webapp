@@ -230,9 +230,16 @@ export default function CoursePlayerPage() {
 
   const playlist = course ? buildPlaylist(course.modules) : []
 
-  // Pass slug via route state so CheckoutPage knows which course to purchase
   const goToCheckout = () => {
-    navigate(ROUTES.CHECKOUT, { state: { courseSlug: slug } })
+    navigate(ROUTES.CHECKOUT, {
+      state: {
+        courseSlug: slug,
+        priceNaira: course?.price_naira,
+        priceKobo: course?.price_kobo,
+        courseTitle: course?.title,
+        trainerName: course?.trainer?.name,
+      },
+    })
   }
 
   return (
