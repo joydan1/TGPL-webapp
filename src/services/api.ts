@@ -115,6 +115,17 @@ export interface PaymentConfigResponse {
   callback_url_pattern: string
 }
 
+// ─── Explicit API result types ────────────────────────────────────────────────
+
+export type LoginResult =
+  | { success: true; access: string; refresh: string; user: UserResponse }
+  | { success: false; error: string; statusCode?: number; code?: string }
+
+
+type CheckoutResult =
+  | { success: true; data: CheckoutResponse | FreeCourseCheckoutResponse }
+  | { success: false; error: string; statusCode?: number }
+
 // ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
 
 const SKIP_REFRESH_ROUTES = [
@@ -138,7 +149,6 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
     })
 
-    // Request interceptor
     this.axiosInstance.interceptors.request.use(
       (config) => {
         const token = useAuthStore.getState().token
@@ -148,7 +158,6 @@ class ApiClient {
       (error) => Promise.reject(error),
     )
 
-    // Response interceptor
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error: AxiosError<ApiErrorResponse>) => {
@@ -271,20 +280,20 @@ export const authAPI = {
         first_name: payload.firstName,
         last_name: payload.lastName,
       })
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Signup failed')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
   sendVerificationEmail: async (payload: EmailVerificationSendPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.EMAIL_VERIFICATION_SEND, payload)
-      return { success: true }
+      return { success: true as const }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to send verification email')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
@@ -297,36 +306,53 @@ export const authAPI = {
       const { access, refresh } = response.data
       useAuthStore.getState().setToken(access)
       useAuthStore.getState().setRefreshToken(refresh)
-      return { success: true, access, refresh }
+      return { success: true as const, access, refresh }
     } catch (error) {
       const { message } = parseApiError(error, 'Verification failed. Link may be expired or already used.')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
-  login: async (payload: LoginPayload) => {
-    try {
-      const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
-        API_ENDPOINTS.LOGIN,
-        payload,
-      )
-      const { access, refresh, user } = response.data
-      useAuthStore.getState().setToken(access)
-      useAuthStore.getState().setRefreshToken(refresh)
-      return { success: true, access, refresh, user }
-    } catch (error) {
-      const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
-      return { success: false, error: message, statusCode, code }
+  login: async (payload: LoginPayload): Promise<LoginResult> => {
+  try {
+    const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
+      API_ENDPOINTS.LOGIN,
+      payload,
+    )
+
+    const { access, refresh, user } = response.data
+
+    useAuthStore.getState().setToken(access)
+    useAuthStore.getState().setRefreshToken(refresh)
+
+    return {
+      success: true as const,
+      access,
+      refresh,
+      user,
     }
-  },
+  } catch (error) {
+    const { message, statusCode, code } = parseApiError(
+      error,
+      'Invalid email or password',
+    )
+
+    return {
+      success: false as const,
+      error: message,
+      statusCode,
+      code,
+    }
+  }
+},
 
   getCurrentUser: async () => {
     try {
       const response = await apiClient.get<UserResponse>(API_ENDPOINTS.ME)
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to get user')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
@@ -337,31 +363,31 @@ export const authAPI = {
         await apiClient.post(API_ENDPOINTS.LOGOUT, { refresh: refreshToken })
       }
       useAuthStore.getState().logout()
-      return { success: true }
+      return { success: true as const }
     } catch (error) {
       useAuthStore.getState().logout()
       const { message } = parseApiError(error, 'Logout failed')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
   requestPasswordReset: async (payload: PasswordResetPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
-      return { success: true }
+      return { success: true as const }
     } catch (error) {
       const { message } = parseApiError(error, 'Password reset request failed')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
   confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
     try {
       await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
-      return { success: true }
+      return { success: true as const }
     } catch (error) {
       const { message } = parseApiError(error, 'Password reset failed')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
@@ -390,19 +416,17 @@ export const authAPI = {
 // ─── Payment API ──────────────────────────────────────────────────────────────
 
 export const paymentAPI = {
-  // GET /api/v1/payments/config/
   getConfig: async () => {
     try {
       const response = await apiClient.get<PaymentConfigResponse>('/v1/payments/config/')
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to load payment configuration')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
-  // POST /api/v1/payments/checkout/
-  checkout: async (courseSlug: string) => {
+  checkout: async (courseSlug: string): Promise<CheckoutResult> => {
     try {
       const response = await apiClient.post<CheckoutResponse | FreeCourseCheckoutResponse>(
         '/v1/payments/checkout/',
@@ -415,16 +439,15 @@ export const paymentAPI = {
     }
   },
 
-  // GET /api/v1/payments/{reference}/
   getStatus: async (reference: string) => {
     try {
       const response = await apiClient.get<PaymentStatusResponse>(
         `/v1/payments/${reference}/`,
       )
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to get payment status')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 }
@@ -435,10 +458,10 @@ export const learnerProfileAPI = {
   getLearnerProfile: async () => {
     try {
       const response = await apiClient.get<LearnerProfile>('/v1/users/me/learner-profile/')
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to get learner profile')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 
@@ -448,10 +471,10 @@ export const learnerProfileAPI = {
         '/v1/users/me/learner-profile/',
         payload,
       )
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to update learner profile')
-      return { success: false, error: message }
+      return { success: false as const, error: message }
     }
   },
 }

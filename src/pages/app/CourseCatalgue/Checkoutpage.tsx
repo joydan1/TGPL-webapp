@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
+﻿import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Clock, BookOpen, CreditCard, Tag, Shield, MessageSquare, Play, Download } from 'lucide-react'
 import Alert from '../../../components/Alert'
@@ -6,10 +6,10 @@ import Button from '../../../components/Button'
 import { Card, CardBody } from '../../../components/Card'
 import Input from '../../../components/Input'
 import { paymentAPI } from '../../../services/api'
+import type { CheckoutResponse, FreeCourseCheckoutResponse } from '../../../services/api'
 import { useAuthStore } from '../../../store/auth'
 import { ROUTES } from '../../../constants/routes'
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type Screen = 'checkout' | 'processing' | 'success' | 'failed'
 
 interface CourseInfo {
@@ -48,7 +48,6 @@ interface CheckoutCtx {
   error: string | null
 }
 
-// ── Context ────────────────────────────────────────────────────────────────
 const CheckoutContext = createContext<CheckoutCtx | null>(null)
 
 const useCheckout = () => {
@@ -57,7 +56,6 @@ const useCheckout = () => {
   return ctx
 }
 
-// ── Paystack inline loader ─────────────────────────────────────────────────
 declare global {
   interface Window {
     PaystackPop: {
@@ -87,11 +85,10 @@ function loadPaystackScript(): Promise<void> {
 
 function fmtNaira(raw: string): string {
   const num = parseFloat(raw)
-  if (isNaN(num)) return `₦${raw}`
-  return '₦' + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (isNaN(num)) return `â‚¦${raw}`
+  return 'â‚¦' + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ── Provider ───────────────────────────────────────────────────────────────
 function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
   const user = useAuthStore(s => s.user)
 
@@ -104,7 +101,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Sync email when user loads into store after mount
   useEffect(() => {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
@@ -133,7 +129,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
     setIsLoading(true)
     setError(null)
     try {
-      // Validate price before hitting the API
       if (!courseInfo.priceKobo || courseInfo.priceKobo <= 0) {
         throw new Error('Invalid course price. Please go back and try again.')
       }
@@ -141,15 +136,15 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       const configRes = await paymentAPI.getConfig()
       if (!configRes.success || !configRes.data) throw new Error('Failed to load payment configuration')
       const { public_key } = configRes.data
-
       if (!public_key) throw new Error('Payment is not configured yet. Please try again later.')
 
       const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
-      if (!checkoutRes.success || !checkoutRes.data) throw new Error(checkoutRes.error || 'Failed to initiate payment')
+      if (!checkoutRes.success) {
+      if (!checkoutRes.success) throw new Error((checkoutRes as {success:false;error:string}).error  || 'Failed to initiate payment')
+      }
 
-      const checkoutData = checkoutRes.data
+      const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
 
-      // Free course — backend skips Paystack entirely
       if (checkoutData.is_free) {
         setResult({
           reference: checkoutData.reference,
@@ -167,9 +162,7 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         return
       }
 
-      // Checkout response shape: { is_free, reference, payment_id, access_code, authorization_url }
-      // Note: amount_kobo is NOT in the checkout response — we use courseInfo.priceKobo instead
-      const { reference: ref, access_code } = checkoutData
+      const { reference: ref, access_code } = checkoutData as CheckoutResponse
       setReference(ref)
 
       await loadPaystackScript()
@@ -178,7 +171,7 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       const handler = window.PaystackPop.setup({
         key: public_key,
         email,
-        amount: courseInfo.priceKobo, // from location.state passed by course pages
+        amount: courseInfo.priceKobo,
         ref,
         access_code,
         onClose: () => { setScreen('processing'); pollStatus(ref) },
@@ -210,7 +203,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
   )
 }
 
-// ── Shared UI ──────────────────────────────────────────────────────────────
 const ChevronLeft = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="15,18 9,12 15,6" />
@@ -274,7 +266,6 @@ function CourseSummary() {
 
 const wrap: React.CSSProperties = { maxWidth: 600, margin: '1.25rem auto 0', padding: '0 1.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }
 
-// ── Checkout Screen ────────────────────────────────────────────────────────
 function CheckoutScreen({ onBack }: { onBack: () => void }) {
   const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error, courseInfo } = useCheckout()
   const [promoOpen, setPromoOpen] = useState(false)
@@ -287,7 +278,6 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
       <div style={wrap}>
         <CourseSummary />
 
-        {/* Order summary */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Order summary</p>
@@ -302,7 +292,6 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
-          {/* Promo code */}
           <div>
             <div onClick={() => setPromoOpen(o => !o)} style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>
@@ -321,7 +310,6 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Card>
 
-        {/* Email — pre-filled from user account, editable */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Email address</p>
@@ -344,7 +332,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             <PaystackLogo />
           </div>
           <Button size="large" disabled={!canPay} onClick={initiatePayment} style={{ width: '100%', borderRadius: '0.75rem' }}>
-            {isLoading ? 'Please wait…' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
+            {isLoading ? 'Please waitâ€¦' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
           </Button>
         </div>
 
@@ -371,7 +359,6 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
   )
 }
 
-// ── Paystack Logo ──────────────────────────────────────────────────────────
 function PaystackLogo() {
   return (
     <svg width="90" height="20" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -383,7 +370,6 @@ function PaystackLogo() {
   )
 }
 
-// ── Processing Screen ──────────────────────────────────────────────────────
 function ProcessingScreen() {
   const { reference, go } = useCheckout()
   return (
@@ -394,7 +380,7 @@ function ProcessingScreen() {
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.75rem' }}>Processing payment</p>
         <p style={{ fontSize: '1rem', color: '#6B7280', margin: '0 0 0.5rem', lineHeight: 1.6 }}>Don't close this page. We're confirming your payment.</p>
-        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>This usually takes 5–30 seconds</p>
+        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>This usually takes 5â€“30 seconds</p>
       </div>
       {reference && (
         <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
@@ -409,19 +395,17 @@ function ProcessingScreen() {
   )
 }
 
-// ── Success Screen ─────────────────────────────────────────────────────────
 function SuccessScreen() {
   const { result, courseInfo } = useCheckout()
   const navigate = useNavigate()
 
-  // Prefer API result data, fall back to courseInfo passed at checkout
   const courseTitle = result?.course?.title || courseInfo.title
   const trainerName = result?.course?.trainer_name || courseInfo.trainerName
   const amountDisplay = result?.amount_naira ? fmtNaira(result.amount_naira) : fmtNaira(courseInfo.priceNaira)
   const dateDisplay = result?.paid_at
     ? new Date(result.paid_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  const ref = result?.reference ?? '—'
+  const ref = result?.reference ?? 'â€”'
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
@@ -466,11 +450,10 @@ function SuccessScreen() {
   )
 }
 
-// ── Failed Screen ──────────────────────────────────────────────────────────
 function FailedScreen() {
   const { result, retryPayment } = useCheckout()
   const failureTitle = result?.failure_reason ?? 'Your card was declined'
-  const ref = result?.reference ?? '—'
+  const ref = result?.reference ?? 'â€”'
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
@@ -504,7 +487,6 @@ function FailedScreen() {
   )
 }
 
-// ── Root ───────────────────────────────────────────────────────────────────
 function CheckoutPageInner() {
   const navigate = useNavigate()
   const { screen } = useCheckout()
@@ -533,7 +515,6 @@ export default function CheckoutPage() {
 
   const courseSlug = state?.courseSlug
 
-  // Guard: no slug means someone navigated here directly — send back
   if (!courseSlug) {
     navigate(ROUTES.COURSES, { replace: true })
     return null

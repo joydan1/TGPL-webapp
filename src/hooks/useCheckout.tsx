@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
+﻿import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
 import { useAuthStore } from '../store/auth'
 import { paymentAPI } from '../services/api'
+import type { CheckoutResponse, FreeCourseCheckoutResponse } from '../services/api'
 import type { CheckoutScreen, PaymentResult } from '../types'
 
-// ── Paystack types ─────────────────────────────────────────────────────────
 declare global {
   interface Window {
     PaystackPop: {
@@ -31,7 +31,6 @@ function loadPaystackScript(): Promise<void> {
   })
 }
 
-// ── Context shape ──────────────────────────────────────────────────────────
 interface CheckoutState {
   screen: CheckoutScreen
   email: string
@@ -49,7 +48,6 @@ interface CheckoutState {
 
 const CheckoutContext = createContext<CheckoutState | null>(null)
 
-// ── Provider ───────────────────────────────────────────────────────────────
 export function CheckoutProvider({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
 
@@ -63,7 +61,6 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Sync email if user loads into store after mount
   useEffect(() => {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
@@ -79,13 +76,11 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Poll GET /api/v1/payments/{reference}/ every 3s until is_terminal
-  // Uses paymentAPI so the JWT Bearer token is sent automatically
   const pollStatus = useCallback((ref: string) => {
     stopPolling()
     pollRef.current = setInterval(async () => {
       const res = await paymentAPI.getStatus(ref)
-      if (!res.success) return // transient error — keep polling
+      if (!res.success) return
       const data = res.data!
       if (data.is_terminal) {
         stopPolling()
@@ -101,22 +96,19 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     setError(null)
 
     try {
-      // 1. Fetch Paystack public key — unauthenticated endpoint
       const configRes = await paymentAPI.getConfig()
       if (!configRes.success || !configRes.data) {
         throw new Error('Could not load payment configuration')
       }
       const { public_key } = configRes.data
 
-      // 2. Create (or reuse) transaction — JWT sent automatically via apiClient
       const checkoutRes = await paymentAPI.checkout(courseSlug)
-      if (!checkoutRes.success || !checkoutRes.data) {
-        throw new Error(checkoutRes.error ?? 'Failed to initiate payment')
+      if (!checkoutRes.success) {
+        if (!checkoutRes.success) throw new Error((checkoutRes as {success:false;error:string}).error?? 'Failed to initiate payment')
       }
 
-      const checkoutData = checkoutRes.data
+      const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
 
-      // 3. Free course — no Paystack needed
       if (checkoutData.is_free) {
         setResult({
           reference: checkoutData.reference,
@@ -134,12 +126,11 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const { reference: ref, access_code, amount_kobo } = checkoutData
+      const { reference: ref, access_code, amount_kobo } = checkoutData as CheckoutResponse
       setReference(ref)
 
-      // 4. Load Paystack inline script and open modal
       await loadPaystackScript()
-      setIsProcessing(false) // loading done — modal takes over
+      setIsProcessing(false)
 
       const handler = window.PaystackPop.setup({
         key: public_key,
@@ -147,16 +138,8 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         amount: amount_kobo,
         ref,
         access_code,
-        // User closed modal — poll anyway, they may have paid before closing
-        onClose: () => {
-          setScreen('processing')
-          pollStatus(ref)
-        },
-        // Paystack signals completion — verify with backend
-        callback: () => {
-          setScreen('processing')
-          pollStatus(ref)
-        },
+        onClose: () => { setScreen('processing'); pollStatus(ref) },
+        callback: () => { setScreen('processing'); pollStatus(ref) },
       })
 
       handler.openIframe()
@@ -177,25 +160,16 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CheckoutContext.Provider value={{
-      screen,
-      email,
-      promoCode,
-      reference,
-      result,
-      isProcessing,
-      error,
-      setEmail,
-      setPromoCode,
+      screen, email, promoCode, reference, result, isProcessing, error,
+      setEmail, setPromoCode,
       go: setScreen,
-      initiatePayment,
-      retryPayment,
+      initiatePayment, retryPayment,
     }}>
       {children}
     </CheckoutContext.Provider>
   )
 }
 
-// ── Hook ───────────────────────────────────────────────────────────────────
 export const useCheckout = () => {
   const ctx = useContext(CheckoutContext)
   if (!ctx) throw new Error('useCheckout must be used within CheckoutProvider')
