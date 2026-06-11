@@ -1,26 +1,24 @@
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Clock, BookOpen, CreditCard, Tag, Shield, MessageSquare, Play, Download } from 'lucide-react'
 import Alert from '../../../components/Alert'
 import Button from '../../../components/Button'
 import { Card, CardBody } from '../../../components/Card'
 import Input from '../../../components/Input'
+import { paymentAPI } from '../../../services/api'
+import { useAuthStore } from '../../../store/auth'
 import { ROUTES } from '../../../constants/routes'
-
-// ── Constants ──────────────────────────────────────────────────────────────
-const COURSE = {
-  title: 'Project Management Course',
-  instructor: 'Enobong Okposin',
-  duration: '4h 30m',
-  modules: '8 modules',
-  thumbnail: '/intro.png',
-  slug: 'project-management-course', // replace with real slug
-}
-
-const fmt = (n: number) => '₦' + n.toLocaleString('en-NG')
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Screen = 'checkout' | 'processing' | 'success' | 'failed'
+
+interface CourseInfo {
+  slug: string
+  title: string
+  trainerName: string
+  priceNaira: string
+  priceKobo: number
+}
 
 interface PaymentResult {
   reference: string
@@ -43,6 +41,7 @@ interface CheckoutCtx {
   setPromoCode: (v: string) => void
   reference: string | null
   result: PaymentResult | null
+  courseInfo: CourseInfo
   initiatePayment: () => Promise<void>
   retryPayment: () => void
   isLoading: boolean
@@ -86,10 +85,18 @@ function loadPaystackScript(): Promise<void> {
   })
 }
 
+function fmtNaira(raw: string): string {
+  const num = parseFloat(raw)
+  if (isNaN(num)) return `₦${raw}`
+  return '₦' + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // ── Provider ───────────────────────────────────────────────────────────────
-function CheckoutProvider({ children }: { children: React.ReactNode }) {
+function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
+  const user = useAuthStore(s => s.user)
+
   const [screen, setScreen] = useState<Screen>('checkout')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(user?.email ?? '')
   const [promoCode, setPromoCode] = useState('')
   const [reference, setReference] = useState<string | null>(null)
   const [result, setResult] = useState<PaymentResult | null>(null)
@@ -97,63 +104,56 @@ function CheckoutProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Sync email when user loads into store after mount
+  useEffect(() => {
+    if (user?.email) setEmail(user.email)
+  }, [user?.email])
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
   const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
-    }
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }, [])
 
   const pollStatus = useCallback((ref: string) => {
     stopPolling()
     pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/v1/payments/${ref}/`, {
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        })
-        if (!res.ok) return
-        const data: PaymentResult = await res.json()
-        if (data.is_terminal) {
-          stopPolling()
-          setResult(data)
-          setScreen(data.status === 'succeeded' ? 'success' : 'failed')
-        }
-      } catch {
-        // keep polling on network hiccups
+      const res = await paymentAPI.getStatus(ref)
+      if (!res.success) return
+      const data = res.data!
+      if (data.is_terminal) {
+        stopPolling()
+        setResult(data)
+        setScreen(data.status === 'succeeded' ? 'success' : 'failed')
       }
     }, 3000)
   }, [stopPolling])
-
-  // Stop polling on unmount
-  useEffect(() => () => stopPolling(), [stopPolling])
 
   const initiatePayment = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      // 1. Get public key
-      const configRes = await fetch('/api/v1/payments/config/', { credentials: 'include' })
-      const { public_key } = await configRes.json()
+      const configRes = await paymentAPI.getConfig()
+      if (!configRes.success || !configRes.data) throw new Error('Failed to load payment configuration')
+      const { public_key } = configRes.data
 
-      // 2. Create/reuse transaction
-      const checkoutRes = await fetch('/api/v1/payments/checkout/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ course_slug: COURSE.slug }),
-      })
+      const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
+      if (!checkoutRes.success || !checkoutRes.data) throw new Error(checkoutRes.error || 'Failed to initiate payment')
 
-      if (!checkoutRes.ok) {
-        const err = await checkoutRes.json()
-        throw new Error(err?.detail || 'Failed to initiate payment')
-      }
+      const checkoutData = checkoutRes.data
 
-      const checkoutData = await checkoutRes.json()
-
-      // 3. Free course — skip Paystack entirely
       if (checkoutData.is_free) {
-        setResult({ ...checkoutData, status: 'succeeded', is_terminal: true, failure_reason: null })
+        setResult({
+          reference: checkoutData.reference,
+          status: 'succeeded',
+          amount_kobo: 0,
+          amount_naira: '0.00',
+          paid_at: new Date().toISOString(),
+          is_terminal: true,
+          failure_reason: null,
+          course: { slug: courseInfo.slug, title: courseInfo.title, trainer_name: courseInfo.trainerName },
+          created_at: new Date().toISOString(),
+        })
         setScreen('success')
         setIsLoading(false)
         return
@@ -162,7 +162,6 @@ function CheckoutProvider({ children }: { children: React.ReactNode }) {
       const { reference: ref, access_code, amount_kobo } = checkoutData
       setReference(ref)
 
-      // 4. Load Paystack and open modal
       await loadPaystackScript()
       setIsLoading(false)
 
@@ -172,29 +171,18 @@ function CheckoutProvider({ children }: { children: React.ReactNode }) {
         amount: amount_kobo,
         ref,
         access_code,
-        onClose: () => {
-          // User closed modal — go to processing and poll; they may have paid
-          setScreen('processing')
-          pollStatus(ref)
-        },
-        callback: () => {
-          // Paystack signals success — poll to verify
-          setScreen('processing')
-          pollStatus(ref)
-        },
+        onClose: () => { setScreen('processing'); pollStatus(ref) },
+        callback: () => { setScreen('processing'); pollStatus(ref) },
       })
       handler.openIframe()
     } catch (e: unknown) {
       setIsLoading(false)
       setError(e instanceof Error ? e.message : 'Something went wrong')
     }
-  }, [email, pollStatus])
+  }, [email, courseInfo, pollStatus])
 
   const retryPayment = useCallback(() => {
-    setResult(null)
-    setReference(null)
-    setError(null)
-    setScreen('checkout')
+    setResult(null); setReference(null); setError(null); setScreen('checkout')
   }, [])
 
   return (
@@ -203,6 +191,7 @@ function CheckoutProvider({ children }: { children: React.ReactNode }) {
       email, setEmail,
       promoCode, setPromoCode,
       reference, result,
+      courseInfo,
       initiatePayment, retryPayment,
       isLoading, error,
     }}>
@@ -228,22 +217,25 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
 }
 
 function Stepper({ step }: { step: 1 | 2 | 3 }) {
+  const steps = ['Review', 'Pay', 'Done']
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '1.25rem 1.25rem 0', maxWidth: 600, margin: '0 auto' }}>
-      {['Review', 'Pay', 'Done'].map((label, i) => {
+      {steps.map((label, i) => {
         const num = i + 1
         const done = num < step
         const active = num === step
         return (
-          <>
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          <div key={label} style={{ display: 'contents' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: done || active ? '#2563EB' : '#E5E7EB', color: done || active ? '#fff' : '#9CA3AF' }}>
                 {done ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg> : num}
               </div>
               <span style={{ fontSize: '0.875rem', fontWeight: 500, color: active || done ? '#111' : '#9CA3AF' }}>{label}</span>
             </div>
-            {i < 2 && <div style={{ flex: 1, height: 1.5, background: done ? '#2563EB' : '#E5E7EB', margin: '0 0.5rem' }} />}
-          </>
+            {i < steps.length - 1 && (
+              <div key={`d-${i}`} style={{ flex: 1, height: 1.5, background: done ? '#2563EB' : '#E5E7EB', margin: '0 0.5rem' }} />
+            )}
+          </div>
         )
       })}
     </div>
@@ -251,15 +243,16 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
 }
 
 function CourseSummary() {
+  const { courseInfo } = useCheckout()
   return (
     <Card variant="elevated">
       <CardBody style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <img src={COURSE.thumbnail} alt={COURSE.title} style={{ width: 80, height: 60, borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
+        <img src="/intro.png" alt={courseInfo.title} style={{ width: 80, height: 60, borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
         <div>
-          <p style={{ fontWeight: 700, color: '#111', margin: '0 0 0.2rem', fontSize: '0.9375rem' }}>{COURSE.title}</p>
-          <p style={{ color: '#6B7280', fontSize: '0.8rem', margin: '0 0 0.4rem' }}>{COURSE.instructor}</p>
+          <p style={{ fontWeight: 700, color: '#111', margin: '0 0 0.2rem', fontSize: '0.9375rem' }}>{courseInfo.title}</p>
+          <p style={{ color: '#6B7280', fontSize: '0.8rem', margin: '0 0 0.4rem' }}>{courseInfo.trainerName}</p>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {[{ icon: <Clock size={12} color="#9CA3AF" />, text: COURSE.duration }, { icon: <BookOpen size={12} color="#9CA3AF" />, text: COURSE.modules }].map(({ icon, text }) => (
+            {[{ icon: <Clock size={12} color="#9CA3AF" />, text: 'Full access' }, { icon: <BookOpen size={12} color="#9CA3AF" />, text: 'Certificate included' }].map(({ icon, text }) => (
               <span key={text} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: '#6B7280' }}>{icon}{text}</span>
             ))}
           </div>
@@ -272,12 +265,10 @@ function CourseSummary() {
 const wrap: React.CSSProperties = { maxWidth: 600, margin: '1.25rem auto 0', padding: '0 1.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }
 
 // ── Checkout Screen ────────────────────────────────────────────────────────
-function CheckoutScreen({ onBack, price }: { onBack: () => void; price?: number }) {
-  const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error } = useCheckout()
+function CheckoutScreen({ onBack }: { onBack: () => void }) {
+  const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error, courseInfo } = useCheckout()
   const [promoOpen, setPromoOpen] = useState(false)
-  const displayPrice = price ?? 40992
-
-  const canPay = email.includes('@') && !isLoading
+  const canPay = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !isLoading
 
   return (
     <>
@@ -291,12 +282,13 @@ function CheckoutScreen({ onBack, price }: { onBack: () => void; price?: number 
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Order summary</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: '#374151' }}>
-              <span>Course price</span><span>{fmt(displayPrice)}</span>
+              <span>Course price</span>
+              <span>{fmtNaira(courseInfo.priceNaira)}</span>
             </div>
             <div style={{ height: 1, background: '#F3F4F6' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111' }}>Total</span>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2563EB' }}>{fmt(displayPrice)}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2563EB' }}>{fmtNaira(courseInfo.priceNaira)}</span>
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
@@ -319,36 +311,35 @@ function CheckoutScreen({ onBack, price }: { onBack: () => void; price?: number 
           </div>
         </Card>
 
-        {/* Email */}
+        {/* Email — pre-filled from user account, editable */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Email address</p>
-            <Input iconType="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" hint="Course access link will be sent to this email" />
+            <Input
+              iconType="email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              hint="Course access link will be sent to this email"
+            />
           </CardBody>
         </Card>
 
         {error && <Alert type="error">{error}</Alert>}
 
-        {/* Paystack badge + Pay Now */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {/* Powered by Paystack */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem 0' }}>
             <span style={{ fontSize: '0.875rem', color: '#6B7280', fontWeight: 500 }}>Powered by</span>
             <PaystackLogo />
           </div>
-          <Button
-            size="large"
-            disabled={!canPay}
-            onClick={initiatePayment}
-            style={{ width: '100%', borderRadius: '0.75rem' }}
-          >
-            {isLoading ? 'Please wait…' : 'Pay Now'}
+          <Button size="large" disabled={!canPay} onClick={initiatePayment} style={{ width: '100%', borderRadius: '0.75rem' }}>
+            {isLoading ? 'Please wait…' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
           </Button>
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#9CA3AF', margin: 0 }}>By continuing, you agree to our Terms of Service</p>
 
-        {/* Trust badges */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingBottom: '1rem' }}>
           {[
             { bg: '#EFF6FF', icon: <Shield size={18} color="#2563EB" />, label: 'Secure payment', sub: '256-bit SSL' },
@@ -370,15 +361,13 @@ function CheckoutScreen({ onBack, price }: { onBack: () => void; price?: number 
   )
 }
 
-// ── Paystack Logo SVG ──────────────────────────────────────────────────────
+// ── Paystack Logo ──────────────────────────────────────────────────────────
 function PaystackLogo() {
   return (
     <svg width="90" height="20" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Paystack stack icon */}
       <rect x="0" y="2" width="18" height="5" rx="1.5" fill="#00C3F7" />
       <rect x="0" y="8.5" width="18" height="5" rx="1.5" fill="#011B33" />
       <rect x="0" y="15" width="18" height="5" rx="1.5" fill="#011B33" opacity="0.4" />
-      {/* Paystack wordmark */}
       <text x="23" y="15" fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="13" fill="#011B33">Paystack</text>
     </svg>
   )
@@ -387,7 +376,6 @@ function PaystackLogo() {
 // ── Processing Screen ──────────────────────────────────────────────────────
 function ProcessingScreen() {
   const { reference, go } = useCheckout()
-
   return (
     <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '2rem' }}>
       <div style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -404,10 +392,7 @@ function ProcessingScreen() {
           <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{reference}</p>
         </div>
       )}
-      <button
-        onClick={() => go('checkout')}
-        style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}
-      >
+      <button onClick={() => go('checkout')} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}>
         Cancel
       </button>
     </div>
@@ -416,52 +401,43 @@ function ProcessingScreen() {
 
 // ── Success Screen ─────────────────────────────────────────────────────────
 function SuccessScreen() {
-  const { result } = useCheckout()
+  const { result, courseInfo } = useCheckout()
   const navigate = useNavigate()
 
-  const amountDisplay = result?.amount_naira ?? fmt(40992)
+  // Prefer API result data, fall back to courseInfo passed at checkout
+  const courseTitle = result?.course?.title || courseInfo.title
+  const trainerName = result?.course?.trainer_name || courseInfo.trainerName
+  const amountDisplay = result?.amount_naira ? fmtNaira(result.amount_naira) : fmtNaira(courseInfo.priceNaira)
   const dateDisplay = result?.paid_at
     ? new Date(result.paid_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  const courseTitle = result?.course?.title ?? COURSE.title
-  const trainerName = result?.course?.trainer_name ?? COURSE.instructor
   const ref = result?.reference ?? '—'
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
-      {/* Green circle */}
       <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 16px rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
       </div>
-
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.5rem' }}>Payment successful</p>
         <p style={{ fontSize: '0.9rem', color: '#6B7280', margin: 0 }}>You now have full access to <strong>{courseTitle}</strong></p>
       </div>
-
-      {/* Receipt card */}
       <Card variant="elevated" style={{ width: '100%', maxWidth: 480 }}>
-        {/* Order ID header row — blue tint */}
         <div style={{ background: 'linear-gradient(135deg, #EFF6FF, #F0F9FF)', borderRadius: '0.75rem 0.75rem 0 0', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>Order ID</span>
           <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>{ref}</span>
         </div>
         <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Course row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #F3F4F6' }}>
-            <img src={COURSE.thumbnail} alt={courseTitle} style={{ width: 56, height: 42, borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
+            <img src="/intro.png" alt={courseTitle} style={{ width: 56, height: 42, borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
             <div>
               <p style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111', margin: 0 }}>{courseTitle}</p>
               <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: 0 }}>{trainerName}</p>
             </div>
           </div>
-          {/* Details */}
           {[
             { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Amount paid', value: amountDisplay },
-            {
-              icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
-              label: 'Date', value: dateDisplay,
-            },
+            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Date', value: dateDisplay },
             { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Payment method', value: 'Paystack' },
           ].map(({ icon, label, value }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -471,8 +447,6 @@ function SuccessScreen() {
           ))}
         </CardBody>
       </Card>
-
-      {/* Actions */}
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <Button size="large" icon={<Play size={16} />} onClick={() => navigate(ROUTES.COURSES)} style={{ width: '100%', borderRadius: '0.75rem' }}>Start learning</Button>
         <Button size="large" variant="outline" icon={<Download size={16} />} style={{ width: '100%', borderRadius: '0.75rem' }}>Download receipt</Button>
@@ -485,45 +459,36 @@ function SuccessScreen() {
 // ── Failed Screen ──────────────────────────────────────────────────────────
 function FailedScreen() {
   const { result, retryPayment } = useCheckout()
-
-  // Use dynamic failure reason from API, fall back to a generic message
   const failureTitle = result?.failure_reason ?? 'Your card was declined'
   const ref = result?.reference ?? '—'
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
-      {/* Orange warning circle */}
       <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#F59E0B" stroke="none" />
-          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#F59E0B" />
           <line x1="12" y1="9" x2="12" y2="13" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx="12" cy="17" r="1" fill="#fff" />
         </svg>
       </div>
-
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.375rem' }}>Payment didn't go through</p>
         <p style={{ fontWeight: 700, fontSize: '1rem', color: '#374151', margin: '0 0 0.75rem' }}>{failureTitle}</p>
         <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, maxWidth: 360, lineHeight: 1.6 }}>
-          This could be due to incorrect card details, expired card, or your bank blocking the transaction for security reasons.
+          This could be due to incorrect card details, expired card, or your bank blocking the transaction.
         </p>
       </div>
-
-      {/* Reference */}
       <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
         <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Reference ID</p>
         <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{ref}</p>
       </div>
-
-      {/* Actions */}
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <Button size="large" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Try again</Button>
         <Button size="large" variant="outline" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Use a different method</Button>
         <button style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
           <MessageSquare size={16} />Contact support
         </button>
-        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF', margin: 0 }}>Need help? Our support team is available 24/7 to assist you with payment issues.</p>
+        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF', margin: 0 }}>Need help? Our support team is available 24/7.</p>
       </div>
     </div>
   )
@@ -535,22 +500,45 @@ function CheckoutPageInner() {
   const { screen } = useCheckout()
 
   const screens: Record<Screen, React.ReactNode> = {
-    checkout: <CheckoutScreen onBack={() => navigate(ROUTES.COURSES)} />,
+    checkout: <CheckoutScreen onBack={() => navigate(-1)} />,
     processing: <ProcessingScreen />,
     success: <SuccessScreen />,
     failed: <FailedScreen />,
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#F5F5F5' }}>
-      {screens[screen]}
-    </div>
-  )
+  return <div style={{ minHeight: '100vh', background: '#F5F5F5' }}>{screens[screen]}</div>
 }
 
 export default function CheckoutPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const state = (location.state as {
+    courseSlug?: string
+    priceNaira?: string
+    priceKobo?: number
+    courseTitle?: string
+    trainerName?: string
+  } | null)
+
+  const courseSlug = state?.courseSlug
+
+  // Guard: no slug means someone navigated here directly — send back
+  if (!courseSlug) {
+    navigate(ROUTES.COURSES, { replace: true })
+    return null
+  }
+
+  const courseInfo: CourseInfo = {
+    slug: courseSlug,
+    title: state?.courseTitle ?? courseSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    trainerName: state?.trainerName ?? '',
+    priceNaira: state?.priceNaira ?? '0',
+    priceKobo: state?.priceKobo ?? 0,
+  }
+
   return (
-    <CheckoutProvider>
+    <CheckoutProvider courseInfo={courseInfo}>
       <CheckoutPageInner />
     </CheckoutProvider>
   )

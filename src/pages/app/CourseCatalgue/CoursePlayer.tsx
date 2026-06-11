@@ -24,6 +24,7 @@ interface CoursePreview {
   title: string
   category: string
   price_naira: string
+  price_kobo: number
   trainer: { id: string; name: string; credential: string }
   modules: Module[]
 }

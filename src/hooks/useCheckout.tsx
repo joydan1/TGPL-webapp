@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
 import { useAuthStore } from '../store/auth'
+import { paymentAPI } from '../services/api'
 import type { CheckoutScreen, PaymentResult } from '../types'
 
 // ── Paystack types ─────────────────────────────────────────────────────────
@@ -62,11 +63,13 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Clean up polling on unmount
+  // Sync email if user loads into store after mount
   useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
+    if (user?.email) setEmail(user.email)
+  }, [user?.email])
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
   const stopPolling = useCallback(() => {
@@ -77,25 +80,18 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Poll GET /api/v1/payments/{reference}/ every 3s until is_terminal
+  // Uses paymentAPI so the JWT Bearer token is sent automatically
   const pollStatus = useCallback((ref: string) => {
     stopPolling()
     pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/v1/payments/${ref}/`, {
-          credentials: 'include',
-        })
-        if (!res.ok) return // keep polling on non-fatal errors
-
-        const data: PaymentResult = await res.json()
-
-        if (data.is_terminal) {
-          stopPolling()
-          setResult(data)
-          setIsProcessing(false)
-          setScreen(data.status === 'succeeded' ? 'success' : 'failed')
-        }
-      } catch {
-        // network hiccup — keep polling
+      const res = await paymentAPI.getStatus(ref)
+      if (!res.success) return // transient error — keep polling
+      const data = res.data!
+      if (data.is_terminal) {
+        stopPolling()
+        setResult(data)
+        setIsProcessing(false)
+        setScreen(data.status === 'succeeded' ? 'success' : 'failed')
       }
     }, 3000)
   }, [stopPolling])
@@ -105,31 +101,34 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     setError(null)
 
     try {
-      // 1. Fetch Paystack public key
-      const configRes = await fetch('/api/v1/payments/config/', {
-        credentials: 'include',
-      })
-      if (!configRes.ok) throw new Error('Could not load payment configuration')
-      const { public_key } = await configRes.json()
+      // 1. Fetch Paystack public key — unauthenticated endpoint
+      const configRes = await paymentAPI.getConfig()
+      if (!configRes.success || !configRes.data) {
+        throw new Error('Could not load payment configuration')
+      }
+      const { public_key } = configRes.data
 
-      // 2. Create (or reuse) transaction
-      const checkoutRes = await fetch('/api/v1/payments/checkout/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ course_slug: courseSlug }),
-      })
-
-      if (!checkoutRes.ok) {
-        const body = await checkoutRes.json().catch(() => ({}))
-        throw new Error(body?.detail ?? 'Failed to initiate payment')
+      // 2. Create (or reuse) transaction — JWT sent automatically via apiClient
+      const checkoutRes = await paymentAPI.checkout(courseSlug)
+      if (!checkoutRes.success || !checkoutRes.data) {
+        throw new Error(checkoutRes.error ?? 'Failed to initiate payment')
       }
 
-      const checkoutData = await checkoutRes.json()
+      const checkoutData = checkoutRes.data
 
       // 3. Free course — no Paystack needed
       if (checkoutData.is_free) {
-        setResult({ ...checkoutData, status: 'succeeded', is_terminal: true, failure_reason: null })
+        setResult({
+          reference: checkoutData.reference,
+          status: 'succeeded',
+          amount_kobo: 0,
+          amount_naira: '0.00',
+          paid_at: new Date().toISOString(),
+          is_terminal: true,
+          failure_reason: null,
+          course: { slug: courseSlug, title: '', trainer_name: '' },
+          created_at: new Date().toISOString(),
+        })
         setIsProcessing(false)
         setScreen('success')
         return
@@ -148,12 +147,12 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         amount: amount_kobo,
         ref,
         access_code,
-        // User closed the modal — they may or may not have paid, so poll anyway
+        // User closed modal — poll anyway, they may have paid before closing
         onClose: () => {
           setScreen('processing')
           pollStatus(ref)
         },
-        // Paystack signals completion — poll to verify with your backend
+        // Paystack signals completion — verify with backend
         callback: () => {
           setScreen('processing')
           pollStatus(ref)
@@ -167,7 +166,6 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     }
   }, [email, pollStatus])
 
-  // Reset everything and return to checkout so user can try again
   const retryPayment = useCallback(() => {
     stopPolling()
     setReference(null)
