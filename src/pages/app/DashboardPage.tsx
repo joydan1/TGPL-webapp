@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings, Search, Bell,
   ChevronRight, ChevronDown, PanelLeftClose, PanelLeftOpen,
-  Play, Clock, Calendar, Trophy, CheckCircle, Circle,
+  Play, Clock, Calendar, Trophy, CheckCircle, Circle, LogOut, User as UserIcon,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
@@ -65,12 +65,43 @@ const CSS = `
     cursor: pointer; color: #6B7280; position: relative;
   }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
+
+  /* ── Profile menu ────────────────────────────────────────────────────── */
+  .profile-menu-wrap { position: relative; }
+  .profile-trigger {
+    display: flex; align-items: center; gap: 0.375rem;
+    background: none; border: none; cursor: pointer; padding: 0;
+  }
   .topbar-avatar {
     width: 36px; height: 36px; border-radius: 50%;
     background: #2563EB; display: flex; align-items: center; justify-content: center;
     color: #fff; font-weight: 700; font-size: 0.875rem;
-    cursor: pointer; border: 2px solid #E5E7EB;
+    border: 2px solid #E5E7EB; flex-shrink: 0;
   }
+  .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
+  .profile-chevron.open { transform: rotate(180deg); }
+
+  .profile-dropdown {
+    position: absolute; top: calc(100% + 0.625rem); right: 0;
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    width: 220px; padding: 0.5rem; z-index: 300;
+  }
+  .profile-dropdown-header {
+    display: flex; align-items: center; gap: 0.625rem;
+    padding: 0.625rem 0.625rem 0.75rem; border-bottom: 1px solid #F3F4F6; margin-bottom: 0.375rem;
+  }
+  .profile-dropdown-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-dropdown-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-dropdown-item {
+    display: flex; align-items: center; gap: 0.625rem; width: 100%;
+    padding: 0.625rem 0.625rem; border-radius: 0.6rem; border: none; background: none;
+    font-size: 0.8125rem; font-weight: 500; color: #374151; cursor: pointer;
+    text-align: left; transition: background 0.15s;
+  }
+  .profile-dropdown-item:hover { background: #F9FAFB; }
+  .profile-dropdown-item.danger { color: #EF4444; }
+  .profile-dropdown-item.danger:hover { background: #FEF2F2; }
 
   .db-body { display: flex; flex: 1; }
 
@@ -161,13 +192,13 @@ const CSS = `
   .asgn-next-btn:hover { background: #F9FAFB; }
 
   .asgn-card { min-width: 200px; max-width: 200px; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0; }
-  .asgn-card.due { background: #FEF2F2; border-color: #FECACA; }
+  .asgn-card.active { background: #EFF6FF; border-color: #BFDBFE; }
   .asgn-badge { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 0.25rem; }
-  .asgn-badge.due { color: #EF4444; }
+  .asgn-badge.active { color: #2563EB; }
   .asgn-badge.upcoming { color: #6B7280; }
   .asgn-title { font-size: 0.875rem; font-weight: 700; color: #111; line-height: 1.3; }
   .asgn-course { font-size: 0.75rem; color: #6B7280; margin-top: 0.125rem; }
-  .asgn-time { font-size: 0.75rem; color: #EF4444; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.375rem; font-weight: 500; }
+  .asgn-due-note { font-size: 0.75rem; color: #6B7280; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.375rem; }
   .asgn-time-upcoming { font-size: 0.75rem; color: #6B7280; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.375rem; }
 
   .sessions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
@@ -243,11 +274,11 @@ const CSS = `
 `
 
 const ASSIGNMENTS = [
-  { id: 1, due: true,  title: 'Stakeholder Map Draft', course: 'Project Management', time: 'Today, 11:59 PM' },
-  { id: 2, due: false, title: 'Data Viz Quiz',          course: 'Data Storytelling',  time: 'Mon, 9 Jun' },
-  { id: 3, due: false, title: 'Data Viz Quiz',          course: 'Data Storytelling',  time: 'Mon, 9 Jun' },
-  { id: 4, due: false, title: 'Data Viz Quiz',          course: 'Data Storytelling',  time: 'Mon, 9 Jun' },
-  { id: 5, due: false, title: 'Data Viz Quiz',          course: 'Data Storytelling',  time: 'Mon, 9 Jun' },
+  { id: 1, active: true,  title: 'Stakeholder Map Draft', course: 'Project Management', note: 'Due before the end of program' },
+  { id: 2, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
+  { id: 3, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
+  { id: 4, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
+  { id: 5, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
 ]
 
 const CERT_ITEMS = [
@@ -267,14 +298,27 @@ const NAV_ITEMS = [
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState('home')
+  const [profileOpen, setProfileOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
   }, [isAuthenticated, navigate])
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   if (!user) {
     return (
@@ -292,6 +336,12 @@ export default function DashboardPage() {
   function handleNav(key: string) {
     setActiveNav(key)
     if (key === 'courses') navigate(ROUTES.COURSES)
+  }
+
+  async function handleLogout() {
+    setProfileOpen(false)
+    await logout()
+    navigate(ROUTES.LOGIN)
   }
 
   return (
@@ -313,7 +363,47 @@ export default function DashboardPage() {
               <Bell size={20} />
               <div className="bell-dot" />
             </div>
-            <div className="topbar-avatar">{initials}</div>
+
+            {/* Profile menu */}
+            <div className="profile-menu-wrap" ref={profileRef}>
+              <button
+                className="profile-trigger"
+                onClick={() => setProfileOpen((open) => !open)}
+                aria-haspopup="true"
+                aria-expanded={profileOpen}
+                aria-label="Open profile menu"
+              >
+                <div className="topbar-avatar">{initials}</div>
+                <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
+              </button>
+
+              {profileOpen && (
+                <div className="profile-dropdown" role="menu">
+                  <div className="profile-dropdown-header">
+                    <div className="user-avatar">{initials}</div>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div className="profile-dropdown-name">{user.name || user.email}</div>
+                      <div className="profile-dropdown-email">{user.email}</div>
+                    </div>
+                  </div>
+                  <button
+                    className="profile-dropdown-item"
+                    onClick={() => {
+                      setProfileOpen(false)
+                      setActiveNav('settings')
+                      navigate(ROUTES.SETTINGS)
+                    }}
+                  >
+                    <UserIcon size={16} />
+                    Profile settings
+                  </button>
+                  <button className="profile-dropdown-item danger" onClick={handleLogout}>
+                    <LogOut size={16} />
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </nav>
 
@@ -387,16 +477,15 @@ export default function DashboardPage() {
                 <div className="assignments-wrap">
                   <div className="assignments-scroll" ref={scrollRef}>
                     {ASSIGNMENTS.map((a) => (
-                      <div key={a.id} className={`asgn-card${a.due ? ' due' : ''}`}>
-                        <div className={`asgn-badge ${a.due ? 'due' : 'upcoming'}`}>
-                          {a.due ? '● Due today' : '○ Upcoming'}
+                      <div key={a.id} className={`asgn-card${a.active ? ' active' : ''}`}>
+                        <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
+                          {a.active ? '● Active' : '○ Upcoming'}
                         </div>
                         <div className="asgn-title">{a.title}</div>
                         <div className="asgn-course">{a.course}</div>
-                        {a.due
-                          ? <div className="asgn-time"><Clock size={12} />{a.time}</div>
-                          : <div className="asgn-time-upcoming"><Calendar size={12} />{a.time}</div>
-                        }
+                        {a.active && (
+                          <div className="asgn-due-note"><Clock size={12} />{a.note}</div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -478,7 +567,7 @@ export default function DashboardPage() {
                   {CERT_ITEMS.map((item, i) => (
                     <div key={i} className={`cert-item${item.done ? ' done' : ''}`}>
                       {item.done
-                        ? <CheckCircle size={16} color="#2563EB" fill="#EFF6FF" />
+                        ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
                         : <Circle size={16} color="#D1D5DB" />
                       }
                       {item.label}

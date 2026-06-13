@@ -31,6 +31,10 @@ function loadPaystackScript(): Promise<void> {
   })
 }
 
+const POLL_INTERVAL_MS = 3000
+const POLL_MAX_ATTEMPTS = 10
+const POLL_MAX_ERRORS = 3
+
 interface CheckoutState {
   screen: CheckoutScreen
   email: string
@@ -51,15 +55,17 @@ const CheckoutContext = createContext<CheckoutState | null>(null)
 export function CheckoutProvider({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
 
-  const [screen, setScreen] = useState<CheckoutScreen>('checkout')
-  const [email, setEmail] = useState(user?.email ?? '')
+  const [screen, setScreen]       = useState<CheckoutScreen>('checkout')
+  const [email, setEmail]         = useState(user?.email ?? '')
   const [promoCode, setPromoCode] = useState('')
   const [reference, setReference] = useState<string | null>(null)
-  const [result, setResult] = useState<PaymentResult | null>(null)
+  const [result, setResult]       = useState<PaymentResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollAttempts = useRef(0)
+  const pollErrors   = useRef(0)
 
   useEffect(() => {
     if (user?.email) setEmail(user.email)
@@ -74,13 +80,53 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
       clearInterval(pollRef.current)
       pollRef.current = null
     }
+    pollAttempts.current = 0
+    pollErrors.current = 0
   }, [])
+
+  const failPayment = useCallback((reason: string) => {
+    stopPolling()
+    setResult(prev => prev
+      ? { ...prev, status: 'failed', is_terminal: true, failure_reason: reason }
+      : {
+          reference: '',
+          status: 'failed',
+          amount_kobo: 0,
+          amount_naira: '0.00',
+          paid_at: null,
+          is_terminal: true,
+          failure_reason: reason,
+          course: { slug: '', title: '', trainer_name: '' },
+          created_at: new Date().toISOString(),
+        }
+    )
+    setIsProcessing(false)
+    setScreen('failed')
+  }, [stopPolling])
 
   const pollStatus = useCallback((ref: string) => {
     stopPolling()
+
     pollRef.current = setInterval(async () => {
+      pollAttempts.current += 1
+
+      if (pollAttempts.current > POLL_MAX_ATTEMPTS) {
+        failPayment('Payment could not be confirmed. Please contact support if your card was charged.')
+        return
+      }
+
       const res = await paymentAPI.getStatus(ref)
-      if (!res.success) return
+
+      if (!res.success) {
+        pollErrors.current += 1
+        if (pollErrors.current >= POLL_MAX_ERRORS) {
+          failPayment('Unable to verify payment status. Please contact support.')
+        }
+        return
+      }
+
+      pollErrors.current = 0
+
       const data = res.data!
       if (data.is_terminal) {
         stopPolling()
@@ -88,8 +134,8 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         setIsProcessing(false)
         setScreen(data.status === 'succeeded' ? 'success' : 'failed')
       }
-    }, 3000)
-  }, [stopPolling])
+    }, POLL_INTERVAL_MS)
+  }, [stopPolling, failPayment])
 
   const initiatePayment = useCallback(async (courseSlug: string) => {
     setIsProcessing(true)
@@ -101,10 +147,9 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Could not load payment configuration')
       }
       const { public_key } = configRes.data
-
       const checkoutRes = await paymentAPI.checkout(courseSlug)
       if (!checkoutRes.success) {
-        if (!checkoutRes.success) throw new Error((checkoutRes as {success:false;error:string}).error?? 'Failed to initiate payment')
+        throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment')
       }
 
       const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
@@ -138,8 +183,13 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         amount: amount_kobo,
         ref,
         access_code,
-        onClose: () => { setScreen('processing'); pollStatus(ref) },
-        callback: () => { setScreen('processing'); pollStatus(ref) },
+        onClose: () => {
+          setScreen('checkout')
+        },
+        callback: () => {
+          setScreen('processing')
+          pollStatus(ref)
+        },
       })
 
       handler.openIframe()

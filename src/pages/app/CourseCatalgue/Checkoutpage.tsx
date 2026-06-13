@@ -85,24 +85,28 @@ function loadPaystackScript(): Promise<void> {
 
 function fmtNaira(raw: string): string {
   const num = Number(raw)
-  if (isNaN(num)) return `₦${raw}`
-  return `₦${num.toLocaleString('en-NG', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+  if (isNaN(num)) return `\u20a6${raw}`
+  return `\u20a6${num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+
+const POLL_INTERVAL_MS = 3000
+const POLL_MAX_ATTEMPTS = 10   // 10 × 3s = 30s max wait
+const POLL_MAX_ERRORS   = 3    // 3 consecutive fetch errors → give up
 
 function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
   const user = useAuthStore(s => s.user)
 
-  const [screen, setScreen] = useState<Screen>('checkout')
-  const [email, setEmail] = useState(user?.email ?? '')
+  const [screen, setScreen]       = useState<Screen>('checkout')
+  const [email, setEmail]         = useState(user?.email ?? '')
   const [promoCode, setPromoCode] = useState('')
   const [reference, setReference] = useState<string | null>(null)
-  const [result, setResult] = useState<PaymentResult | null>(null)
+  const [result, setResult]       = useState<PaymentResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+
+  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollAttempts = useRef(0)
+  const pollErrors   = useRef(0)
 
   useEffect(() => {
     if (user?.email) setEmail(user.email)
@@ -112,21 +116,64 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    pollAttempts.current = 0
+    pollErrors.current   = 0
   }, [])
+
+  const failPayment = useCallback((reason: string) => {
+    stopPolling()
+    setResult(prev => prev
+      ? { ...prev, status: 'failed', is_terminal: true, failure_reason: reason }
+      : {
+          reference: '',
+          status: 'failed',
+          amount_kobo: 0,
+          amount_naira: '0.00',
+          paid_at: null,
+          is_terminal: true,
+          failure_reason: reason,
+          course: { slug: courseInfo.slug, title: courseInfo.title, trainer_name: courseInfo.trainerName },
+          created_at: new Date().toISOString(),
+        }
+    )
+    setScreen('failed')
+  }, [stopPolling, courseInfo])
 
   const pollStatus = useCallback((ref: string) => {
     stopPolling()
+    pollAttempts.current = 0
+    pollErrors.current   = 0
+
     pollRef.current = setInterval(async () => {
+      pollAttempts.current += 1
+
+      // Hard timeout
+      if (pollAttempts.current > POLL_MAX_ATTEMPTS) {
+        failPayment('Payment could not be confirmed. Please contact support if your card was charged.')
+        return
+      }
+
       const res = await paymentAPI.getStatus(ref)
-      if (!res.success) return
+
+      if (!res.success) {
+        pollErrors.current += 1
+        if (pollErrors.current >= POLL_MAX_ERRORS) {
+          failPayment('Unable to verify payment status. Please contact support.')
+        }
+        return
+      }
+
+      // Reset error streak on success
+      pollErrors.current = 0
+
       const data = res.data!
       if (data.is_terminal) {
         stopPolling()
         setResult(data)
         setScreen(data.status === 'succeeded' ? 'success' : 'failed')
       }
-    }, 3000)
-  }, [stopPolling])
+    }, POLL_INTERVAL_MS)
+  }, [stopPolling, failPayment])
 
   const initiatePayment = useCallback(async () => {
     setIsLoading(true)
@@ -143,7 +190,7 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
 
       const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
       if (!checkoutRes.success) {
-      if (!checkoutRes.success) throw new Error((checkoutRes as {success:false;error:string}).error  || 'Failed to initiate payment')
+        throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment')
       }
 
       const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
@@ -177,8 +224,15 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         amount: courseInfo.priceKobo,
         ref,
         access_code,
-        onClose: () => { setScreen('processing'); pollStatus(ref) },
-        callback: () => { setScreen('processing'); pollStatus(ref) },
+        // User closed modal without paying — go back to checkout
+        onClose: () => {
+          setScreen('checkout')
+        },
+        // Payment attempted — verify
+        callback: () => {
+          setScreen('processing')
+          pollStatus(ref)
+        },
       })
       handler.openIframe()
     } catch (e: unknown) {
@@ -188,8 +242,12 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
   }, [email, courseInfo, pollStatus])
 
   const retryPayment = useCallback(() => {
-    setResult(null); setReference(null); setError(null); setScreen('checkout')
-  }, [])
+    stopPolling()
+    setResult(null)
+    setReference(null)
+    setError(null)
+    setScreen('checkout')
+  }, [stopPolling])
 
   return (
     <CheckoutContext.Provider value={{
@@ -335,7 +393,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             <PaystackLogo />
           </div>
           <Button size="large" disabled={!canPay} onClick={initiatePayment} style={{ width: '100%', borderRadius: '0.75rem' }}>
-            {isLoading ? 'Please waitâ€¦' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
+            {isLoading ? 'Please wait\u2026' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
           </Button>
         </div>
 
@@ -382,8 +440,8 @@ function ProcessingScreen() {
       </div>
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.75rem' }}>Processing payment</p>
-        <p style={{ fontSize: '1rem', color: '#6B7280', margin: '0 0 0.5rem', lineHeight: 1.6 }}>Don't close this page. We're confirming your payment.</p>
-        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>This usually takes 5â€“30 seconds</p>
+        <p style={{ fontSize: '1rem', color: '#6B7280', margin: '0 0 0.5rem', lineHeight: 1.6 }}>Don&apos;t close this page. We&apos;re confirming your payment.</p>
+        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>This usually takes a few seconds</p>
       </div>
       {reference && (
         <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
@@ -402,13 +460,13 @@ function SuccessScreen() {
   const { result, courseInfo } = useCheckout()
   const navigate = useNavigate()
 
-  const courseTitle = result?.course?.title || courseInfo.title
-  const trainerName = result?.course?.trainer_name || courseInfo.trainerName
+  const courseTitle   = result?.course?.title || courseInfo.title
+  const trainerName   = result?.course?.trainer_name || courseInfo.trainerName
   const amountDisplay = result?.amount_naira ? fmtNaira(result.amount_naira) : fmtNaira(courseInfo.priceNaira)
-  const dateDisplay = result?.paid_at
+  const dateDisplay   = result?.paid_at
     ? new Date(result.paid_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  const ref = result?.reference ?? 'â€”'
+  const ref = result?.reference || '\u2014'
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
@@ -455,8 +513,8 @@ function SuccessScreen() {
 
 function FailedScreen() {
   const { result, retryPayment } = useCheckout()
-  const failureTitle = result?.failure_reason ?? 'Your card was declined'
-  const ref = result?.reference ?? 'â€”'
+  const failureTitle = result?.failure_reason || 'Your payment could not be completed'
+  const ref = result?.reference || ''
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
@@ -468,19 +526,20 @@ function FailedScreen() {
         </svg>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.375rem' }}>Payment didn't go through</p>
+        <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.375rem' }}>Payment didn&apos;t go through</p>
         <p style={{ fontWeight: 700, fontSize: '1rem', color: '#374151', margin: '0 0 0.75rem' }}>{failureTitle}</p>
         <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, maxWidth: 360, lineHeight: 1.6 }}>
-          This could be due to incorrect card details, expired card, or your bank blocking the transaction.
+          This could be due to incorrect card details, insufficient funds, or your bank blocking the transaction.
         </p>
       </div>
-      <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Reference ID</p>
-        <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{ref}</p>
-      </div>
+      {ref && (
+        <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Reference ID</p>
+          <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{ref}</p>
+        </div>
+      )}
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <Button size="large" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Try again</Button>
-        <Button size="large" variant="outline" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Use a different method</Button>
         <button style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
           <MessageSquare size={16} />Contact support
         </button>

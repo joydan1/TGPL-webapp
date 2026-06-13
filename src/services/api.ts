@@ -121,8 +121,7 @@ export type LoginResult =
   | { success: true; access: string; refresh: string; user: UserResponse }
   | { success: false; error: string; statusCode?: number; code?: string }
 
-
-type CheckoutResult =
+export type CheckoutResult =
   | { success: true; data: CheckoutResponse | FreeCourseCheckoutResponse }
   | { success: false; error: string; statusCode?: number }
 
@@ -432,13 +431,12 @@ export const paymentAPI = {
         '/v1/payments/checkout/',
         { course_slug: courseSlug },
       )
-      return { success: true, data: response.data }
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to initiate payment')
-      return { success: false, error: message, statusCode }
+      return { success: false as const, error: message, statusCode }
     }
   },
-
   getStatus: async (reference: string) => {
     try {
       const response = await apiClient.get<PaymentStatusResponse>(
