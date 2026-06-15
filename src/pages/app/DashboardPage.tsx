@@ -6,7 +6,46 @@ import {
   Play, Clock, Calendar, Trophy, CheckCircle, Circle, LogOut, User as UserIcon,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { ROUTES } from '../../constants/routes'
+import { ROUTES, RouteBuilder } from '../../constants/routes'
+import { apiClient } from '../../services/api'
+
+// ── Types ──────────────────────────────────────────────────────────────────
+interface EnrolledCourse {
+  course_id: string
+  course_slug: string
+  title: string
+  category: string
+  thumbnail_url: string
+  trainer_name: string
+  module_count: number
+  completion_percentage: number
+  last_accessed_at: string
+  enrolled_at: string
+  source: string
+  resume_url: string
+}
+
+interface DashboardResponse {
+  user: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string
+    role: string
+    profile_completion_status: string
+  }
+  continue_learning: string | null
+  assignments: {
+    active: unknown[]
+    upcoming: unknown[]
+  }
+  live_sessions: {
+    live_now: unknown[]
+    upcoming: unknown[]
+  }
+  enrolled_courses: EnrolledCourse[]
+  certification_progress: unknown[]
+}
 
 // ── Progress ring ──────────────────────────────────────────────────────────
 function Ring({ pct, size = 80, stroke = 7, color = '#2563EB' }: { pct: number; size?: number; stroke?: number; color?: string }) {
@@ -51,9 +90,9 @@ const CSS = `
   .navbar-right { display: flex; align-items: center; gap: 1rem; }
 
   .search-wrap {
-    display: flex; align-items: center; gap: 0.5rem;
-    background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 2rem;
-    padding: 0.45rem 1.1rem; width: 240px;
+    display: flex; align-items: center; gap: 12px;
+    background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 8px 20px; width: 263px; height: 42px;
   }
   .search-wrap input { background: none; border: none; outline: none; font-size: 0.875rem; color: #111; width: 100%; }
   .search-wrap input::placeholder { color: #9CA3AF; }
@@ -202,7 +241,7 @@ const CSS = `
   .asgn-time-upcoming { font-size: 0.75rem; color: #6B7280; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.375rem; }
 
   .sessions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  .session-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .session-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 540px; height: 141px; }
   .live-badge { display: flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: #EF4444; text-transform: uppercase; margin-bottom: 0.3rem; }
   .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -232,8 +271,8 @@ const CSS = `
   .cert-desc { font-size: 0.8375rem; color: #6B7280; margin-bottom: 1rem; line-height: 1.55; }
   .cert-desc strong { color: #2563EB; }
   .cert-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8375rem; color: #374151; padding: 0.3rem 0; }
-  .cert-item.done { color: #6B7280; text-decoration: line-through; }
-  .cert-view { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; }
+  .cert-item.done { color: #6B7280; }
+  .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
   .cert-right { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   /* ── Mobile tab bar ──────────────────────────────────────────────────── */
@@ -285,7 +324,6 @@ const CERT_ITEMS = [
   { label: 'Complete all 6/8 modules',      done: true },
   { label: 'Pass module quizzes (≥70%)',     done: true },
   { label: 'Submit stakeholder map project', done: false },
-  { label: 'Attend 1 live session',          done: false },
   { label: 'Final assessment',               done: false },
 ]
 
@@ -302,12 +340,36 @@ export default function DashboardPage() {
   const [collapsed, setCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState('home')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
   }, [isAuthenticated, navigate])
+
+  // Fetch dashboard data on mount
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
+        setEnrolledCourses(response.data.enrolled_courses || [])
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err)
+        setError('Failed to load courses')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user])
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -535,22 +597,51 @@ export default function DashboardPage() {
                 <div className="section-header">
                   <span className="section-title">My Courses</span>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="course-card">
-                    <div className="course-thumb">
-                      <img src="/intro.png" alt="Project Management Course" />
-                      <SmallRing pct={37} />
-                    </div>
-                    <div className="course-body">
-                      <div className="course-tag">Management</div>
-                      <div className="course-title">Project Management Course</div>
-                      <div className="course-last">Last opened 2h ago</div>
-                      <div className="course-prog-bar">
-                        <div className="course-prog-fill" style={{ width: '37%' }} />
-                      </div>
-                    </div>
+                {loading ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>Loading courses...</div>
+                ) : error ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>{error}</div>
+                ) : enrolledCourses.length === 0 ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>
+                    No courses enrolled yet.{' '}
+                    <button
+                      onClick={() => navigate(RouteBuilder.courseCatalogPage())}
+                      style={{ color: '#2563EB', cursor: 'pointer', border: 'none', background: 'none', textDecoration: 'underline', fontWeight: 600 }}
+                    >
+                      Browse courses
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    {enrolledCourses.map((course) => {
+                      const lastAccessedDate = new Date(course.last_accessed_at)
+                      const now = new Date()
+                      const hoursAgo = Math.floor((now.getTime() - lastAccessedDate.getTime()) / (1000 * 60 * 60))
+                      const lastAccessedText = hoursAgo === 0 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`
+
+                      return (
+                        <div key={course.course_id} className="course-card">
+                          <div className="course-thumb">
+                            <img
+                              src={course.thumbnail_url || '/intro.png'}
+                              alt={course.title}
+                              onError={(e) => { (e.target as HTMLImageElement).src = '/intro.png' }}
+                            />
+                            <SmallRing pct={course.completion_percentage} />
+                          </div>
+                          <div className="course-body">
+                            <div className="course-tag">{course.category || 'Course'}</div>
+                            <div className="course-title">{course.title}</div>
+                            <div className="course-last">Last opened {lastAccessedText}</div>
+                            <div className="course-prog-bar">
+                              <div className="course-prog-fill" style={{ width: `${course.completion_percentage}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Certificate */}

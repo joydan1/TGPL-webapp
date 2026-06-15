@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3
 
 interface OnboardingData {
   goals: string[]
@@ -88,20 +88,27 @@ function ListOption({
 
 // ── Grid option (Step 2) ───────────────────────────────────────────────────
 function GridOption({
-  icon, label, selected, onClick,
+  icon, label, selected, onClick, disabled = false,
 }: {
-  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; disabled?: boolean
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
         padding: '1.5rem 1rem', borderRadius: '12px',
-        border: selected ? '2px solid var(--primary-500)' : '1.5px solid #E5E7EB',
-        background: selected ? '#EFF6FF' : '#fff', cursor: 'pointer',
+        border: selected
+          ? '2px solid var(--primary-500)'
+          : disabled
+            ? '1.5px solid #F3F4F6'
+            : '1.5px solid #E5E7EB',
+        background: selected ? '#EFF6FF' : disabled ? '#FAFBFC' : '#fff',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.15s ease', minHeight: 130,
       }}
     >
@@ -118,15 +125,15 @@ function GridOption({
       )}
       <div style={{
         width: 44, height: 44, borderRadius: 10,
-        background: selected ? 'var(--primary-500)' : '#F3F4F6',
+        background: selected ? 'var(--primary-500)' : disabled ? '#F9FAFB' : '#F3F4F6',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: selected ? '#fff' : '#6B7280',
+        color: selected ? '#fff' : disabled ? '#D1D5DB' : '#6B7280',
       }}>
         {icon}
       </div>
       <span style={{
         fontSize: '0.9rem', fontWeight: 500,
-        color: selected ? 'var(--primary-500)' : '#111827',
+        color: selected ? 'var(--primary-500)' : disabled ? '#D1D5DB' : '#111827',
         textAlign: 'center', lineHeight: 1.3,
       }}>
         {label}
@@ -183,7 +190,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<OnboardingData>({
     goals: [],
-    experienceLevel: '',
+    experienceLevel: 'beginner', // only the beginner track is available right now
     currentStatus: '',
     learningHours: '',
   })
@@ -199,7 +206,7 @@ export default function OnboardingPage() {
         setData((prev) => ({
           ...prev,
           goals: user.learner_profile!.goals || [],
-          experienceLevel: user.learner_profile!.experience_level || '',
+          experienceLevel: user.learner_profile!.experience_level || 'beginner',
         }))
       }
       setStep(3)
@@ -232,8 +239,9 @@ export default function OnboardingPage() {
         current_status: data.currentStatus,
         preferred_learning_hours: data.learningHours,
       })
-    
-      setStep(4)
+
+      // Onboarding flow ends here -> send the learner to the course overview
+      navigate(RouteBuilder.courseCatalogPage())
     } catch (error) {
       console.error('Failed to complete onboarding', error)
     } finally {
@@ -262,11 +270,13 @@ export default function OnboardingPage() {
     { id: 'explore_field', label: 'Explore the field', icon: <Compass size={18} /> },
   ]
 
+  // Only the "Beginner" track is live for now — the rest are shown
+  // greyed out / disabled until those courses are available.
   const experienceLevels = [
-    { id: 'beginner', label: 'Project Management\n(for Beginners)', icon: <CheckSquare size={20} /> },
-    { id: 'intermediate', label: 'Project Management\n(Intermediate)', icon: <CheckSquare size={20} /> },
-    { id: 'advanced', label: 'Project Management\n(Advance Level)', icon: <CheckSquare size={20} /> },
-    { id: 'expert', label: 'Project Management\n(Expert Level)', icon: <CheckSquare size={20} /> },
+    { id: 'beginner', label: 'Project Management\n(For Beginners)', icon: <CheckSquare size={20} />, available: true },
+    { id: 'intermediate', label: 'Project Management\n(Intermediate)', icon: <CheckSquare size={20} />, available: false },
+    { id: 'advanced', label: 'Project Management\n(Advance Level)', icon: <CheckSquare size={20} />, available: false },
+    { id: 'expert', label: 'Project Management\n(Expert Level)', icon: <CheckSquare size={20} />, available: false },
   ]
 
   const statusOptions = [
@@ -380,6 +390,7 @@ export default function OnboardingPage() {
                 label={item.label}
                 selected={data.experienceLevel === item.id}
                 onClick={() => setExperienceLevel(item.id)}
+                disabled={!item.available}
               />
             ))}
           </div>
@@ -453,7 +464,7 @@ export default function OnboardingPage() {
               cursor: isValid && !loading ? 'pointer' : 'not-allowed', marginTop: '0.5rem',
             }}
           >
-            {loading ? 'Finishing...' : 'Finish setup'}
+            {loading ? 'Finishing...' : 'Proceed to course overview'}
           </button>
           <button
             type="button"
@@ -472,34 +483,5 @@ export default function OnboardingPage() {
     )
   }
 
-  // ── Step 4 — Success ─────────────────────────────────────────────────────
-  return (
-    <Layout showSkip={false}>
-      <div style={{
-        width: '100%', maxWidth: '700px', background: '#fff', borderRadius: '20px',
-        padding: '5rem 2rem', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-      }}>
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}></div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
-          You are all set!
-        </h1>
-        <p style={{ color: '#6B7280', fontSize: '1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
-          Really glad to have you here!<br />
-          Click on the button below to proceed to your dashboard.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate(RouteBuilder.dashboard())}
-          style={{
-            padding: '0.9rem 2.5rem', borderRadius: '12px', border: 'none',
-            background: 'var(--primary-500)', color: '#fff', fontSize: '1rem',
-            fontWeight: 600, cursor: 'pointer', minWidth: '260px',
-          }}
-        >
-          Go to dashboard
-        </button>
-      </div>
-    </Layout>
-  )
+  return null
 }

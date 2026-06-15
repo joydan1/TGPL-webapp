@@ -298,7 +298,7 @@ courseAssignments: (slug: string) =>
   certificateDetail: (id: string | number) =>
     getRoute(ROUTES.CERTIFICATE_DETAIL, { id }),
   checkout: () => ROUTES.CHECKOUT,
-  
+  courseCatalogPage: () => ROUTES.COURSES,
 
   // Trainer routes
   trainerDashboard: () => ROUTES.TRAINER_DASHBOARD,

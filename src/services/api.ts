@@ -477,4 +477,149 @@ export const learnerProfileAPI = {
   },
 }
 
+// ─── Course Types ───────────────────────────────────────────────────────────
+
+export interface EnrollmentStatusResponse {
+  enrolled: boolean
+  source?: string
+  enrolled_at?: string | null
+  access_expires_at?: string | null
+}
+
+export type LessonStatus = 'completed' | 'current' | 'available' | 'locked'
+
+export interface ProgressLesson {
+  id: string
+  title: string
+  duration_display: string
+  status: LessonStatus
+}
+
+export interface ProgressModule {
+  id: string
+  title: string
+  order: number
+  lessons: ProgressLesson[]
+}
+
+export interface CourseProgressResponse {
+  course: {
+    slug: string
+    title: string
+    category: string
+    thumbnail: string | null
+  }
+  lessons_completed: number
+  lessons_total: number
+  time_spent_seconds: number
+  progress_percentage: number
+  current_lesson_id: string | null
+  modules: ProgressModule[]
+}
+
+export interface LessonResource {
+  id: string
+  title: string
+  file_type: string
+  file_url: string
+  size_display: string
+  module_title: string
+  uploaded_at: string
+}
+
+export interface AdjacentLesson {
+  id: string
+  title: string
+  duration_display: string
+}
+
+export interface LessonDetailResponse {
+  id: string
+  title: string
+  module: { id: string; title: string; order: number }
+  course: { slug: string; title: string }
+  video_url: string
+  duration_seconds: number
+  duration_display: string
+  status: LessonStatus
+  notes: string | null
+  resources: LessonResource[]
+  previous_lesson: AdjacentLesson | null
+  next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
+}
+
+export interface LessonCompleteResponse {
+  lesson_id: string
+  course_progress_percentage_before: number
+  course_progress_percentage_after: number
+  lessons_completed: number
+  lessons_total: number
+  next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
+}
+
+// ─── Courses API ──────────────────────────────────────────────────────────────
+
+export const coursesAPI = {
+  getEnrollmentStatus: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.get<EnrollmentStatusResponse>(
+        `/v1/courses/${courseSlug}/enrollment-status/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to check enrollment status')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  getCourseProgress: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.get<CourseProgressResponse>(
+        `/v1/courses/${courseSlug}/progress/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load course progress')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  getLesson: async (courseSlug: string, lessonId: string) => {
+    try {
+      const response = await apiClient.get<LessonDetailResponse>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load lesson')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  completeLesson: async (courseSlug: string, lessonId: string) => {
+    try {
+      const response = await apiClient.post<LessonCompleteResponse>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/complete/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to mark lesson complete')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  saveLessonNotes: async (courseSlug: string, lessonId: string, notes: string) => {
+    try {
+      const response = await apiClient.patch<{ notes: string }>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/notes/`,
+        { notes },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to save notes')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+
 export default apiClient
