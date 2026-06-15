@@ -241,7 +241,7 @@ const CSS = `
   .asgn-time-upcoming { font-size: 0.75rem; color: #6B7280; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.375rem; }
 
   .sessions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  .session-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 540px; height: 141px; }
+  .session-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 540px; width: 100%; height: 141px; box-sizing: border-box; }
   .live-badge { display: flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: #EF4444; text-transform: uppercase; margin-bottom: 0.3rem; }
   .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -297,12 +297,14 @@ const CSS = `
   /* ── Responsive ──────────────────────────────────────────────────────── */
   @media (max-width: 900px) {
     .sessions-row { grid-template-columns: 1fr; }
+    .session-card { height: auto; }
     .content { padding: 1.5rem 1.25rem 2.5rem; }
   }
 
   @media (max-width: 640px) {
     .sidebar { display: none; }
     .search-wrap { display: none; }
+    .session-card { width: 100%; height: auto; }
     .content { padding: 1.25rem 1rem 5rem; }
     .navbar { padding: 0 1rem; }
     .mobile-tabbar { display: block; }
