@@ -24,11 +24,6 @@ interface PaginatedCourses {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Courses whose title starts with "introductory" (case-insensitive) get the
- * video-card treatment (play overlay, navigates to /preview instead of detail).
- * Adjust this heuristic if your backend adds a dedicated type field later.
- */
 function isIntroVideo(course: CourseListItem) {
   return course.title.toLowerCase().startsWith('introductory')
 }

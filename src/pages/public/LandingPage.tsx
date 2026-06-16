@@ -85,6 +85,57 @@ const navigate = useNavigate()
   .lp-paths { display: grid; grid-template-columns: repeat(3, 354px); gap: 2rem; justify-content: center; align-items: center; }
   .hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
   .hover-lift:hover { transform: translateY(-6px); box-shadow: 0 12px 32px rgba(0,102,204,0.12); }
+  .about-image-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 572.7px;
+    height: 384px;
+    min-height: 384px;
+    margin: 0 auto;
+  }
+  .about-image-blue {
+    position: absolute;
+    width: 198.81px;
+    height: 198.81px;
+    left: 0;
+    top: 58px;
+    background: #2492EB;
+    border-radius: 26.5075px;
+    transform: rotate(26.94deg);
+    z-index: 3;
+  }
+  .about-image-frame {
+    position: absolute;
+    width: 327px;
+    height: 384px;
+    left: 131px;
+    top: 0;
+    background: rgba(255,255,255,0.0001);
+    border-radius: 16px;
+    overflow: hidden;
+    z-index: 1;
+  }
+  .about-image {
+    position: absolute;
+    width: 355.49px;
+    height: 532.57px;
+    right: -0.49px;
+    top: -88px;
+    object-fit: cover;
+    border-radius: 16px;
+    z-index: 2;
+  }
+  .about-image-accent {
+    position: absolute;
+    width: 165.63px;
+    height: 165.63px;
+    right: 57.41px;
+    top: 80px;
+    background: #2B3942;
+    border-radius: 22.0844px;
+    transform: rotate(26.94deg);
+    z-index: 0;
+  }
 
   @media (max-width: 900px) {
     .lp-grid-2 { grid-template-columns: 1fr !important; gap: 2rem !important; }
@@ -96,6 +147,11 @@ const navigate = useNavigate()
     .contact-section { padding: 60px 2rem !important; }
     .founder-img-wrap { width: 100% !important; height: 380px !important; }
     .hero-image-wrap { width: 80% !important; }
+    .about-image-wrap { height: auto !important; min-height: 340px; overflow: hidden !important; }
+    .about-image-wrap .about-image { position: static !important; width: 100% !important; height: auto !important; margin: 0 auto !important; top: auto !important; right: auto !important; }
+    .about-image-wrap .about-image-frame { position: static !important; width: 100% !important; height: auto !important; left: auto !important; top: auto !important; overflow: hidden !important; margin: 0 auto !important; }
+    .about-image-wrap .about-image-blue,
+    .about-image-wrap .about-image-accent { display: none !important; }
   .hero-spacer { height: 300px !important; }
   .hero-badges { display: none !important; }
   .hero-mobile-badges { display: flex !important; }
@@ -116,10 +172,20 @@ const navigate = useNavigate()
 
   {/* Image */}
   <motion.div
+    className="hero-image-wrap"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
     style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '55%', maxWidth: '680px', zIndex: 1 }}
   >
-    <img src="/Image4.png" alt="TGPL Hero" style={{ width: '100%', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }} />
+    <img
+      src="/Image4.png"
+      alt="TGPL Hero"
+      width={773}
+      height={463}
+      loading="eager"
+      decoding="async"
+      ref={(el) => { if (el) el.setAttribute('fetchpriority', 'high') }}
+      style={{ width: '100%', height: 'auto', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }}
+    />
   </motion.div>
 
   {/* Diamonds */}
@@ -246,10 +312,20 @@ const navigate = useNavigate()
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', marginBottom: '1.5rem' }}>The Global Project Leaders (TGPL) is a project management agency, training organization, consultancy, and community founded in August 2024 and registered with the Corporate Affairs Commission (CAC), Nigeria.</p>
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', margin: 0 }}>TGPL was created to close the project management gap in Africa by empowering organizations, young professionals, and women with the skills and structure required to deliver successful and sustainable projects.</p>
             </motion.div>
-            <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} style={{ position: 'relative', width: '100%', height: '400px' }}>
-              <div style={{ position: 'absolute', top: 58, left: 0, width: 199, height: 199, backgroundColor: '#2890E4', borderRadius: 26, zIndex: 3, transform: 'rotate(-26.94deg)' }} />
-              <div style={{ position: 'absolute', top: 80, right: 0, width: 166, height: 166, backgroundColor: '#1e2d3d', borderRadius: 22, zIndex: 1, transform: 'rotate(-26.94deg)' }} />
-              <img src="/image6.png" alt="TGPL Team" style={{ position: 'absolute', left: 131, top: 20, width: 327, height: 384, objectFit: 'cover', borderRadius: 16, zIndex: 2 }} />
+            <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} className="about-image-wrap">
+              <div className="about-image-blue" />
+              <div className="about-image-frame">
+                <img
+                  className="about-image"
+                  src="/image6.png"
+                  alt="TGPL Team"
+                  width={327}
+                  height={384}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div className="about-image-accent" />
             </motion.div>
           </div>
 
@@ -335,7 +411,15 @@ const navigate = useNavigate()
       <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={vp}>
         <div className="founder-img-wrap" style={{ position: 'relative', height: 460, width: 360, maxWidth: '100%' }}>
           <div style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 360, backgroundColor: '#2B3942', borderRadius: 20, zIndex: 1 }} />
-          <img src="/ceo.png" alt="Enobong Okposin" style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 460, objectFit: 'cover', objectPosition: 'top center', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }} />
+          <img
+            src="/ceo.png"
+            alt="Enobong Okposin"
+            width={360}
+            height={451}
+            loading="lazy"
+            decoding="async"
+            style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 460, objectFit: 'cover', objectPosition: 'top center', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }}
+          />
           <motion.div
             initial={{ opacity: 0, scale: 0.5 }} whileInView={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5, duration: 0.4, type: 'spring', stiffness: 200 }} viewport={vp}

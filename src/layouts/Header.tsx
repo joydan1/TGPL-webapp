@@ -81,8 +81,8 @@ const Header: React.FC = () => {
           {/* Mobile Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
-            className="md:hidden"
+            style={{ alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+            className="md:hidden flex"
           >
             {mobileMenuOpen ? <X size={24} color="var(--black)" /> : <Menu size={24} color="var(--black)" />}
           </button>
@@ -91,7 +91,7 @@ const Header: React.FC = () => {
 
       {/* Mobile Nav */}
       {mobileMenuOpen && (
-        <div style={{ backgroundColor: 'var(--white)', borderTop: '1px solid var(--grey)', padding: '1rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} className="md:hidden">
+        <div style={{ backgroundColor: 'var(--white)', borderTop: '1px solid var(--grey)', padding: '1rem 2rem' }} className="md:hidden flex flex-col gap-4">
           {navLinks.map((link) => {
             const active = activeSection === link.sectionId
             return (
