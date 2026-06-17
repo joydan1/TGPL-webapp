@@ -397,21 +397,24 @@ export default function SignupPage() {
                     onChange={(e) => {
                       setTermsAccepted(e.target.checked)
                       if (e.target.checked && formErrors.terms) {
-                        setFormErrors((prev) => { const next = { ...prev }; delete next.terms; return next })
+                        setFormErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.terms
+                          return next
+                        })
                       }
                     }}
                   />
                   <label htmlFor="terms" className="terms-label">
-  I agree to the{' '}
-  <a href={ROUTES.TERMS} target="_blank" rel="noopener noreferrer">Terms of Service</a>
-  {' '}and{' '}
-  <a href={ROUTES.PRIVACY} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-</label>
+                    I agree to the{' '}
+                    <a href={ROUTES.TERMS} target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                    {' '}and{' '}
+                    <a href={ROUTES.PRIVACY} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                  </label>
                 </div>
                 {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}
               </div>
 
-<<<<<<< HEAD
               <Button
                 type="submit"
                 disabled={!isFormFilled || isLoading || role === 'trainer'}
@@ -422,23 +425,6 @@ export default function SignupPage() {
               >
                 {isLoading ? 'Creating account...' : 'Create account'}
               </Button>
-=======
-             <Button
-  type="submit"
-  disabled={!isFormFilled || isLoading || role === 'trainer'}
-  className="submit-button"
-  style={{ width: '100%', padding: '0.8125rem 1rem' }}
->
-  {isLoading ? (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-      <Spinner />
-      <span>Creating account...</span>
-    </div>
-  ) : (
-    'Create account'
-  )}
-</Button>
->>>>>>> 1a617c6a3bc1483648974dd9eed82a04851fdce6
             </form>
 
             <div className="signup-footer">

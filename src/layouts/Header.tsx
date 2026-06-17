@@ -77,10 +77,6 @@ const Header: React.FC = () => {
         }}
       >
         {/* Logo */}
-<<<<<<< HEAD
-        <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0 }}>
-          <img src="/ICON.png" alt="TGPL Logo" style={{ height: '40px', objectFit: 'contain' }} />
-=======
         <button
           onClick={() => scrollToSection('home')}
           style={{
@@ -93,8 +89,7 @@ const Header: React.FC = () => {
             padding: 0
           }}
         >
-          <img src="/ICON.png" alt="TGPL Logo" style={{ height: '40px' }} />
->>>>>>> 1a617c6a3bc1483648974dd9eed82a04851fdce6
+          <img src="/ICON.png" alt="TGPL Logo" style={{ height: '40px', objectFit: 'contain' }} />
         </button>
 
         {/* Desktop Nav */}
