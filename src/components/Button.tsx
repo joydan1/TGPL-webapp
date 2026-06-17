@@ -61,6 +61,8 @@ const Button: React.FC<ButtonProps> = ({
 
   const mergedStyle: React.CSSProperties = {
     display: 'inline-flex',
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: props.disabled ? 'not-allowed' : 'pointer',

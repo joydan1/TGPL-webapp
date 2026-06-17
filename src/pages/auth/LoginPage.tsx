@@ -229,8 +229,14 @@ export default function LoginPage() {
               </div>
 
               {unverifiedEmail === null ? (
-                <Button type="submit" disabled={!isFormFilled || isLoading} style={{ width: '100%', padding: '0.8125rem 1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  {isLoading ? <><Spinner size={18} /><span>Logging in...</span></> : 'Log in'}
+                <Button
+                  type="submit"
+                  disabled={!isFormFilled || isLoading}
+                  icon={isLoading ? <Spinner size={18} /> : undefined}
+                  iconPosition="left"
+                  style={{ width: '100%', padding: '0.8125rem 1rem', marginTop: '0.5rem', gap: '0.5rem' }}
+                >
+                  {isLoading ? 'Logging in...' : 'Log in'}
                 </Button>
               ) : (
                 <Button type="button" onClick={() => { setUnverifiedEmail(null); setResendMessage('') }} style={{ width: '100%', padding: '0.8125rem 1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

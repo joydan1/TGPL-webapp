@@ -411,8 +411,15 @@ export default function SignupPage() {
                 {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}
               </div>
 
-              <Button type="submit" disabled={!isFormFilled || isLoading || role === 'trainer'} className="submit-button" style={{ width: '100%', padding: '0.8125rem 1rem' }}>
-                {isLoading ? <><Spinner /><span>Creating account...</span></> : 'Create account'}
+              <Button
+                type="submit"
+                disabled={!isFormFilled || isLoading || role === 'trainer'}
+                className="submit-button"
+                icon={isLoading ? <Spinner /> : undefined}
+                iconPosition="left"
+                style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
+              >
+                {isLoading ? 'Creating account...' : 'Create account'}
               </Button>
             </form>
 

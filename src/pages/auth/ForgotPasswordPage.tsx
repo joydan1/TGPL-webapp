@@ -448,15 +448,11 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   disabled={!isFormFilled || isLoading}
                   className="submit-button"
+                  icon={isLoading ? <Spinner /> : undefined}
+                  iconPosition="left"
+                  style={{ gap: '0.5rem' }}
                 >
-                  {isLoading ? (
-                    <>
-                      <Spinner />
-                      <span>Sending link...</span>
-                    </>
-                  ) : (
-                    'Send reset link'
-                  )}
+                  {isLoading ? 'Sending link...' : 'Send reset link'}
                 </Button>
 
                 <p className="back-link-text">

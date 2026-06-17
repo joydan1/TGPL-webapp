@@ -261,11 +261,9 @@ const token = searchParams.get('token') ?? ''
               <Button
                 type="submit"
                 disabled={!isFormFilled || isLoading}
+                icon={isLoading ? <Spinner /> : undefined}
+                iconPosition="left"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
                   width: '100%',
                   padding: '0.8125rem 1rem',
                   borderRadius: 'var(--radius-md)',
@@ -278,16 +276,10 @@ const token = searchParams.get('token') ?? ''
                   background: isFormFilled ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
                   color: 'var(--white)',
                   letterSpacing: '0.01em',
+                  gap: '0.5rem',
                 }}
               >
-                {isLoading ? (
-                  <>
-                    <Spinner />
-                    Update password...
-                  </>
-                ) : (
-                  'Update password'
-                )}
+                {isLoading ? 'Update password...' : 'Update password'}
               </Button>
               <p style={{ margin: 0, color: 'rgba(0, 0, 0, 0.65)', fontSize: '0.95rem', textAlign: 'center' }}>
                 Remembered your password?{' '}
