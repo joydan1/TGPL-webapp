@@ -113,90 +113,125 @@ export default function LoginPage() {
   }, [clearError])
 
   return (
-    <form className="login-form" onSubmit={handleSubmit}>
+    <>
+      <form className="login-form" onSubmit={handleSubmit}>
 
-      <Input
-        label="Email"
-        name="email"
-        type="email"
-        placeholder="you@example.com"
-        value={formData.email}
-        onChange={handleInputChange}
-        error={formErrors.email}
-        disabled={unverifiedEmail !== null}
-      />
-
-      <div className="password-wrapper">
+        {/* EMAIL */}
         <Input
-          id="password"
-          name="password"
-          type={showPassword ? 'text' : 'password'}
-          placeholder="Enter your password"
-          value={formData.password}
+          label="Email"
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          value={formData.email}
           onChange={handleInputChange}
-          error={formErrors.password}
+          error={formErrors.email}
           disabled={unverifiedEmail !== null}
         />
 
+        {/* PASSWORD */}
+        <div className="password-wrapper">
+          <Input
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Enter your password"
+            value={formData.password}
+            onChange={handleInputChange}
+            error={formErrors.password}
+            disabled={unverifiedEmail !== null}
+          />
+
+          {unverifiedEmail === null && (
+            <button
+              type="button"
+              className="eye-button"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          )}
+        </div>
+
+        {/* REMEMBER ME */}
+        <div className="remember-row">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          <label>Remember me</label>
+        </div>
+
+        {/* LOGIN BUTTON (PRODUCTION-GRADE) */}
         {unverifiedEmail === null && (
-          <button
-            type="button"
-            className="eye-button"
-            onClick={() => setShowPassword(!showPassword)}
+          <Button
+            type="submit"
+            disabled={!isFormFilled || isLoading}
+            style={{
+              width: '100%',
+              padding: '0.8125rem 1rem',
+              marginTop: '0.5rem',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              opacity: !isFormFilled || isLoading ? 0.7 : 1,
+              cursor: !isFormFilled || isLoading ? 'not-allowed' : 'pointer'
+            }}
           >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
+            {/* stable text (no layout shift) */}
+            <span style={{ visibility: isLoading ? 'hidden' : 'visible' }}>
+              Log in
+            </span>
+
+            {/* loading overlay */}
+            {isLoading && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Spinner size={18} />
+                <span>Logging in...</span>
+              </div>
+            )}
+          </Button>
         )}
+
+        {/* TRY AGAIN BUTTON */}
+        {unverifiedEmail !== null && (
+          <Button
+            type="button"
+            onClick={() => {
+              setUnverifiedEmail(null)
+              setResendMessage('')
+            }}
+            style={{
+              width: '100%',
+              padding: '0.8125rem 1rem',
+              marginTop: '0.5rem',
+              display: 'flex',
+              justifyContent: 'center'
+            }}
+          >
+            Try Again
+          </Button>
+        )}
+
+      </form>
+
+      {/* FOOTER */}
+      <div className="login-footer">
+        <p>
+          New here? <Link to={ROUTES.SIGNUP}>Create an account</Link>
+        </p>
       </div>
-
-      <div className="remember-row">
-        <input
-          type="checkbox"
-          checked={rememberMe}
-          onChange={(e) => setRememberMe(e.target.checked)}
-        />
-        <label>Remember me</label>
-      </div>
-
-      {unverifiedEmail === null && (
-        <Button
-          type="submit"
-          disabled={!isFormFilled || isLoading}
-          style={{
-            width: '100%',
-            padding: '0.8125rem 1rem',
-            marginTop: '0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {isLoading && <Spinner size={18} />}
-            <span>{isLoading ? 'Logging in...' : 'Log in'}</span>
-          </div>
-        </Button>
-      )}
-
-      {unverifiedEmail !== null && (
-        <Button
-          type="button"
-          onClick={() => {
-            setUnverifiedEmail(null)
-            setResendMessage('')
-          }}
-          style={{
-            width: '100%',
-            padding: '0.8125rem 1rem',
-            marginTop: '0.5rem',
-            display: 'flex',
-            justifyContent: 'center'
-          }}
-        >
-          Try Again
-        </Button>
-      )}
-
-    </form>
+    </>
   )
 }
