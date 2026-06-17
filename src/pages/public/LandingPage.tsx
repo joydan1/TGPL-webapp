@@ -309,7 +309,11 @@ const navigate = useNavigate()
 
           <div className="lp-grid-2" style={{ marginBottom: '4rem', alignItems: 'center' }}>
             <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={vp}>
+<<<<<<< HEAD
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', marginBottom: '1.5rem' }}>The Global Project Leaders (TGPL) is a project management agency that helps individuals and organisations plan, structure, and deliver sucessful projects through training, consulting, project delivery, and community-led capacity building. Founded in August 2024 and registered with the Corporate Affairs Commission (CAC), Nigeria.</p>
+=======
+              <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', marginBottom: '1.5rem' }}>The Global Project Leaders (TGPL) is a project management agency that helps individuals and organisations plan, structure, and deliver successful projects through training, consulting, project delivery support, and community-led capacity building. TGPL was founded in August 2024 and registered with the Corporate Affairs Commission (CAC), Nigeria.</p>
+>>>>>>> 1a617c6a3bc1483648974dd9eed82a04851fdce6
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', margin: 0 }}>TGPL was created to close the project management gap in Africa by empowering organizations, young professionals, and women with the skills and structure required to deliver successful and sustainable projects.</p>
             </motion.div>
             <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} className="about-image-wrap">
