@@ -41,9 +41,7 @@ const Header: React.FC = () => {
         {/* Logo */}
         <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0 }}>
           <img src="/ICON.png" alt="TGPL Logo" style={{ height: '40px', objectFit: 'contain' }} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--grey)', lineHeight: 1 }}>
-            From blueprint to reality, we lead the way.
-          </span>
+          
         </button>
 
         {/* Desktop Nav */}
