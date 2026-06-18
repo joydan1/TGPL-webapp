@@ -339,6 +339,13 @@ const ENROLLED_CSS = `
   .modules-header { display: flex; align-items: baseline; justify-content: space-between; }
   .modules-title { font-size: 1.0625rem; font-weight: 700; color: #111; }
   .modules-sub { font-size: 0.8125rem; color: #9CA3AF; }
+  .modules-empty {
+    background: #fff; border: 1px dashed #E5E7EB; border-radius: 0.875rem;
+    padding: 2.5rem 1.5rem; display: flex; flex-direction: column; align-items: center;
+    gap: 0.375rem; text-align: center;
+  }
+  .modules-empty-title { font-size: 0.9375rem; font-weight: 700; color: #374151; }
+  .modules-empty-sub { font-size: 0.8125rem; color: #9CA3AF; max-width: 360px; line-height: 1.55; }
   .module-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; overflow: hidden; }
   .module-card.current { border-color: #2563EB; box-shadow: 0 0 0 1px #2563EB; }
   .module-row { display: flex; align-items: center; gap: 0.875rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; }
@@ -682,6 +689,9 @@ function EnrolledCourseOverview({
   )
   const currentLesson = currentModule?.lessons.find((l) => l.status === 'current')
 
+  const modules = progress?.modules || []
+  const hasModules = modules.length > 0
+
   function handleNav(key: string) {
     setActiveNav(key)
     if (key === 'home') navigate(ROUTES.DASHBOARD)
@@ -841,77 +851,87 @@ function EnrolledCourseOverview({
                 <div className="modules-header" style={{ marginBottom: '0.875rem' }}>
                   <span className="modules-title">Course Modules</span>
                   <span className="modules-sub">
-                    {progress?.modules.length || course.module_count} modules · {lessonsTotal} lessons
+                    {modules.length || course.module_count} modules · {lessonsTotal} lessons
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {(progress?.modules || []).map((mod, mi) => {
-                    const doneCount = mod.lessons.filter((l) => l.status === 'completed').length
-                    const total = mod.lessons.length
-                    const hasCurrent = mod.lessons.some((l) => l.status === 'current')
-                    const allDone = doneCount === total
-                    const isExpanded = expandedModule === mod.id
+                {!hasModules ? (
+                  <div className="modules-empty">
+                    <BookOpen size={28} color="#D1D5DB" />
+                    <span className="modules-empty-title">No modules added to this course yet</span>
+                    <span className="modules-empty-sub">
+                      This course doesn't have any modules or lessons on the backend yet — there's nothing to display until content is added.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {modules.map((mod, mi) => {
+                      const doneCount = mod.lessons.filter((l) => l.status === 'completed').length
+                      const total = mod.lessons.length
+                      const hasCurrent = mod.lessons.some((l) => l.status === 'current')
+                      const allDone = doneCount === total
+                      const isExpanded = expandedModule === mod.id
 
-                    return (
-                      <div key={mod.id} className={`module-card${hasCurrent ? ' current' : ''}`}>
-                        <div
-                          className="module-row"
-                          onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
-                        >
+                      return (
+                        <div key={mod.id} className={`module-card${hasCurrent ? ' current' : ''}`}>
                           <div
-                            className={`module-num${allDone ? ' done' : ''}${hasCurrent ? ' current' : ''}`}
+                            className="module-row"
+                            onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
                           >
-                            {allDone ? <CheckCircle size={16} /> : mi + 1}
-                          </div>
-                          <div className="module-info">
-                            <div className="module-title-row">
-                              <span className="module-title">{mod.title}</span>
-                              {hasCurrent && (
-                                <span className="module-current-pill">CURRENT</span>
-                              )}
+                            <div
+                              className={`module-num${allDone ? ' done' : ''}${hasCurrent ? ' current' : ''}`}
+                            >
+                              {allDone ? <CheckCircle size={16} /> : mi + 1}
                             </div>
-                            <div className="module-prog-bar">
-                              <div
-                                className={`module-prog-fill ${allDone ? 'done' : hasCurrent ? 'current' : 'todo'}`}
-                                style={{ width: total ? `${(doneCount / total) * 100}%` : '0%' }}
-                              />
-                            </div>
-                          </div>
-                          <span className="module-count">{doneCount}/{total}</span>
-                          <ChevronDown
-                            size={16}
-                            className={`module-chevron${isExpanded ? ' open' : ''}`}
-                          />
-                        </div>
-
-                        {isExpanded && (
-                          <div className="lessons-list">
-                            {mod.lessons.map((lesson) => {
-                              const locked = lesson.status === 'locked'
-                              return (
+                            <div className="module-info">
+                              <div className="module-title-row">
+                                <span className="module-title">{mod.title}</span>
+                                {hasCurrent && (
+                                  <span className="module-current-pill">CURRENT</span>
+                                )}
+                              </div>
+                              <div className="module-prog-bar">
                                 <div
-                                  key={lesson.id}
-                                  className={`lesson-row ${lesson.status}${locked ? '' : ' clickable'}`}
-                                  onClick={() => goToLesson(lesson.id, locked)}
-                                >
-                                  <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
-                                  <span className="lesson-title">
-                                    {lesson.title}
-                                    {lesson.status === 'current' && (
-                                      <div className="lesson-up-next">Up next</div>
-                                    )}
-                                  </span>
-                                  <span className="lesson-duration">{lesson.duration_display}</span>
-                                </div>
-                              )
-                            })}
+                                  className={`module-prog-fill ${allDone ? 'done' : hasCurrent ? 'current' : 'todo'}`}
+                                  style={{ width: total ? `${(doneCount / total) * 100}%` : '0%' }}
+                                />
+                              </div>
+                            </div>
+                            <span className="module-count">{doneCount}/{total}</span>
+                            <ChevronDown
+                              size={16}
+                              className={`module-chevron${isExpanded ? ' open' : ''}`}
+                            />
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+
+                          {isExpanded && (
+                            <div className="lessons-list">
+                              {mod.lessons.map((lesson) => {
+                                const locked = lesson.status === 'locked'
+                                return (
+                                  <div
+                                    key={lesson.id}
+                                    className={`lesson-row ${lesson.status}${locked ? '' : ' clickable'}`}
+                                    onClick={() => goToLesson(lesson.id, locked)}
+                                  >
+                                    <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
+                                    <span className="lesson-title">
+                                      {lesson.title}
+                                      {lesson.status === 'current' && (
+                                        <div className="lesson-up-next">Up next</div>
+                                      )}
+                                    </span>
+                                    <span className="lesson-duration">{lesson.duration_display}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* ── Continue bar — inline at bottom of content, not floating ── */}

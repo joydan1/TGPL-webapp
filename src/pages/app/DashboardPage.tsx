@@ -253,7 +253,26 @@ const CSS = `
   .remind-btn { padding: 0.5rem 1.1rem; border-radius: 2rem; border: 1.5px solid #E5E7EB; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .remind-btn:hover { background: #F9FAFB; }
 
-  .course-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; overflow: hidden; width: 260px; flex-shrink: 0; }
+  .empty-state-card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem;
+    padding: 3rem 2rem; display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 0.625rem;
+  }
+  .empty-state-icon {
+    width: 3.5rem; height: 3.5rem; border-radius: 50%; background: #EFF6FF;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem;
+  }
+  .empty-state-title { font-size: 1.0625rem; font-weight: 700; color: #111; }
+  .empty-state-sub { font-size: 0.875rem; color: #6B7280; max-width: 420px; line-height: 1.6; }
+  .empty-state-btn {
+    display: flex; align-items: center; gap: 0.5rem; margin-top: 0.875rem;
+    background: #2563EB; color: #fff; border: none; border-radius: 2rem;
+    padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer;
+  }
+  .empty-state-btn:hover { opacity: 0.9; }
+
+  .course-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; overflow: hidden; width: 260px; flex-shrink: 0; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+  .course-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-color: #D1D5DB; }
   .course-thumb { position: relative; width: 100%; aspect-ratio: 16/10; overflow: hidden; background: #D0D0D0; }
   .course-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .course-body { padding: 0.75rem 1rem 1rem; }
@@ -397,9 +416,25 @@ export default function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
+  // Resume banner, Assignments, and Certificate progress only make sense once
+  // the learner has at least one enrolled course — until we know that for
+  // sure (loaded, no error, courses present), we don't render them so a
+  // brand-new account never sees fake progress data.
+  const hasCourses = enrolledCourses.length > 0
+  const showCourseDependentSections = !loading && !error && hasCourses
+  const showEmptyState = !loading && !error && !hasCourses
+
   function handleNav(key: string) {
     setActiveNav(key)
     if (key === 'courses') navigate(ROUTES.COURSES)
+  }
+
+  // Goes to the course's overview page — from there the learner can resume
+  // a specific lesson or browse modules (this mirrors CourseDetailPage's
+  // existing, working links into CourseLearnPage).
+  function goToCourse(slug: string) {
+    if (!slug) return
+    navigate(RouteBuilder.course(slug))
   }
 
   async function handleLogout() {
@@ -518,48 +553,52 @@ export default function DashboardPage() {
                 <div className="greeting-name">{firstName} 👋</div>
               </div>
 
-              {/* Resume banner */}
-              <div className="resume-banner">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="resume-label">Continue where you left off</div>
-                  <div className="resume-module">Module 3 — Stakeholder Mapping</div>
-                  <div className="resume-progress-wrap">
-                    <div className="resume-progress-fill" style={{ width: '40%' }} />
+              {/* Resume banner — only meaningful once there's real progress to resume */}
+              {showCourseDependentSections && (
+                <div className="resume-banner">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="resume-label">Continue where you left off</div>
+                    <div className="resume-module">Module 3 — Stakeholder Mapping</div>
+                    <div className="resume-progress-wrap">
+                      <div className="resume-progress-fill" style={{ width: '40%' }} />
+                    </div>
+                    <div className="resume-sub">40% complete · 2h 50m remaining</div>
                   </div>
-                  <div className="resume-sub">40% complete · 2h 50m remaining</div>
-                </div>
-                <button className="resume-btn">
-                  <Play size={14} fill="#2563EB" /> Resume
-                </button>
-              </div>
-
-              {/* Assignments */}
-              <div>
-                <div className="section-header">
-                  <span className="section-title">Assignment(s)</span>
-                </div>
-                <div className="assignments-wrap">
-                  <div className="assignments-scroll" ref={scrollRef}>
-                    {ASSIGNMENTS.map((a) => (
-                      <div key={a.id} className={`asgn-card${a.active ? ' active' : ''}`}>
-                        <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
-                          {a.active ? '● Active' : '○ Upcoming'}
-                        </div>
-                        <div className="asgn-title">{a.title}</div>
-                        <div className="asgn-course">{a.course}</div>
-                        {a.active && (
-                          <div className="asgn-due-note"><Clock size={12} />{a.note}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <button className="asgn-next-btn" onClick={() => {
-                    if (scrollRef.current) scrollRef.current.scrollLeft += 220
-                  }}>
-                    <ChevronRight size={14} />
+                  <button className="resume-btn">
+                    <Play size={14} fill="#2563EB" /> Resume
                   </button>
                 </div>
-              </div>
+              )}
+
+              {/* Assignments */}
+              {showCourseDependentSections && (
+                <div>
+                  <div className="section-header">
+                    <span className="section-title">Assignment(s)</span>
+                  </div>
+                  <div className="assignments-wrap">
+                    <div className="assignments-scroll" ref={scrollRef}>
+                      {ASSIGNMENTS.map((a) => (
+                        <div key={a.id} className={`asgn-card${a.active ? ' active' : ''}`}>
+                          <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
+                            {a.active ? '● Active' : '○ Upcoming'}
+                          </div>
+                          <div className="asgn-title">{a.title}</div>
+                          <div className="asgn-course">{a.course}</div>
+                          {a.active && (
+                            <div className="asgn-due-note"><Clock size={12} />{a.note}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button className="asgn-next-btn" onClick={() => {
+                      if (scrollRef.current) scrollRef.current.scrollLeft += 220
+                    }}>
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Sessions */}
               <div className="sessions-row">
@@ -603,14 +642,21 @@ export default function DashboardPage() {
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>Loading courses...</div>
                 ) : error ? (
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>{error}</div>
-                ) : enrolledCourses.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>
-                    No courses enrolled yet.{' '}
+                ) : showEmptyState ? (
+                  <div className="empty-state-card">
+                    <div className="empty-state-icon">
+                      <BookOpen size={26} color="#2563EB" />
+                    </div>
+                    <div className="empty-state-title">You haven't enrolled in a course yet</div>
+                    <div className="empty-state-sub">
+                      Browse the catalog and enroll in your first course — your progress, assignments,
+                      and certificate tracker will show up right here once you do.
+                    </div>
                     <button
+                      className="empty-state-btn"
                       onClick={() => navigate(RouteBuilder.courseCatalogPage())}
-                      style={{ color: '#2563EB', cursor: 'pointer', border: 'none', background: 'none', textDecoration: 'underline', fontWeight: 600 }}
                     >
-                      Browse courses
+                      <BookOpen size={16} /> Browse Courses
                     </button>
                   </div>
                 ) : (
@@ -622,7 +668,16 @@ export default function DashboardPage() {
                       const lastAccessedText = hoursAgo === 0 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`
 
                       return (
-                        <div key={course.course_id} className="course-card">
+                        <div
+                          key={course.course_id}
+                          className="course-card"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => goToCourse(course.course_slug)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') goToCourse(course.course_slug)
+                          }}
+                        >
                           <div className="course-thumb">
                             <img
                               src={course.thumbnail_url || '/intro.png'}
@@ -647,33 +702,35 @@ export default function DashboardPage() {
               </div>
 
               {/* Certificate */}
-              <div className="cert-section">
-                <div className="cert-left">
-                  <div className="cert-badge">
-                    <Trophy size={20} color="#F59E0B" />
-                    <span className="cert-badge-label">Certificate</span>
-                  </div>
-                  <div className="cert-name">Project Management</div>
-                  <div className="cert-desc">
-                    You're <strong>40%</strong> to your Project Management certificate — keep going!
-                  </div>
-                  {CERT_ITEMS.map((item, i) => (
-                    <div key={i} className={`cert-item${item.done ? ' done' : ''}`}>
-                      {item.done
-                        ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
-                        : <Circle size={16} color="#D1D5DB" />
-                      }
-                      {item.label}
+              {showCourseDependentSections && (
+                <div className="cert-section">
+                  <div className="cert-left">
+                    <div className="cert-badge">
+                      <Trophy size={20} color="#F59E0B" />
+                      <span className="cert-badge-label">Certificate</span>
                     </div>
-                  ))}
-                  <button className="cert-view">
-                    View all requirements <ChevronRight size={14} />
-                  </button>
+                    <div className="cert-name">Project Management</div>
+                    <div className="cert-desc">
+                      You're <strong>40%</strong> to your Project Management certificate — keep going!
+                    </div>
+                    {CERT_ITEMS.map((item, i) => (
+                      <div key={i} className={`cert-item${item.done ? ' done' : ''}`}>
+                        {item.done
+                          ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
+                          : <Circle size={16} color="#D1D5DB" />
+                        }
+                        {item.label}
+                      </div>
+                    ))}
+                    <button className="cert-view">
+                      View all requirements <ChevronRight size={14} />
+                    </button>
+                  </div>
+                  <div className="cert-right">
+                    <Ring pct={40} size={110} stroke={10} color="#2563EB" />
+                  </div>
                 </div>
-                <div className="cert-right">
-                  <Ring pct={40} size={110} stroke={10} color="#2563EB" />
-                </div>
-              </div>
+              )}
 
             </div>
           </main>
