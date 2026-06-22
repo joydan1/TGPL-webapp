@@ -23,7 +23,7 @@ import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
 import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
-
+import AssignmentDetailPage from './pages/app/CourseCatalgue/AssignmentDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
 
@@ -115,6 +115,7 @@ function App() {
 <Route path="/courses/:slug" element={<ProtectedRoute requiredRole="learner"><CourseDetailPage /></ProtectedRoute>} />
 <Route path="/courses/:slug/preview" element={<ProtectedRoute requiredRole="learner"><CoursePlayerPage /></ProtectedRoute>} />
 <Route path={ROUTES.COURSE_LEARN} element={<ProtectedRoute requiredRole="learner"><CourseLearnPage /></ProtectedRoute>} />
+<Route path={ROUTES.ASSIGNMENT_DETAIL} element={<ProtectedRoute requiredRole="learner"><AssignmentDetailPage /></ProtectedRoute>} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

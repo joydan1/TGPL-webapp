@@ -191,7 +191,7 @@ const CSS = `
   .sidebar.collapsed .user-text { display: none; }
 
   .main { flex: 1; min-width: 0; overflow-y: auto; }
-  .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.75rem; max-width: 1100px; }
+  .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.75rem; }
 
   .greeting-line { font-size: 0.9375rem; color: #6B7280; }
   .greeting-name { font-size: 1.625rem; font-weight: 700; color: #111; margin-top: 0.125rem; }
@@ -230,7 +230,8 @@ const CSS = `
   }
   .asgn-next-btn:hover { background: #F9FAFB; }
 
-  .asgn-card { min-width: 200px; max-width: 200px; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0; }
+  .asgn-card { min-width: 200px; max-width: 200px; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+  .asgn-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-color: #D1D5DB; }
   .asgn-card.active { background: #EFF6FF; border-color: #BFDBFE; }
   .asgn-badge { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 0.25rem; }
   .asgn-badge.active { color: #2563EB; }
@@ -437,6 +438,10 @@ export default function DashboardPage() {
     navigate(RouteBuilder.course(slug))
   }
 
+  function goToAssignment(assignmentId: number | string) {
+    navigate(RouteBuilder.assignmentDetail(assignmentId))
+  }
+
   async function handleLogout() {
     setProfileOpen(false)
     await logout()
@@ -579,7 +584,16 @@ export default function DashboardPage() {
                   <div className="assignments-wrap">
                     <div className="assignments-scroll" ref={scrollRef}>
                       {ASSIGNMENTS.map((a) => (
-                        <div key={a.id} className={`asgn-card${a.active ? ' active' : ''}`}>
+                      <div
+  key={a.id}
+  className={`asgn-card${a.active ? ' active' : ''}`}
+  role="button"
+  tabIndex={a.active ? 0 : -1}
+  onClick={() => a.active && goToAssignment(a.id)}
+  onKeyDown={(e) => {
+    if (a.active && (e.key === 'Enter' || e.key === ' ')) goToAssignment(a.id)
+  }}
+                        >
                           <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
                             {a.active ? '● Active' : '○ Upcoming'}
                           </div>
@@ -662,11 +676,16 @@ export default function DashboardPage() {
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     {enrolledCourses.map((course) => {
-                      const lastAccessedDate = new Date(course.last_accessed_at)
-                      const now = new Date()
-                      const hoursAgo = Math.floor((now.getTime() - lastAccessedDate.getTime()) / (1000 * 60 * 60))
-                      const lastAccessedText = hoursAgo === 0 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`
-
+                     const lastAccessedDate = course.last_accessed_at ? new Date(course.last_accessed_at) : null
+const lastAccessedText = (() => {
+  if (!lastAccessedDate || isNaN(lastAccessedDate.getTime()) || lastAccessedDate.getFullYear() < 2000) {
+    return 'Not accessed yet'
+  }
+  const hoursAgo = Math.floor((Date.now() - lastAccessedDate.getTime()) / (1000 * 60 * 60))
+  if (hoursAgo < 1) return 'Just now'
+  if (hoursAgo < 24) return `${hoursAgo}h ago`
+  return `${Math.floor(hoursAgo / 24)}d ago`
+})()
                       return (
                         <div
                           key={course.course_id}
@@ -689,7 +708,7 @@ export default function DashboardPage() {
                           <div className="course-body">
                             <div className="course-tag">{course.category || 'Course'}</div>
                             <div className="course-title">{course.title}</div>
-                            <div className="course-last">Last opened {lastAccessedText}</div>
+                            <div className="course-last">last opened {lastAccessedText}</div>
                             <div className="course-prog-bar">
                               <div className="course-prog-fill" style={{ width: `${course.completion_percentage}%` }} />
                             </div>

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { apiClient, coursesAPI } from '../../../services/api'
-import type { CourseProgressResponse, EnrollmentStatusResponse } from '../../../services/api'
+import type { CourseProgressResponse, EnrollmentStatusResponse, LessonStatus } from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
 
 // ─── API types ────────────────────────────────────────────────────────────────
@@ -92,30 +92,25 @@ function formatTimeSpent(seconds: number): string {
 
 // ─── Mock progress ────────────────────────────────────────────────────────────
 function buildMockProgress(course: CourseDetail): CourseProgressResponse {
-  const modules = course.modules.map((m, mi) => ({
-    id: m.id,
-    title: m.title,
-    order: m.order,
-    lessons: m.lessons.map((l, li) => {
-      let status: CourseProgressResponse['modules'][number]['lessons'][number]['status'] = 'locked'
-      if (mi < 2) status = 'completed'
-      else if (mi === 2) status = li === 0 ? 'completed' : li === 1 ? 'current' : 'locked'
-      return { id: l.id, title: l.title, duration_display: l.duration_display, status }
-    }),
-  }))
-
-  const allLessons = modules.flatMap((m) => m.lessons)
-  const completed = allLessons.filter((l) => l.status === 'completed').length
-  const current = allLessons.find((l) => l.status === 'current')
+  const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0)
+  const nextIncompleteLesson = course.modules
+    .flatMap((m) => m.lessons.map((l) => ({ module_id: m.id, id: l.id, title: l.title })))
+    .slice(0, 1)[0] || null
 
   return {
-    course: { slug: course.slug, title: course.title, category: course.category, thumbnail: null },
-    lessons_completed: completed,
-    lessons_total: allLessons.length,
-    time_spent_seconds: 9900,
-    progress_percentage: allLessons.length ? Math.round((completed / allLessons.length) * 100) : 0,
-    current_lesson_id: current?.id || null,
-    modules,
+    overall: {
+      lessons_completed: 0,
+      lessons_total: totalLessons,
+      percent: 0,
+      next_incomplete_lesson: nextIncompleteLesson,
+      estimated_seconds_remaining: 0,
+    },
+    modules: course.modules.map((m) => ({
+      module_id: m.id,
+      lessons_completed: 0,
+      lessons_total: m.lessons.length,
+    })),
+    completed_lesson_ids: [],
   }
 }
 
@@ -434,7 +429,7 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings',     Icon: Settings },
 ]
 
-function lessonIcon(status: CourseProgressResponse['modules'][number]['lessons'][number]['status']) {
+function lessonIcon(status: LessonStatus) {
   switch (status) {
     case 'completed':
       return <CheckCircle size={18} color="#22C55E" fill="#ECFDF3" />
@@ -444,10 +439,10 @@ function lessonIcon(status: CourseProgressResponse['modules'][number]['lessons']
           <Play size={9} color="#fff" fill="#fff" />
         </div>
       )
-    case 'locked':
-      return <Lock size={15} color="#D1D5DB" />
-    default:
+    case 'available':
       return <Play size={16} color="#9CA3AF" />
+    default:
+      return <Lock size={15} color="#D1D5DB" />
   }
 }
 
@@ -671,25 +666,46 @@ function EnrolledCourseOverview({
   const [collapsed, setCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState('courses')
   const [profileOpen, setProfileOpen] = useState(false)
-  const [expandedModule, setExpandedModule] = useState<string | null>(
-    progress?.modules.find((m) => m.lessons.some((l) => l.status === 'current'))?.id || null,
-  )
+  const [expandedModule, setExpandedModule] = useState<string | null>(null)
 
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
-  const pct = progress?.progress_percentage ?? 0
-  const lessonsCompleted = progress?.lessons_completed ?? 0
-  const lessonsTotal =
-    progress?.lessons_total ?? course.modules.reduce((sum, m) => sum + m.lessons.length, 0)
-  const timeSpent = progress ? formatTimeSpent(progress.time_spent_seconds) : '0m'
+  const completedLessonIds = new Set(progress?.completed_lesson_ids ?? [])
+  const nextIncompleteLessonId = progress?.overall.next_incomplete_lesson?.id ?? null
 
-  const currentModule = progress?.modules.find((m) =>
+  const safeModules = Array.isArray(course.modules) ? course.modules : []
+  const pct = progress?.overall.percent ?? 0
+  const lessonsCompleted = progress?.overall.lessons_completed ?? 0
+  const lessonsTotal =
+    progress?.overall.lessons_total ?? safeModules.reduce((sum, m) => sum + (Array.isArray(m.lessons) ? m.lessons.length : 0), 0)
+  const timeSpent = progress ? formatTimeSpent(progress.overall.estimated_seconds_remaining) : '0m'
+
+  const courseModules = safeModules.map((m) => ({
+    id: m.id,
+    title: m.title,
+    order: m.order,
+    lessons: Array.isArray(m.lessons) ? m.lessons.map((lesson) => {
+      const status: LessonStatus = completedLessonIds.has(lesson.id)
+        ? 'completed'
+        : lesson.id === nextIncompleteLessonId
+          ? 'current'
+          : 'available'
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        duration_display: lesson.duration_display,
+        status,
+      }
+    }) : [],
+  }))
+
+  const currentModule = courseModules.find((m) =>
     m.lessons.some((l) => l.status === 'current'),
   )
   const currentLesson = currentModule?.lessons.find((l) => l.status === 'current')
 
-  const modules = progress?.modules || []
+  const modules = courseModules
   const hasModules = modules.length > 0
 
   function handleNav(key: string) {
@@ -907,12 +923,12 @@ function EnrolledCourseOverview({
                           {isExpanded && (
                             <div className="lessons-list">
                               {mod.lessons.map((lesson) => {
-                                const locked = lesson.status === 'locked'
+                                const isClickable = lesson.status !== 'completed'
                                 return (
                                   <div
                                     key={lesson.id}
-                                    className={`lesson-row ${lesson.status}${locked ? '' : ' clickable'}`}
-                                    onClick={() => goToLesson(lesson.id, locked)}
+                                    className={`lesson-row ${lesson.status}${isClickable ? ' clickable' : ''}`}
+                                    onClick={() => goToLesson(lesson.id, lesson.status === 'completed')}
                                   >
                                     <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
                                     <span className="lesson-title">

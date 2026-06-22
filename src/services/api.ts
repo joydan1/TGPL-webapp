@@ -502,19 +502,28 @@ export interface ProgressModule {
   lessons: ProgressLesson[]
 }
 
-export interface CourseProgressResponse {
-  course: {
-    slug: string
-    title: string
-    category: string
-    thumbnail: string | null
-  }
+export interface CourseProgressOverall {
   lessons_completed: number
   lessons_total: number
-  time_spent_seconds: number
-  progress_percentage: number
-  current_lesson_id: string | null
-  modules: ProgressModule[]
+  percent: number
+  next_incomplete_lesson: {
+    id: string
+    module_id: string
+    title: string
+  } | null
+  estimated_seconds_remaining: number
+}
+
+export interface CourseProgressModuleSummary {
+  module_id: string
+  lessons_completed: number
+  lessons_total: number
+}
+
+export interface CourseProgressResponse {
+  overall: CourseProgressOverall
+  modules: CourseProgressModuleSummary[]
+  completed_lesson_ids: string[]
 }
 
 export interface LessonResource {
@@ -548,13 +557,17 @@ export interface LessonDetailResponse {
   next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
 }
 
-export interface LessonCompleteResponse {
+export interface LessonCompleteRawResponse {
   lesson_id: string
-  course_progress_percentage_before: number
-  course_progress_percentage_after: number
-  lessons_completed: number
-  lessons_total: number
-  next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
+  completed_at: string
+}
+
+export interface LessonCompleteResponse extends LessonCompleteRawResponse {
+  course_progress_percentage_before?: number
+  course_progress_percentage_after?: number
+  lessons_completed?: number
+  lessons_total?: number
+  next_lesson?: (AdjacentLesson & { thumbnail?: string | null }) | null
 }
 
 // ─── Courses API ──────────────────────────────────────────────────────────────
@@ -598,10 +611,27 @@ export const coursesAPI = {
 
   completeLesson: async (courseSlug: string, lessonId: string) => {
     try {
+      const beforeResponse = await apiClient.get<CourseProgressResponse>(
+        `/v1/courses/${courseSlug}/progress/`,
+      )
       const response = await apiClient.post<LessonCompleteResponse>(
         `/v1/courses/${courseSlug}/lessons/${lessonId}/complete/`,
       )
-      return { success: true as const, data: response.data }
+      const afterResponse = await apiClient.get<CourseProgressResponse>(
+        `/v1/courses/${courseSlug}/progress/`,
+      )
+
+      return {
+        success: true as const,
+        data: {
+          ...response.data,
+          course_progress_percentage_before: beforeResponse.data.overall.percent,
+          course_progress_percentage_after: afterResponse.data.overall.percent,
+          lessons_completed: afterResponse.data.overall.lessons_completed,
+          lessons_total: afterResponse.data.overall.lessons_total,
+          next_lesson: response.data.next_lesson ?? null,
+        },
+      }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to mark lesson complete')
       return { success: false as const, error: message, statusCode }

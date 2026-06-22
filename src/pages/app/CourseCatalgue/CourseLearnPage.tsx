@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI } from '../../../services/api'
-import type { LessonDetailResponse, LessonResource } from '../../../services/api'
+import type { AdjacentLesson, LessonDetailResponse, LessonResource } from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -411,13 +411,14 @@ export default function CourseLearnPage() {
     setMarking(false)
     if (res.success) {
       setLesson((prev) => (prev ? { ...prev, status: 'completed' } : prev))
+      const nextLesson = res.data.next_lesson as AdjacentLesson | null
       setCompleteInfo({
         before: res.data.course_progress_percentage_before,
         after: res.data.course_progress_percentage_after,
         lessonsCompleted: res.data.lessons_completed,
         lessonsTotal: res.data.lessons_total,
-        nextLesson: res.data.next_lesson
-          ? { id: res.data.next_lesson.id, title: res.data.next_lesson.title, duration_display: res.data.next_lesson.duration_display }
+        nextLesson: nextLesson
+          ? { id: nextLesson.id, title: nextLesson.title, duration_display: nextLesson.duration_display }
           : null,
       })
     }
