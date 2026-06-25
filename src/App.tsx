@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import { ROUTES } from './constants/routes'
 
@@ -46,6 +46,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   return <>{children}</>
 }
 
+// Forces DashboardPage to remount on every navigation to /dashboard so its
+// useEffect fetch always runs and course/progress data is never stale.
+function DashboardPageWrapper() {
+  const location = useLocation()
+  return <DashboardPage key={location.key} />
+}
+
 function App() {
   const { isAuthenticated } = useAuthStore()
 
@@ -54,7 +61,6 @@ function App() {
       <Routes>
         {/* ===== PUBLIC ROUTES (with Header & Footer) ===== */}
         <Route element={<PublicLayout />}>
-          {/* Home route – conditionally render LandingPage or redirect to dashboard */}
           <Route
             path="/"
             element={
@@ -86,7 +92,7 @@ function App() {
         <Route path={ROUTES.TERMS} element={<TermsPage />} />
         <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
 
-        {/* ===== PROTECTED APP ROUTES */}
+        {/* ===== PROTECTED APP ROUTES ===== */}
         <Route
           path={ROUTES.ONBOARDING}
           element={
@@ -95,27 +101,63 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path={ROUTES.CHECKOUT} element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+        <Route
+          path={ROUTES.CHECKOUT}
+          element={
+            <ProtectedRoute>
+              <CheckoutPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.DASHBOARD}
           element={
             <ProtectedRoute requiredRole="learner">
-              <DashboardPage />
+              <DashboardPageWrapper />
             </ProtectedRoute>
           }
         />
-<Route
-  path={ROUTES.COURSES}
-  element={
-    <ProtectedRoute requiredRole="learner">
-      <CourseCatalogPage />
-    </ProtectedRoute>
-  }
-/>
-<Route path="/courses/:slug" element={<ProtectedRoute requiredRole="learner"><CourseDetailPage /></ProtectedRoute>} />
-<Route path="/courses/:slug/preview" element={<ProtectedRoute requiredRole="learner"><CoursePlayerPage /></ProtectedRoute>} />
-<Route path={ROUTES.COURSE_LEARN} element={<ProtectedRoute requiredRole="learner"><CourseLearnPage /></ProtectedRoute>} />
-<Route path={ROUTES.ASSIGNMENT_DETAIL} element={<ProtectedRoute requiredRole="learner"><AssignmentDetailPage /></ProtectedRoute>} />
+        <Route
+          path={ROUTES.COURSES}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <CourseCatalogPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courses/:slug"
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <CourseDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courses/:slug/preview"
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <CoursePlayerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.COURSE_LEARN}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <CourseLearnPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ASSIGNMENT_DETAIL}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <AssignmentDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

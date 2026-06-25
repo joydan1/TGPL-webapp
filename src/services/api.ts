@@ -371,24 +371,30 @@ export const authAPI = {
   },
 
   requestPasswordReset: async (payload: PasswordResetPayload) => {
-    try {
-      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
-      return { success: true as const }
-    } catch (error) {
-      const { message } = parseApiError(error, 'Password reset request failed')
-      return { success: false as const, error: message }
+  try {
+    await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
+    return { success: true as const }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Password reset request failed')
+    if (statusCode === 429) {
+      return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
     }
-  },
+    return { success: false as const, error: message }
+  }
+},
 
-  confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
-    try {
-      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
-      return { success: true as const }
-    } catch (error) {
-      const { message } = parseApiError(error, 'Password reset failed')
-      return { success: false as const, error: message }
+confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
+  try {
+    await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
+    return { success: true as const }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Password reset failed')
+    if (statusCode === 429) {
+      return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
     }
-  },
+    return { success: false as const, error: message }
+  }
+},
 
   ...(import.meta.env.DEV && {
     testLearnerOnly: async () => {
@@ -529,11 +535,10 @@ export interface CourseProgressResponse {
 export interface LessonResource {
   id: string
   title: string
-  file_type: string
-  file_url: string
-  size_display: string
-  module_title: string
-  uploaded_at: string
+  resource_type: 'template' | 'worksheet' | 'slides' | 'document' | 'other'
+  file_format: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'zip' | 'image' | 'other' | null
+  file_size: number   // raw bytes — format client-side
+  created_at: string
 }
 
 export interface AdjacentLesson {
@@ -650,6 +655,19 @@ export const coursesAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
+getResourceDownloadUrl: async (courseSlug: string, lessonId: string, resourceId: string) => {
+  try {
+    const response = await apiClient.get<{ download_url: string; expires_in: number }>(
+      `/v1/courses/${courseSlug}/lessons/${lessonId}/resources/${resourceId}/download/`,
+    )
+    return { success: true as const, data: response.data }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Failed to get download URL')
+    return { success: false as const, error: message, statusCode }
+  }
+},
+
+
 }
 
 export default apiClient

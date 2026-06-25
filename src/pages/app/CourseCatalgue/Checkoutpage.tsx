@@ -8,7 +8,7 @@ import Input from '../../../components/Input'
 import { paymentAPI } from '../../../services/api'
 import type { CheckoutResponse, FreeCourseCheckoutResponse } from '../../../services/api'
 import { useAuthStore } from '../../../store/auth'
-import { ROUTES } from '../../../constants/routes'
+import { ROUTES, RouteBuilder } from '../../../constants/routes'
 
 type Screen = 'checkout' | 'processing' | 'success' | 'failed'
 
@@ -72,26 +72,17 @@ declare global {
   }
 }
 
-function loadPaystackScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.PaystackPop) return resolve()
-    const s = document.createElement('script')
-    s.src = 'https://js.paystack.co/v1/inline.js'
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('Failed to load Paystack'))
-    document.head.appendChild(s)
-  })
-}
-
 function fmtNaira(raw: string): string {
   const num = Number(raw)
   if (isNaN(num)) return `\u20a6${raw}`
   return `\u20a6${num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-const POLL_INTERVAL_MS = 3000
-const POLL_MAX_ATTEMPTS = 10   // 10 × 3s = 30s max wait
-const POLL_MAX_ERRORS   = 3    // 3 consecutive fetch errors → give up
+const POLL_INTERVAL_MS  = 3000
+const POLL_MAX_ATTEMPTS = 10  // 10 × 3s = 30s max
+const POLL_MAX_ERRORS   = 3   // 3 consecutive fetch errors → give up
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
   const user = useAuthStore(s => s.user)
@@ -147,7 +138,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
     pollRef.current = setInterval(async () => {
       pollAttempts.current += 1
 
-      // Hard timeout
       if (pollAttempts.current > POLL_MAX_ATTEMPTS) {
         failPayment('Payment could not be confirmed. Please contact support if your card was charged.')
         return
@@ -163,7 +153,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         return
       }
 
-      // Reset error streak on success
       pollErrors.current = 0
 
       const data = res.data!
@@ -183,18 +172,24 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         throw new Error('Invalid course price. Please go back and try again.')
       }
 
+      // Guard — script must already be loaded via index.html
+      if (!window.PaystackPop) {
+        throw new Error('Payment SDK failed to load. Please refresh and try again.')
+      }
+
       const configRes = await paymentAPI.getConfig()
-      if (!configRes.success || !configRes.data) throw new Error('Failed to load payment configuration')
+      if (!configRes.success || !configRes.data) throw new Error('Failed to load payment configuration.')
       const { public_key } = configRes.data
       if (!public_key) throw new Error('Payment is not configured yet. Please try again later.')
 
       const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
       if (!checkoutRes.success) {
-        throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment')
+        throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment.')
       }
 
       const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
 
+      // Free course — skip Paystack entirely
       if (checkoutData.is_free) {
         setResult({
           reference: checkoutData.reference,
@@ -214,8 +209,6 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
 
       const { reference: ref, access_code } = checkoutData as CheckoutResponse
       setReference(ref)
-
-      await loadPaystackScript()
       setIsLoading(false)
 
       const handler = window.PaystackPop.setup({
@@ -224,11 +217,9 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         amount: courseInfo.priceKobo,
         ref,
         access_code,
-        // User closed modal without paying — go back to checkout
         onClose: () => {
           setScreen('checkout')
         },
-        // Payment attempted — verify
         callback: () => {
           setScreen('processing')
           pollStatus(ref)
@@ -237,7 +228,7 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       handler.openIframe()
     } catch (e: unknown) {
       setIsLoading(false)
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     }
   }, [email, courseInfo, pollStatus])
 
@@ -264,6 +255,8 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
   )
 }
 
+// ─── Shared UI ────────────────────────────────────────────────────────────────
+
 const ChevronLeft = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="15,18 9,12 15,6" />
@@ -273,7 +266,9 @@ const ChevronLeft = () => (
 function Header({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div style={{ background: '#fff', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#111', display: 'flex', padding: '0.25rem' }}><ChevronLeft /></button>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#111', display: 'flex', padding: '0.25rem' }}>
+        <ChevronLeft />
+      </button>
       <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#111' }}>{title}</span>
     </div>
   )
@@ -285,13 +280,15 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
     <div style={{ display: 'flex', alignItems: 'center', padding: '1.25rem 1.25rem 0', maxWidth: 600, margin: '0 auto' }}>
       {steps.map((label, i) => {
         const num = i + 1
-        const done = num < step
+        const done   = num < step
         const active = num === step
         return (
           <div key={label} style={{ display: 'contents' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: done || active ? '#2563EB' : '#E5E7EB', color: done || active ? '#fff' : '#9CA3AF' }}>
-                {done ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg> : num}
+                {done
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
+                  : num}
               </div>
               <span style={{ fontSize: '0.875rem', fontWeight: 500, color: active || done ? '#111' : '#9CA3AF' }}>{label}</span>
             </div>
@@ -315,8 +312,13 @@ function CourseSummary() {
           <p style={{ fontWeight: 700, color: '#111', margin: '0 0 0.2rem', fontSize: '0.9375rem' }}>{courseInfo.title}</p>
           <p style={{ color: '#6B7280', fontSize: '0.8rem', margin: '0 0 0.4rem' }}>{courseInfo.trainerName}</p>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {[{ icon: <Clock size={12} color="#9CA3AF" />, text: 'Full access' }, { icon: <BookOpen size={12} color="#9CA3AF" />, text: 'Certificate included' }].map(({ icon, text }) => (
-              <span key={text} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: '#6B7280' }}>{icon}{text}</span>
+            {[
+              { icon: <Clock size={12} color="#9CA3AF" />, text: 'Full access' },
+              { icon: <BookOpen size={12} color="#9CA3AF" />, text: 'Certificate included' },
+            ].map(({ icon, text }) => (
+              <span key={text} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: '#6B7280' }}>
+                {icon}{text}
+              </span>
             ))}
           </div>
         </div>
@@ -325,7 +327,27 @@ function CourseSummary() {
   )
 }
 
-const wrap: React.CSSProperties = { maxWidth: 600, margin: '1.25rem auto 0', padding: '0 1.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }
+function PaystackLogo() {
+  return (
+    <svg width="90" height="20" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0"  y="2"    width="18" height="5" rx="1.5" fill="#00C3F7" />
+      <rect x="0"  y="8.5"  width="18" height="5" rx="1.5" fill="#011B33" />
+      <rect x="0"  y="15"   width="18" height="5" rx="1.5" fill="#011B33" opacity="0.4" />
+      <text x="23" y="15" fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="13" fill="#011B33">Paystack</text>
+    </svg>
+  )
+}
+
+const wrap: React.CSSProperties = {
+  maxWidth: 600,
+  margin: '1.25rem auto 0',
+  padding: '0 1.25rem 2rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+}
+
+// ─── Checkout screen ──────────────────────────────────────────────────────────
 
 function CheckoutScreen({ onBack }: { onBack: () => void }) {
   const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error, courseInfo } = useCheckout()
@@ -339,6 +361,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
       <div style={wrap}>
         <CourseSummary />
 
+        {/* Order summary */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Order summary</p>
@@ -353,8 +376,12 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
+          {/* Promo code */}
           <div>
-            <div onClick={() => setPromoOpen(o => !o)} style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            <div
+              onClick={() => setPromoOpen(o => !o)}
+              style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            >
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>
                 <Tag size={16} color="#6B7280" />Have a promo code?
               </span>
@@ -371,6 +398,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Card>
 
+        {/* Email */}
         <Card variant="elevated">
           <CardBody style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111', margin: 0 }}>Email address</p>
@@ -387,6 +415,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
 
         {error && <Alert type="error">{error}</Alert>}
 
+        {/* Pay button */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem 0' }}>
             <span style={{ fontSize: '0.875rem', color: '#6B7280', fontWeight: 500 }}>Powered by</span>
@@ -397,16 +426,26 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
           </Button>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#9CA3AF', margin: 0 }}>By continuing, you agree to our Terms of Service</p>
+        <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#9CA3AF', margin: 0 }}>
+          By continuing, you agree to our Terms of Service
+        </p>
 
+        {/* Trust badges */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingBottom: '1rem' }}>
           {[
             { bg: '#EFF6FF', icon: <Shield size={18} color="#2563EB" />, label: 'Secure payment', sub: '256-bit SSL' },
-            { bg: '#FFF7ED', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10" /></svg>, label: 'Instant access', sub: 'Start learning now' },
+            {
+              bg: '#FFF7ED',
+              icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10" /></svg>,
+              label: 'Instant access',
+              sub: 'Start learning now',
+            },
           ].map(({ bg, icon, label, sub }) => (
             <Card key={label} variant="elevated">
               <CardBody style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {icon}
+                </div>
                 <div>
                   <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111', margin: 0 }}>{label}</p>
                   <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: 0 }}>{sub}</p>
@@ -420,16 +459,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
   )
 }
 
-function PaystackLogo() {
-  return (
-    <svg width="90" height="20" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="2" width="18" height="5" rx="1.5" fill="#00C3F7" />
-      <rect x="0" y="8.5" width="18" height="5" rx="1.5" fill="#011B33" />
-      <rect x="0" y="15" width="18" height="5" rx="1.5" fill="#011B33" opacity="0.4" />
-      <text x="23" y="15" fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="13" fill="#011B33">Paystack</text>
-    </svg>
-  )
-}
+// ─── Processing screen ────────────────────────────────────────────────────────
 
 function ProcessingScreen() {
   const { reference, go } = useCheckout()
@@ -449,17 +479,23 @@ function ProcessingScreen() {
           <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{reference}</p>
         </div>
       )}
-      <button onClick={() => go('checkout')} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}>
+      <button
+        onClick={() => go('checkout')}
+        style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.9rem', cursor: 'pointer', marginTop: '2rem' }}
+      >
         Cancel
       </button>
     </div>
   )
 }
 
+// ─── Success screen ───────────────────────────────────────────────────────────
+
 function SuccessScreen() {
   const { result, courseInfo } = useCheckout()
   const navigate = useNavigate()
 
+  const courseSlug    = result?.course?.slug || courseInfo.slug
   const courseTitle   = result?.course?.title || courseInfo.title
   const trainerName   = result?.course?.trainer_name || courseInfo.trainerName
   const amountDisplay = result?.amount_naira ? fmtNaira(result.amount_naira) : fmtNaira(courseInfo.priceNaira)
@@ -468,15 +504,21 @@ function SuccessScreen() {
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   const ref = result?.reference || '\u2014'
 
+  function handlePrintReceipt() {
+    window.print()
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
       <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 16px rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
       </div>
+
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.5rem' }}>Payment successful</p>
         <p style={{ fontSize: '0.9rem', color: '#6B7280', margin: 0 }}>You now have full access to <strong>{courseTitle}</strong></p>
       </div>
+
       <Card variant="elevated" style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ background: 'linear-gradient(135deg, #EFF6FF, #F0F9FF)', borderRadius: '0.75rem 0.75rem 0 0', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>Order ID</span>
@@ -491,8 +533,17 @@ function SuccessScreen() {
             </div>
           </div>
           {[
-            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Amount paid', value: amountDisplay },
-            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Date', value: dateDisplay },
+            { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Amount paid',     value: amountDisplay },
+            {
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              ),
+              label: 'Date',
+              value: dateDisplay,
+            },
             { icon: <CreditCard size={16} color="#9CA3AF" />, label: 'Payment method', value: 'Paystack' },
           ].map(({ icon, label, value }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -502,29 +553,61 @@ function SuccessScreen() {
           ))}
         </CardBody>
       </Card>
+
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <Button size="large" icon={<Play size={16} />} onClick={() => navigate(ROUTES.COURSES)} style={{ width: '100%', borderRadius: '0.75rem' }}>Start learning</Button>
-        <Button size="large" variant="outline" icon={<Download size={16} />} style={{ width: '100%', borderRadius: '0.75rem' }}>Download receipt</Button>
-        <button onClick={() => navigate(ROUTES.DASHBOARD ?? '/')} style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textAlign: 'center' }}>Go to dashboard</button>
+        {/* Navigate directly to the course they just purchased */}
+        <Button
+          size="large"
+          icon={<Play size={16} />}
+          onClick={() => navigate(RouteBuilder.course(courseSlug))}
+          style={{ width: '100%', borderRadius: '0.75rem' }}
+        >
+          Start learning
+        </Button>
+
+        {/* Print receipt as a simple fallback until a dedicated receipt endpoint exists */}
+        <Button
+          size="large"
+          variant="outline"
+          icon={<Download size={16} />}
+          onClick={handlePrintReceipt}
+          style={{ width: '100%', borderRadius: '0.75rem' }}
+        >
+          Download receipt
+        </Button>
+
+        <button
+          onClick={() => navigate(ROUTES.DASHBOARD ?? '/')}
+          style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textAlign: 'center' }}
+        >
+          Go to dashboard
+        </button>
       </div>
     </div>
   )
 }
+
+// ─── Failed screen ────────────────────────────────────────────────────────────
 
 function FailedScreen() {
   const { result, retryPayment } = useCheckout()
   const failureTitle = result?.failure_reason || 'Your payment could not be completed'
   const ref = result?.reference || ''
 
+  function handleContactSupport() {
+    window.open('mailto:support@tgpl.co', '_blank')
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8faff 0%, #f0f4ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '2rem' }}>
       <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#F59E0B" />
-          <line x1="12" y1="9" x2="12" y2="13" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="12" y1="9"  x2="12" y2="13" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx="12" cy="17" r="1" fill="#fff" />
         </svg>
       </div>
+
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.375rem' }}>Payment didn&apos;t go through</p>
         <p style={{ fontWeight: 700, fontSize: '1rem', color: '#374151', margin: '0 0 0.75rem' }}>{failureTitle}</p>
@@ -532,32 +615,43 @@ function FailedScreen() {
           This could be due to incorrect card details, insufficient funds, or your bank blocking the transaction.
         </p>
       </div>
+
       {ref && (
         <div style={{ background: '#F3F4F6', borderRadius: '0.75rem', padding: '0.875rem 1.5rem', textAlign: 'center' }}>
           <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: '0 0 0.25rem' }}>Reference ID</p>
           <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{ref}</p>
         </div>
       )}
+
       <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <Button size="large" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>Try again</Button>
-        <button style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+        <Button size="large" onClick={retryPayment} style={{ width: '100%', borderRadius: '0.75rem' }}>
+          Try again
+        </Button>
+        <button
+          onClick={handleContactSupport}
+          style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
           <MessageSquare size={16} />Contact support
         </button>
-        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF', margin: 0 }}>Need help? Our support team is available 24/7.</p>
+        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF', margin: 0 }}>
+          Need help? Our support team is available 24/7.
+        </p>
       </div>
     </div>
   )
 }
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
 
 function CheckoutPageInner() {
   const navigate = useNavigate()
   const { screen } = useCheckout()
 
   const screens: Record<Screen, React.ReactNode> = {
-    checkout: <CheckoutScreen onBack={() => navigate(-1)} />,
+    checkout:   <CheckoutScreen onBack={() => navigate(-1)} />,
     processing: <ProcessingScreen />,
-    success: <SuccessScreen />,
-    failed: <FailedScreen />,
+    success:    <SuccessScreen />,
+    failed:     <FailedScreen />,
   }
 
   return <div style={{ minHeight: '100vh', background: '#F5F5F5' }}>{screens[screen]}</div>
@@ -568,9 +662,9 @@ export default function CheckoutPage() {
   const location = useLocation()
 
   const state = (location.state as {
-    courseSlug?: string
-    priceNaira?: string
-    priceKobo?: number
+    courseSlug?:  string
+    priceNaira?:  string
+    priceKobo?:   number
     courseTitle?: string
     trainerName?: string
   } | null)
@@ -583,11 +677,11 @@ export default function CheckoutPage() {
   }
 
   const courseInfo: CourseInfo = {
-    slug: courseSlug,
-    title: state?.courseTitle ?? courseSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    slug:        courseSlug,
+    title:       state?.courseTitle ?? courseSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     trainerName: state?.trainerName ?? '',
-    priceNaira: state?.priceNaira ?? '0',
-    priceKobo: state?.priceKobo ?? 0,
+    priceNaira:  state?.priceNaira  ?? '0',
+    priceKobo:   state?.priceKobo   ?? 0,
   }
 
   return (

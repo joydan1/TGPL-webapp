@@ -56,6 +56,7 @@ interface CourseDetail {
   enrolled_count: number
   trainer: Trainer
   modules: Module[]
+  thumbnail_url?: string | null   // ← added
   created_at: string
   updated_at: string
 }
@@ -237,7 +238,6 @@ const ENROLLED_CSS = `
   .profile-menu-wrap { position: relative; }
   .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
   .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
-  .topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
   .profile-chevron.open { transform: rotate(180deg); }
   .profile-dropdown {
@@ -293,7 +293,7 @@ const ENROLLED_CSS = `
 
   /* ── Main content ── */
   .main { flex: 1; min-width: 0; overflow-y: auto; }
-  .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; max-width: 1100px; }
+  .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; width: 100%; }
 
   /* ── Course hero ── */
   .course-hero {
@@ -302,6 +302,7 @@ const ENROLLED_CSS = `
     justify-content: space-between; padding: 1.25rem;
   }
   .course-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+  .course-hero-placeholder { position: absolute; inset: 0; background: linear-gradient(135deg, #2B3942 0%, #1a252c 100%); z-index: 0; }
   .course-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.75) 100%); z-index: 1; }
   .hero-top-row { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; }
   .hero-back-btn {
@@ -364,25 +365,24 @@ const ENROLLED_CSS = `
   .module-chevron { color: #9CA3AF; flex-shrink: 0; transition: transform 0.15s ease; }
   .module-chevron.open { transform: rotate(180deg); }
   .lessons-list { border-top: 1px solid #F3F4F6; padding: 0.5rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.125rem; }
-  .lesson-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.625rem; border-radius: 0.625rem; font-size: 0.875rem; transition: background 0.12s; }
-  .lesson-row.clickable { cursor: pointer; }
-  .lesson-row.clickable:hover { background: #F9FAFB; }
+  .lesson-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.625rem; border-radius: 0.625rem; font-size: 0.875rem; transition: background 0.12s; cursor: pointer; }
+  .lesson-row:hover { background: #F9FAFB; }
   .lesson-row.locked { color: #C0C5CC; cursor: not-allowed; }
+  .lesson-row.locked:hover { background: transparent; }
   .lesson-row.completed { color: #6B7280; }
   .lesson-row.current { color: #111; font-weight: 700; }
   .lesson-row.available { color: #374151; }
   .lesson-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .lesson-title { flex: 1; min-width: 0; }
-  .lesson-up-next { font-size: 0.75rem; color: #2563EB; font-weight: 600; }
+  .lesson-title-col { flex: 1; min-width: 0; }
+  .lesson-up-next { font-size: 0.75rem; color: #2563EB; font-weight: 600; margin-top: 0.1rem; }
   .lesson-duration { font-size: 0.8125rem; color: #9CA3AF; flex-shrink: 0; }
 
-  /* ── Continue bar — inline, not floating ── */
+  /* ── Continue bar ── */
   .continue-bar {
     background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%);
     border-radius: 1rem; padding: 1.25rem 1.5rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
     color: #fff; box-shadow: 0 4px 20px rgba(36,146,235,0.3);
-    /* no position:fixed — sits naturally at the bottom of .content */
   }
   .continue-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
   .continue-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
@@ -567,7 +567,10 @@ function PublicCourseOverview({ course }: { course: CourseDetail }) {
           <h1 className="outer-title">Course Overview</h1>
           <div className="card">
             <div className="hero">
-              <div className="hero-placeholder" />
+              {course.thumbnail_url
+                ? <img src={course.thumbnail_url} alt={course.title} />
+                : <div className="hero-placeholder" />
+              }
               <div className="hero-overlay" />
               <button className="hero-back" onClick={() => navigate(ROUTES.COURSES)}>
                 <ChevronLeft />
@@ -678,35 +681,39 @@ function EnrolledCourseOverview({
   const pct = progress?.overall.percent ?? 0
   const lessonsCompleted = progress?.overall.lessons_completed ?? 0
   const lessonsTotal =
-    progress?.overall.lessons_total ?? safeModules.reduce((sum, m) => sum + (Array.isArray(m.lessons) ? m.lessons.length : 0), 0)
-  const timeSpent = progress ? formatTimeSpent(progress.overall.estimated_seconds_remaining) : '0m'
+    progress?.overall.lessons_total ??
+    safeModules.reduce((sum, m) => sum + (Array.isArray(m.lessons) ? m.lessons.length : 0), 0)
+
+  const timeSpent = progress
+    ? formatTimeSpent(
+        course.total_duration_seconds - (progress.overall.estimated_seconds_remaining ?? 0),
+      )
+    : '0m'
 
   const courseModules = safeModules.map((m) => ({
     id: m.id,
     title: m.title,
     order: m.order,
-    lessons: Array.isArray(m.lessons) ? m.lessons.map((lesson) => {
-      const status: LessonStatus = completedLessonIds.has(lesson.id)
-        ? 'completed'
-        : lesson.id === nextIncompleteLessonId
-          ? 'current'
-          : 'available'
-      return {
-        id: lesson.id,
-        title: lesson.title,
-        duration_display: lesson.duration_display,
-        status,
-      }
-    }) : [],
+    lessons: Array.isArray(m.lessons)
+      ? m.lessons.map((lesson): { id: string; title: string; duration_display: string; status: LessonStatus } => {
+          const status: LessonStatus = completedLessonIds.has(lesson.id)
+            ? 'completed'
+            : lesson.id === nextIncompleteLessonId
+              ? 'current'
+              : 'available'
+          return {
+            id: lesson.id,
+            title: lesson.title,
+            duration_display: lesson.duration_display,
+            status,
+          }
+        })
+      : [],
   }))
 
-  const currentModule = courseModules.find((m) =>
-    m.lessons.some((l) => l.status === 'current'),
-  )
+  const currentModule = courseModules.find((m) => m.lessons.some((l) => l.status === 'current'))
   const currentLesson = currentModule?.lessons.find((l) => l.status === 'current')
-
-  const modules = courseModules
-  const hasModules = modules.length > 0
+  const hasModules = courseModules.length > 0
 
   function handleNav(key: string) {
     setActiveNav(key)
@@ -720,9 +727,17 @@ function EnrolledCourseOverview({
     navigate(ROUTES.LOGIN)
   }
 
-  function goToLesson(lessonId: string, locked: boolean) {
-    if (locked || !course.slug) return
-    navigate(RouteBuilder.courseLearn(course.slug, lessonId))
+  // ── Navigate to lesson — all lessons are accessible (re-watch completed, continue current/available) ──
+  // locked status is never set in this page, but guard just in case
+  function goToLesson(lessonId: string, status: LessonStatus, moduleTitle: string) {
+    if (status === 'locked' || !course.slug) return
+    navigate(RouteBuilder.courseLearn(course.slug, lessonId), {
+      state: {
+        courseTitle: course.title,
+        moduleTitle,
+        thumbnailUrl: course.thumbnail_url ?? undefined,  // ← pass thumbnail
+      },
+    })
   }
 
   return (
@@ -823,6 +838,10 @@ function EnrolledCourseOverview({
 
               {/* Course hero */}
               <div className="course-hero">
+                {course.thumbnail_url
+                  ? <img src={course.thumbnail_url} alt={course.title} />
+                  : <div className="course-hero-placeholder" />
+                }
                 <div className="hero-top-row">
                   <button className="hero-back-btn" onClick={() => navigate(ROUTES.DASHBOARD)}>
                     <ChevronLeft />
@@ -867,25 +886,25 @@ function EnrolledCourseOverview({
                 <div className="modules-header" style={{ marginBottom: '0.875rem' }}>
                   <span className="modules-title">Course Modules</span>
                   <span className="modules-sub">
-                    {modules.length || course.module_count} modules · {lessonsTotal} lessons
+                    {courseModules.length || course.module_count} modules · {lessonsTotal} lessons
                   </span>
                 </div>
 
                 {!hasModules ? (
                   <div className="modules-empty">
                     <BookOpen size={28} color="#D1D5DB" />
-                    <span className="modules-empty-title">No modules added to this course yet</span>
+                    <span className="modules-empty-title">No modules added yet</span>
                     <span className="modules-empty-sub">
-                      This course doesn't have any modules or lessons on the backend yet — there's nothing to display until content is added.
+                      This course doesn't have any modules or lessons yet — check back soon.
                     </span>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {modules.map((mod, mi) => {
+                    {courseModules.map((mod, mi) => {
                       const doneCount = mod.lessons.filter((l) => l.status === 'completed').length
                       const total = mod.lessons.length
                       const hasCurrent = mod.lessons.some((l) => l.status === 'current')
-                      const allDone = doneCount === total
+                      const allDone = total > 0 && doneCount === total
                       const isExpanded = expandedModule === mod.id
 
                       return (
@@ -894,9 +913,7 @@ function EnrolledCourseOverview({
                             className="module-row"
                             onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
                           >
-                            <div
-                              className={`module-num${allDone ? ' done' : ''}${hasCurrent ? ' current' : ''}`}
-                            >
+                            <div className={`module-num${allDone ? ' done' : hasCurrent ? ' current' : ''}`}>
                               {allDone ? <CheckCircle size={16} /> : mi + 1}
                             </div>
                             <div className="module-info">
@@ -922,25 +939,22 @@ function EnrolledCourseOverview({
 
                           {isExpanded && (
                             <div className="lessons-list">
-                              {mod.lessons.map((lesson) => {
-                                const isClickable = lesson.status !== 'completed'
-                                return (
-                                  <div
-                                    key={lesson.id}
-                                    className={`lesson-row ${lesson.status}${isClickable ? ' clickable' : ''}`}
-                                    onClick={() => goToLesson(lesson.id, lesson.status === 'completed')}
-                                  >
-                                    <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
-                                    <span className="lesson-title">
-                                      {lesson.title}
-                                      {lesson.status === 'current' && (
-                                        <div className="lesson-up-next">Up next</div>
-                                      )}
-                                    </span>
-                                    <span className="lesson-duration">{lesson.duration_display}</span>
-                                  </div>
-                                )
-                              })}
+                              {mod.lessons.map((lesson) => (
+                                <div
+                                  key={lesson.id}
+                                  className={`lesson-row ${lesson.status}${lesson.status === 'locked' ? '' : ''}`}
+                                  onClick={() => goToLesson(lesson.id, lesson.status, mod.title)}
+                                >
+                                  <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
+                                  <span className="lesson-title-col">
+                                    {lesson.title}
+                                    {lesson.status === 'current' && (
+                                      <div className="lesson-up-next">Up next</div>
+                                    )}
+                                  </span>
+                                  <span className="lesson-duration">{lesson.duration_display}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -950,7 +964,7 @@ function EnrolledCourseOverview({
                 )}
               </div>
 
-              {/* ── Continue bar — inline at bottom of content, not floating ── */}
+              {/* Continue bar — only shown when there's a current lesson */}
               {currentLesson && (
                 <div className="continue-bar">
                   <div className="continue-text">
@@ -961,7 +975,7 @@ function EnrolledCourseOverview({
                     <span className="continue-pct">{pct}% complete</span>
                     <button
                       className="continue-btn"
-                      onClick={() => goToLesson(currentLesson.id, false)}
+                      onClick={() => goToLesson(currentLesson.id, currentLesson.status, currentModule?.title ?? '')}
                     >
                       <Play size={14} fill="#2563EB" /> Resume
                     </button>

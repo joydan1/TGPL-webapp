@@ -25,6 +25,21 @@ interface EnrolledCourse {
   resume_url: string
 }
 
+interface CertRequirement {
+  label: string
+  satisfied: boolean
+  current: number
+  target: number
+}
+
+interface CertificationProgress {
+  course_id: string
+  course_slug: string
+  course_title: string
+  completion_percentage: number
+  requirements: CertRequirement[]
+}
+
 interface DashboardResponse {
   user: {
     id: string
@@ -44,7 +59,7 @@ interface DashboardResponse {
     upcoming: unknown[]
   }
   enrolled_courses: EnrolledCourse[]
-  certification_progress: unknown[]
+  certification_progress: CertificationProgress[]
 }
 
 // ── Progress ring ──────────────────────────────────────────────────────────
@@ -105,7 +120,6 @@ const CSS = `
   }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
 
-  /* ── Profile menu ────────────────────────────────────────────────────── */
   .profile-menu-wrap { position: relative; }
   .profile-trigger {
     display: flex; align-items: center; gap: 0.375rem;
@@ -295,16 +309,13 @@ const CSS = `
   .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
   .cert-right { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-  /* ── Mobile tab bar ──────────────────────────────────────────────────── */
   .mobile-tabbar {
     display: none;
     position: fixed; bottom: 0; left: 0; right: 0;
     height: 60px; background: #fff; border-top: 1px solid #F3F4F6;
     z-index: 300;
   }
-  .mobile-tabbar-inner {
-    display: flex; height: 100%;
-  }
+  .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item {
     flex: 1; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 3px; cursor: pointer;
@@ -314,7 +325,6 @@ const CSS = `
   .tab-item.active { color: #2563EB; }
   .tab-item span { font-size: 0.65rem; }
 
-  /* ── Responsive ──────────────────────────────────────────────────────── */
   @media (max-width: 900px) {
     .sessions-row { grid-template-columns: 1fr; }
     .session-card { height: auto; }
@@ -342,13 +352,6 @@ const ASSIGNMENTS = [
   { id: 5, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
 ]
 
-const CERT_ITEMS = [
-  { label: 'Complete all 6/8 modules',      done: true },
-  { label: 'Pass module quizzes (≥70%)',     done: true },
-  { label: 'Submit stakeholder map project', done: false },
-  { label: 'Final assessment',               done: false },
-]
-
 const NAV_ITEMS = [
   { key: 'home',     label: 'Home',         Icon: Home     },
   { key: 'courses',  label: 'Courses',      Icon: BookOpen },
@@ -363,6 +366,7 @@ export default function DashboardPage() {
   const [activeNav, setActiveNav] = useState('home')
   const [profileOpen, setProfileOpen] = useState(false)
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
+  const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -372,14 +376,17 @@ export default function DashboardPage() {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
   }, [isAuthenticated, navigate])
 
-  // Fetch dashboard data on mount
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
         setError(null)
         const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
-        setEnrolledCourses(response.data.enrolled_courses || [])
+        const courses = response.data.enrolled_courses || []
+        setCertProgress(response.data.certification_progress || [])
+        // TODO: merge real completion_percentage once dashboard returns correct slugs
+        // or backend fixes completion_percentage in the dashboard response
+        setEnrolledCourses(courses)
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
         setError('Failed to load courses')
@@ -388,12 +395,9 @@ export default function DashboardPage() {
       }
     }
 
-    if (user) {
-      fetchDashboardData()
-    }
+    if (user) fetchDashboardData()
   }, [user])
 
-  // Close profile dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
@@ -417,22 +421,27 @@ export default function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  // Resume banner, Assignments, and Certificate progress only make sense once
-  // the learner has at least one enrolled course — until we know that for
-  // sure (loaded, no error, courses present), we don't render them so a
-  // brand-new account never sees fake progress data.
   const hasCourses = enrolledCourses.length > 0
   const showCourseDependentSections = !loading && !error && hasCourses
   const showEmptyState = !loading && !error && !hasCourses
+
+  // ── Resume banner: most recently accessed course ───────────────────────
+  const resumeCourse = hasCourses
+    ? [...enrolledCourses].sort((a, b) => {
+        const ta = a.last_accessed_at ? new Date(a.last_accessed_at).getTime() : 0
+        const tb = b.last_accessed_at ? new Date(b.last_accessed_at).getTime() : 0
+        return tb - ta
+      })[0]
+    : null
+
+  // ── Cert tracker: first entry ──────────────────────────────────────────
+  const activeCert = certProgress.length > 0 ? certProgress[0] : null
 
   function handleNav(key: string) {
     setActiveNav(key)
     if (key === 'courses') navigate(ROUTES.COURSES)
   }
 
-  // Goes to the course's overview page — from there the learner can resume
-  // a specific lesson or browse modules (this mirrors CourseDetailPage's
-  // existing, working links into CourseLearnPage).
   function goToCourse(slug: string) {
     if (!slug) return
     navigate(RouteBuilder.course(slug))
@@ -468,7 +477,6 @@ export default function DashboardPage() {
               <div className="bell-dot" />
             </div>
 
-            {/* Profile menu */}
             <div className="profile-menu-wrap" ref={profileRef}>
               <button
                 className="profile-trigger"
@@ -514,7 +522,6 @@ export default function DashboardPage() {
         {/* Body */}
         <div className="db-body">
 
-          {/* Sidebar — hidden on mobile */}
           <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
             <div className="sidebar-top">
               <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
@@ -549,7 +556,6 @@ export default function DashboardPage() {
             </div>
           </aside>
 
-          {/* Main */}
           <main className="main">
             <div className="content">
 
@@ -558,24 +564,34 @@ export default function DashboardPage() {
                 <div className="greeting-name">{firstName} 👋</div>
               </div>
 
-              {/* Resume banner — only meaningful once there's real progress to resume */}
-              {showCourseDependentSections && (
+              {/* Resume banner — wired to most recently accessed course */}
+              {showCourseDependentSections && resumeCourse && (
                 <div className="resume-banner">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="resume-label">Continue where you left off</div>
-                    <div className="resume-module">Module 3 — Stakeholder Mapping</div>
+                    <div className="resume-module">{resumeCourse.title}</div>
                     <div className="resume-progress-wrap">
-                      <div className="resume-progress-fill" style={{ width: '40%' }} />
+                      <div className="resume-progress-fill" style={{ width: `${resumeCourse.completion_percentage}%` }} />
                     </div>
-                    <div className="resume-sub">40% complete · 2h 50m remaining</div>
+                    <div className="resume-sub">{resumeCourse.completion_percentage}% complete</div>
                   </div>
-                  <button className="resume-btn">
+                  <button
+                    className="resume-btn"
+                    onClick={() => {
+                      if (resumeCourse.resume_url) {
+                        // resume_url is a full path like /courses/:slug/learn/:lessonId
+                        navigate(resumeCourse.resume_url)
+                      } else {
+                        goToCourse(resumeCourse.course_slug)
+                      }
+                    }}
+                  >
                     <Play size={14} fill="#2563EB" /> Resume
                   </button>
                 </div>
               )}
 
-              {/* Assignments */}
+              {/* Assignments — hardcoded until M2 */}
               {showCourseDependentSections && (
                 <div>
                   <div className="section-header">
@@ -584,15 +600,15 @@ export default function DashboardPage() {
                   <div className="assignments-wrap">
                     <div className="assignments-scroll" ref={scrollRef}>
                       {ASSIGNMENTS.map((a) => (
-                      <div
-  key={a.id}
-  className={`asgn-card${a.active ? ' active' : ''}`}
-  role="button"
-  tabIndex={a.active ? 0 : -1}
-  onClick={() => a.active && goToAssignment(a.id)}
-  onKeyDown={(e) => {
-    if (a.active && (e.key === 'Enter' || e.key === ' ')) goToAssignment(a.id)
-  }}
+                        <div
+                          key={a.id}
+                          className={`asgn-card${a.active ? ' active' : ''}`}
+                          role="button"
+                          tabIndex={a.active ? 0 : -1}
+                          onClick={() => a.active && goToAssignment(a.id)}
+                          onKeyDown={(e) => {
+                            if (a.active && (e.key === 'Enter' || e.key === ' ')) goToAssignment(a.id)
+                          }}
                         >
                           <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
                             {a.active ? '● Active' : '○ Upcoming'}
@@ -614,7 +630,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Sessions */}
+              {/* Sessions — always visible, hardcoded */}
               <div className="sessions-row">
                 <div>
                   <div className="section-header">
@@ -676,16 +692,16 @@ export default function DashboardPage() {
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     {enrolledCourses.map((course) => {
-                     const lastAccessedDate = course.last_accessed_at ? new Date(course.last_accessed_at) : null
-const lastAccessedText = (() => {
-  if (!lastAccessedDate || isNaN(lastAccessedDate.getTime()) || lastAccessedDate.getFullYear() < 2000) {
-    return 'Not accessed yet'
-  }
-  const hoursAgo = Math.floor((Date.now() - lastAccessedDate.getTime()) / (1000 * 60 * 60))
-  if (hoursAgo < 1) return 'Just now'
-  if (hoursAgo < 24) return `${hoursAgo}h ago`
-  return `${Math.floor(hoursAgo / 24)}d ago`
-})()
+                      const lastAccessedDate = course.last_accessed_at ? new Date(course.last_accessed_at) : null
+                      const lastAccessedText = (() => {
+                        if (!lastAccessedDate || isNaN(lastAccessedDate.getTime()) || lastAccessedDate.getFullYear() < 2000) {
+                          return course.completion_percentage > 0 ? 'In progress' : 'Not accessed yet'
+                        }
+                        const hoursAgo = Math.floor((Date.now() - lastAccessedDate.getTime()) / (1000 * 60 * 60))
+                        if (hoursAgo < 1) return 'Just now'
+                        if (hoursAgo < 24) return `${hoursAgo}h ago`
+                        return `${Math.floor(hoursAgo / 24)}d ago`
+                      })()
                       return (
                         <div
                           key={course.course_id}
@@ -720,25 +736,31 @@ const lastAccessedText = (() => {
                 )}
               </div>
 
-              {/* Certificate */}
-              {showCourseDependentSections && (
+              {/* Certificate tracker — wired to certification_progress[0] */}
+              {showCourseDependentSections && activeCert && (
                 <div className="cert-section">
                   <div className="cert-left">
                     <div className="cert-badge">
                       <Trophy size={20} color="#F59E0B" />
                       <span className="cert-badge-label">Certificate</span>
                     </div>
-                    <div className="cert-name">Project Management</div>
+                    <div className="cert-name">{activeCert.course_title}</div>
                     <div className="cert-desc">
-                      You're <strong>40%</strong> to your Project Management certificate — keep going!
+                      You're <strong>{activeCert.completion_percentage}%</strong> to your {activeCert.course_title} certificate — keep going!
                     </div>
-                    {CERT_ITEMS.map((item, i) => (
-                      <div key={i} className={`cert-item${item.done ? ' done' : ''}`}>
-                        {item.done
+                    {activeCert.requirements.map((req, i) => (
+                      <div key={i} className={`cert-item${req.satisfied ? ' done' : ''}`}>
+                        {req.satisfied
                           ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
                           : <Circle size={16} color="#D1D5DB" />
                         }
-                        {item.label}
+                        {req.label}
+                        {/* Show current/target if target > 1 (e.g. "6/8 modules") */}
+                        {req.target > 1 && (
+                          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#9CA3AF' }}>
+                            {req.current}/{req.target}
+                          </span>
+                        )}
                       </div>
                     ))}
                     <button className="cert-view">
@@ -746,7 +768,7 @@ const lastAccessedText = (() => {
                     </button>
                   </div>
                   <div className="cert-right">
-                    <Ring pct={40} size={110} stroke={10} color="#2563EB" />
+                    <Ring pct={activeCert.completion_percentage} size={110} stroke={10} color="#2563EB" />
                   </div>
                 </div>
               )}
@@ -755,7 +777,7 @@ const lastAccessedText = (() => {
           </main>
         </div>
 
-        {/* Mobile bottom tab bar  */}
+        {/* Mobile bottom tab bar */}
         <div className="mobile-tabbar">
           <div className="mobile-tabbar-inner">
             {NAV_ITEMS.map(({ key, label, Icon }) => (

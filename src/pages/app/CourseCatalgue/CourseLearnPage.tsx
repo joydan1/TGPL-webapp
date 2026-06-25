@@ -1,47 +1,53 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings, Search, Bell,
   ChevronDown, PanelLeftClose, PanelLeftOpen,
-  Play, CheckCircle, Lock, LogOut, User as UserIcon,
+  Play, Pause, CheckCircle, Lock, LogOut, User as UserIcon,
   Volume2, VolumeX, Captions, Settings2, Maximize, SkipBack, SkipForward,
   FileText, FileSpreadsheet, Presentation, Download, Headphones,
   X, Coffee, ChevronRight,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI } from '../../../services/api'
-import type { AdjacentLesson, LessonDetailResponse, LessonResource } from '../../../services/api'
+import type { LessonDetailResponse, LessonResource } from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtTime(seconds: number): string {
+  if (!isFinite(seconds) || isNaN(seconds)) return '0:00'
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
 function resourceIcon(fileType: string) {
-  const t = fileType.toLowerCase()
+  const t = (fileType || '').toLowerCase()
   if (t.includes('xls') || t.includes('sheet')) return <FileSpreadsheet size={20} color="#16A34A" />
   if (t.includes('ppt') || t.includes('slide')) return <Presentation size={20} color="#EA580C" />
   return <FileText size={20} color="#7C3AED" />
 }
 
 function resourceIconBg(fileType: string) {
-  const t = fileType.toLowerCase()
+  const t = (fileType || '').toLowerCase()
   if (t.includes('xls') || t.includes('sheet')) return '#ECFDF3'
   if (t.includes('ppt') || t.includes('slide')) return '#FFF4ED'
   return '#F5F0FF'
 }
 
 const NAV_ITEMS = [
-  { key: 'home', label: 'Home', Icon: Home },
-  { key: 'courses', label: 'Courses', Icon: BookOpen },
-  { key: 'live', label: 'Live Classes', Icon: Radio },
-  { key: 'settings', label: 'Settings', Icon: Settings },
+  { key: 'home',     label: 'Home',         Icon: Home     },
+  { key: 'courses',  label: 'Courses',      Icon: BookOpen },
+  { key: 'live',     label: 'Live Classes', Icon: Radio    },
+  { key: 'settings', label: 'Settings',     Icon: Settings },
 ]
 
-const QUALITY_OPTIONS = ['Auto', '720p', '480p', '240p']
+const QUALITY_OPTIONS = [
+  { label: 'Auto', sub: 'Adjusts automatically', kbps: '—'         },
+  { label: '720p', sub: 'High quality',          kbps: '~2500 kbps' },
+  { label: '480p', sub: 'Standard quality',      kbps: '~1000 kbps' },
+  { label: '240p', sub: 'Low data usage',        kbps: '~300 kbps'  },
+]
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
@@ -95,19 +101,19 @@ const CSS = `
   .sidebar.collapsed .user-text { display: none; }
 
   .main { flex: 1; min-width: 0; overflow-y: auto; }
-  .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; max-width: 1100px; }
+  .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; width: 100%; }
 
   .state-screen { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #9CA3AF; font-size: 0.9375rem; }
   .state-screen.error { color: #EF4444; }
 
   /* Video player */
   .player-card { width: 100%; background: #111827; border-radius: 1.25rem; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.12); }
-  .video-wrap { position: relative; width: 100%; aspect-ratio: 16/7.2; overflow: hidden; background: #000; }
-  .video-wrap img { width: 100%; height: 100%; object-fit: cover; opacity: 0.75; display: block; }
-  .video-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 55%, rgba(0,0,0,0.65) 100%); }
+  .video-wrap { position: relative; width: 100%; aspect-ratio: 16/7.2; overflow: hidden; background: #000; cursor: pointer; }
+  .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .video-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 55%, rgba(0,0,0,0.65) 100%); pointer-events: none; }
   .video-back { position: absolute; top: 1rem; left: 1rem; z-index: 10; width: 2rem; height: 2rem; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(4px); border: none; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; }
   .video-back:hover { background: rgba(255,255,255,0.28); }
-  .video-title-overlay { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); text-align: center; color: #fff; z-index: 10; white-space: nowrap; }
+  .video-title-overlay { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); text-align: center; color: #fff; z-index: 10; white-space: nowrap; pointer-events: none; }
   .vt-title { font-size: 0.9375rem; font-weight: 700; }
   .vt-sub { font-size: 0.75rem; font-weight: 500; opacity: 0.65; margin-top: 0.125rem; }
   .center-controls { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 1.5rem; z-index: 10; }
@@ -116,23 +122,69 @@ const CSS = `
   .ctrl-btn { background: none; border: none; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0.85; }
   .ctrl-btn:hover { opacity: 1; }
   .video-controls { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.75rem 1rem; z-index: 10; }
-  .progress-wrap { width: 100%; height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; margin-bottom: 0.625rem; cursor: pointer; }
-  .progress-fill { height: 100%; background: #2563EB; border-radius: 2px; position: relative; }
+  .progress-wrap { width: 100%; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; margin-bottom: 0.625rem; cursor: pointer; transition: height 0.1s; }
+  .progress-wrap:hover { height: 6px; }
+  .progress-fill { height: 100%; background: #2563EB; border-radius: 2px; position: relative; pointer-events: none; }
   .progress-thumb { position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
   .controls-row { display: flex; align-items: center; justify-content: space-between; }
   .time { font-size: 0.75rem; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
   .controls-right { display: flex; align-items: center; gap: 0.875rem; position: relative; }
 
+  /* Buffering */
+  .buffering { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 15; pointer-events: none; }
+  .buffering svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* No video */
+  .no-video { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.625rem; color: rgba(255,255,255,0.7); font-size: 0.875rem; pointer-events: none; }
+  .no-video-thumb { position: absolute; inset: 0; object-fit: cover; width: 100%; height: 100%; opacity: 0.35; display: block; }
+  .no-video-label { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .no-video-icon { width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
+
+  /* CC popover */
   .popover { position: absolute; bottom: calc(100% + 0.625rem); right: 0; background: #1F2937; border: 1px solid #374151; border-radius: 0.75rem; padding: 0.5rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 30; }
   .popover-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.625rem; border-radius: 0.5rem; font-size: 0.8125rem; color: #D1D5DB; cursor: pointer; white-space: nowrap; }
   .popover-item:hover { background: #2D3748; }
   .popover-item.active { color: #fff; font-weight: 600; }
-  .quality-trigger { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; }
 
-  /* Info / breadcrumb */
+  /* Quality trigger button */
+  .quality-trigger { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; color: #fff; opacity: 0.85; }
+  .quality-trigger:hover { opacity: 1; }
+
+  /* Quality popover — matches Figma */
+  .quality-popover { position: absolute; bottom: calc(100% + 0.625rem); right: 0; background: #1a2030; border: 1px solid #2d3748; border-radius: 1rem; width: 280px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 30; }
+  .qp-save { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.875rem 1rem; border-bottom: 1px solid #2d3748; }
+  .qp-save-left { display: flex; align-items: center; gap: 0.625rem; }
+  .qp-save-title { font-size: 0.9375rem; font-weight: 700; color: #fff; }
+  .qp-save-sub { font-size: 0.8125rem; color: #9CA3AF; }
+  .qp-toggle { width: 40px; height: 22px; border-radius: 99px; border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; padding: 0; }
+  .qp-toggle-thumb { position: absolute; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.2s; }
+  .qp-section-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; color: #6B7280; text-transform: uppercase; padding: 0.75rem 1rem 0.375rem; }
+  .qp-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; cursor: pointer; transition: background 0.15s; }
+  .qp-item:hover { background: rgba(255,255,255,0.05); }
+  .qp-item-left { display: flex; flex-direction: column; gap: 0.1rem; }
+  .qp-item-label { font-size: 0.9375rem; font-weight: 700; color: #fff; }
+  .qp-item-label.active { color: #2563EB; }
+  .qp-item-sub { font-size: 0.8125rem; color: #6B7280; }
+  .qp-item-right { display: flex; align-items: center; gap: 0.625rem; }
+  .qp-kbps { font-size: 0.8125rem; color: #6B7280; }
+  /* Circle check — outline ring with filled inner dot when active */
+  .qp-check-ring { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2563EB; background: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qp-check-ring-empty { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #4B5563; background: transparent; flex-shrink: 0; }
+
+  /* Volume */
+  .volume-wrap { display: flex; align-items: center; gap: 0.5rem; }
+  .volume-slider { -webkit-appearance: none; appearance: none; width: 64px; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; outline: none; cursor: pointer; vertical-align: middle; }
+  .volume-slider::-webkit-slider-runnable-track { -webkit-appearance: none; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; border: none; }
+  .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #fff; cursor: pointer; margin-top: -3.5px; box-shadow: none; border: none; }
+  .volume-slider::-moz-range-track { height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; border: none; }
+  .volume-slider::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: none; cursor: pointer; box-shadow: none; }
+  .volume-slider:focus { outline: none; }
+  .volume-slider:focus::-webkit-slider-thumb { box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+
+  /* Lesson meta */
   .lesson-meta { padding: 1.25rem 0 0; display: flex; flex-direction: column; gap: 0.25rem; }
   .crumb { font-size: 0.8125rem; color: #9CA3AF; }
-  .crumb a, .crumb span.crumb-current { color: inherit; }
   .crumb .crumb-link { color: #2563EB; font-weight: 600; cursor: pointer; }
   .lesson-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .lesson-title { font-size: 1.375rem; font-weight: 700; color: #111; }
@@ -148,7 +200,6 @@ const CSS = `
   .tab-btn.active { color: #2563EB; border-bottom-color: #2563EB; }
   .tab-btn:disabled { cursor: not-allowed; color: #D1D5DB; }
   .tab-btn .tab-lock-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #D1D5DB; margin-left: 0.375rem; }
-
   .tab-panel { display: flex; flex-direction: column; gap: 1rem; }
 
   /* Notes */
@@ -175,21 +226,20 @@ const CSS = `
   .resource-download:hover { background: #DBEAFE; }
   .resources-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
   .resources-footer-text { font-size: 0.9375rem; color: #111; font-weight: 600; }
-  .resources-footer-sub { font-size: 0.8125rem; color: #EA580C; font-weight: 600; }
   .download-all-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .download-all-btn:hover { opacity: 0.9; }
   .resources-empty { padding: 2.5rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9375rem; }
 
-  /* Discussion (locked) */
+  /* Discussion */
   .discussion-locked { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem 1rem; color: #9CA3AF; text-align: center; }
   .discussion-locked-title { font-size: 0.9375rem; font-weight: 700; color: #6B7280; }
   .discussion-locked-sub { font-size: 0.8125rem; max-width: 320px; line-height: 1.6; }
 
-  /* Prev / Up next + Ask for help row */
-  .nav-row { display: flex; align-items: stretch; gap: 1rem; flex-wrap: wrap; }
-  .nav-card { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 0.25rem; padding: 1rem 1.25rem; border-radius: 0.875rem; border: 1px solid #E5E7EB; background: #fff; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  /* Nav row — prev/next only, full width */
+  .nav-row { display: flex; align-items: stretch; gap: 1rem; }
+  .nav-card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; padding: 1rem 1.25rem; border-radius: 0.875rem; border: 1px solid #E5E7EB; background: #fff; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
   .nav-card:hover { border-color: #D1D5DB; }
-  .nav-card.disabled { opacity: 0.45; cursor: not-allowed; }
+  .nav-card.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
   .nav-card.up-next { border-color: #BFDBFE; background: #EFF6FF; }
   .nav-card.up-next:hover { background: #DBEAFE; }
   .nav-card-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; color: #9CA3AF; text-transform: uppercase; }
@@ -199,15 +249,20 @@ const CSS = `
   .nav-card-sub { font-size: 0.8125rem; color: #9CA3AF; }
   .nav-card.up-next .nav-card-sub { text-align: right; }
 
-  .ask-help-wrap { position: relative; flex-shrink: 0; align-self: center; }
-  .ask-help-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; height: 100%; }
-  .ask-help-btn:hover { opacity: 0.9; }
-  .ask-help-popover { position: absolute; bottom: calc(100% + 0.625rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.12); width: 240px; padding: 0.5rem; z-index: 50; }
-  .ask-help-item { display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.7rem 0.75rem; border-radius: 0.6rem; border: none; background: none; font-size: 0.8438rem; font-weight: 600; color: #374151; cursor: pointer; text-align: left; transition: background 0.15s; }
-  .ask-help-item:hover { background: #F9FAFB; }
-  .ask-help-item svg { flex-shrink: 0; color: #2563EB; }
+  /* Ask for help — sits below prev/next row */
+  .ask-help-wrap { position: relative; }
+  .ask-help-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; white-space: nowrap; letter-spacing: 0.01em; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+.ask-help-btn:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.45); }
+  .ask-help-popover { position: absolute; bottom: calc(100% + 0.75rem); right: 0; background: #1a2030; border-radius: 1.25rem; box-shadow: 0 12px 40px rgba(0,0,0,0.45); width: 320px; padding: 1.5rem; z-index: 50; display: flex; flex-direction: column; gap: 0.75rem; }
+.ask-help-popover-title { font-size: 1.125rem; font-weight: 700; color: #fff; }
+.ask-help-popover-sub { font-size: 0.875rem; color: #9CA3AF; line-height: 1.5; margin-top: -0.25rem; }
+.ask-help-item { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.875rem 1rem; border-radius: 2rem; border: none; font-size: 0.9375rem; font-weight: 700; cursor: pointer; text-align: center; transition: opacity 0.15s; }
+.ask-help-item.primary { background: #2563EB; color: #fff; }
+.ask-help-item.primary:hover { opacity: 0.9; }
+.ask-help-item.secondary { background: #2d3748; color: #fff; }
+.ask-help-item.secondary:hover { opacity: 0.85; }
 
-  /* Lesson complete modal */
+  /* Modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1.5rem; }
   .modal-card { width: 100%; max-width: 460px; background: #fff; border-radius: 1.25rem; padding: 2rem 1.75rem 1.75rem; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
   .modal-close { position: absolute; top: 1rem; right: 1rem; width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: #F3F4F6; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -224,7 +279,6 @@ const CSS = `
   .modal-progress-footer { display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; }
   .modal-progress-footer .before { color: #9CA3AF; }
   .modal-progress-footer .after { color: #22C55E; font-weight: 700; }
-
   .modal-upnext-card { width: 100%; border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 0.875rem; padding: 0.875rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
   .modal-upnext-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: #2563EB; text-transform: uppercase; }
   .modal-upnext-row { display: flex; align-items: center; gap: 0.75rem; }
@@ -238,6 +292,7 @@ const CSS = `
   .modal-start-now { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .modal-break-link { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8438rem; color: #6B7280; text-decoration: underline; cursor: pointer; background: none; border: none; }
 
+  /* Mobile tab bar */
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
@@ -258,10 +313,11 @@ const CSS = `
     .nav-row { flex-direction: column; }
     .ask-help-wrap { align-self: stretch; }
     .ask-help-btn { width: 100%; justify-content: center; }
+    .volume-slider { display: none; }
   }
 `
 
-// ─── Lesson-complete modal state ───────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface CompleteInfo {
   before: number
   after: number
@@ -270,54 +326,64 @@ interface CompleteInfo {
   nextLesson: { id: string; title: string; duration_display: string } | null
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function CourseLearnPage() {
   const navigate = useNavigate()
   const { slug, lessonId } = useParams<{ slug: string; lessonId: string }>()
+  const location = useLocation()
   const { user, logout } = useAuth()
 
-  const [lesson, setLesson] = useState<LessonDetailResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { courseTitle, moduleTitle, thumbnailUrl } =
+    (location.state as { courseTitle?: string; moduleTitle?: string; thumbnailUrl?: string }) ?? {}
 
-  const [collapsed, setCollapsed] = useState(false)
-  const [activeNav, setActiveNav] = useState('courses')
+  const [lesson, setLesson]   = useState<LessonDetailResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  const [collapsed, setCollapsed]     = useState(false)
+  const [activeNav, setActiveNav]     = useState('courses')
   const [profileOpen, setProfileOpen] = useState(false)
 
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [muted, setMuted] = useState(false)
-  const [qualityOpen, setQualityOpen] = useState(false)
-  const [quality, setQuality] = useState('Auto')
-  const [ccOpen, setCcOpen] = useState(false)
-  const [ccOn, setCcOn] = useState(false)
+  // ── Video ──
+  const videoRef                              = useRef<HTMLVideoElement | null>(null)
+  const [isPlaying, setIsPlaying]             = useState(false)
+  const [currentTime, setCurrentTime]         = useState(0)
+  const [duration, setDuration]               = useState(0)
+  const [volume, setVolume]                   = useState(1)
+  const [muted, setMuted]                     = useState(false)
+  const [buffering, setBuffering]             = useState(false)
+  const [qualityOpen, setQualityOpen]         = useState(false)
+  const [quality, setQuality]                 = useState('Auto')
+  const [saveData, setSaveData]               = useState(false)
+  const [ccOpen, setCcOpen]                   = useState(false)
+  const [ccOn, setCcOn]                       = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'notes' | 'resources' | 'discussion'>('notes')
-  const [notes, setNotes] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
-  const [justSaved, setJustSaved] = useState(false)
-  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const notesLoadedRef = useRef(false)
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  // ── Notes / tabs ──
+  const [activeTab, setActiveTab]             = useState<'notes' | 'resources' | 'discussion'>('notes')
+  const [notes, setNotes]                     = useState('')
+  const [savingNotes, setSavingNotes]         = useState(false)
+  const [justSaved, setJustSaved]             = useState(false)
+  const notesTimer                            = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesLoadedRef                        = useRef(false)
 
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set())
-
-  const [askHelpOpen, setAskHelpOpen] = useState(false)
-
-  const [marking, setMarking] = useState(false)
-  const [completeInfo, setCompleteInfo] = useState<CompleteInfo | null>(null)
-  const [countdown, setCountdown] = useState(5)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [askHelpOpen, setAskHelpOpen]         = useState(false)
+  const [marking, setMarking]                 = useState(false)
+  const [completeInfo, setCompleteInfo]       = useState<CompleteInfo | null>(null)
+  const [countdown, setCountdown]             = useState(5)
+  const countdownRef                          = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Load lesson ──
   useEffect(() => {
     if (!slug || !lessonId) return
     let cancelled = false
+    setLoading(true)
+    setError(null)
+    notesLoadedRef.current = false
 
-    async function load() {
-      setLoading(true)
-      setError(null)
-      notesLoadedRef.current = false
-      const res = await coursesAPI.getLesson(slug as string, lessonId as string)
+    coursesAPI.getLesson(slug, lessonId).then((res) => {
       if (cancelled) return
       if (res.success) {
         setLesson(res.data)
@@ -327,22 +393,57 @@ export default function CourseLearnPage() {
         setError(res.statusCode === 404 ? 'Lesson not found.' : res.error)
       }
       setLoading(false)
-    }
-
-    load()
+    })
     return () => { cancelled = true }
   }, [slug, lessonId])
 
-  // ── Reset transient player/tab state on lesson change ──
+  // ── Reset on lesson change ──
   useEffect(() => {
     setIsPlaying(false)
-    setProgress(0)
+    setCurrentTime(0)
+    setDuration(0)
+    setBuffering(false)
     setActiveTab('notes')
     setSelectedResources(new Set())
     setAskHelpOpen(false)
+    setCompleteInfo(null)
   }, [lessonId])
 
-  // ── Debounced notes autosave ──
+  // ── Wire video events ──
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const onPlay         = () => setIsPlaying(true)
+    const onPause        = () => setIsPlaying(false)
+    const onTimeUpdate   = () => setCurrentTime(v.currentTime)
+    const onDuration     = () => setDuration(v.duration)
+    const onWaiting      = () => setBuffering(true)
+    const onCanPlay      = () => setBuffering(false)
+    const onVolumeChange = () => { setVolume(v.volume); setMuted(v.muted) }
+
+    v.addEventListener('play',           onPlay)
+    v.addEventListener('pause',          onPause)
+    v.addEventListener('timeupdate',     onTimeUpdate)
+    v.addEventListener('loadedmetadata', onDuration)
+    v.addEventListener('durationchange', onDuration)
+    v.addEventListener('waiting',        onWaiting)
+    v.addEventListener('canplay',        onCanPlay)
+    v.addEventListener('playing',        onCanPlay)
+    v.addEventListener('volumechange',   onVolumeChange)
+    return () => {
+      v.removeEventListener('play',           onPlay)
+      v.removeEventListener('pause',          onPause)
+      v.removeEventListener('timeupdate',     onTimeUpdate)
+      v.removeEventListener('loadedmetadata', onDuration)
+      v.removeEventListener('durationchange', onDuration)
+      v.removeEventListener('waiting',        onWaiting)
+      v.removeEventListener('canplay',        onCanPlay)
+      v.removeEventListener('playing',        onCanPlay)
+      v.removeEventListener('volumechange',   onVolumeChange)
+    }
+  }, [lesson])
+
+  // ── Notes autosave ──
   useEffect(() => {
     if (!notesLoadedRef.current || !slug || !lessonId) return
     if (notesTimer.current) clearTimeout(notesTimer.current)
@@ -351,26 +452,19 @@ export default function CourseLearnPage() {
       setSavingNotes(true)
       const res = await coursesAPI.saveLessonNotes(slug, lessonId, notes)
       setSavingNotes(false)
-      if (res.success) {
-        setJustSaved(true)
-        setTimeout(() => setJustSaved(false), 2000)
-      }
+      if (res.success) { setJustSaved(true); setTimeout(() => setJustSaved(false), 2000) }
     }, 800)
     return () => { if (notesTimer.current) clearTimeout(notesTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes])
 
-  // ── Auto-advance countdown when complete modal is showing ──
+  // ── Auto-advance countdown ──
   useEffect(() => {
     if (!completeInfo?.nextLesson) return
     setCountdown(5)
     countdownRef.current = setInterval(() => {
       setCountdown((c) => {
-        if (c <= 1) {
-          if (countdownRef.current) clearInterval(countdownRef.current)
-          goToNext()
-          return 0
-        }
+        if (c <= 1) { clearInterval(countdownRef.current!); goToNext(); return 0 }
         return c - 1
       })
     }, 1000)
@@ -381,9 +475,49 @@ export default function CourseLearnPage() {
   if (!user) return null
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
 
+  // ── Video controls ──
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    v.paused ? v.play().catch(() => {}) : v.pause()
+  }, [])
+
+  const seekBy = useCallback((secs: number) => {
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + secs))
+  }, [])
+
+  const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const v = videoRef.current
+    if (!v || !v.duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration
+  }, [])
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = videoRef.current
+    if (!v) return
+    const val = Number(e.target.value)
+    v.volume = val
+    v.muted  = val === 0
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    const v = videoRef.current
+    if (v) v.muted = !v.muted
+  }, [])
+
+  const handleFullscreen = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : v.requestFullscreen().catch(() => {})
+  }, [])
+
+  // ── Navigation ──
   function handleNav(key: string) {
     setActiveNav(key)
-    if (key === 'home') navigate(ROUTES.DASHBOARD)
+    if (key === 'home')    navigate(ROUTES.DASHBOARD)
     if (key === 'courses') navigate(ROUTES.COURSES)
   }
 
@@ -396,7 +530,9 @@ export default function CourseLearnPage() {
   function goToLesson(id: string) {
     if (!slug) return
     setCompleteInfo(null)
-    navigate(RouteBuilder.courseLearn(slug, id))
+    navigate(RouteBuilder.courseLearn(slug, id), {
+      state: { courseTitle, moduleTitle, thumbnailUrl },
+    })
   }
 
   function goToNext() {
@@ -404,57 +540,73 @@ export default function CourseLearnPage() {
     else setCompleteInfo(null)
   }
 
+  // ── Mark done ──
   async function handleMarkDone() {
     if (!slug || !lessonId || lesson?.status === 'completed') return
     setMarking(true)
     const res = await coursesAPI.completeLesson(slug, lessonId)
     setMarking(false)
     if (res.success) {
-      setLesson((prev) => (prev ? { ...prev, status: 'completed' } : prev))
-      const nextLesson = res.data.next_lesson as AdjacentLesson | null
+      setLesson((prev) => prev ? { ...prev, status: 'completed' } : prev)
+      const next = res.data.next_lesson ?? lesson?.next_lesson ?? null
       setCompleteInfo({
-        before: res.data.course_progress_percentage_before,
-        after: res.data.course_progress_percentage_after,
-        lessonsCompleted: res.data.lessons_completed,
-        lessonsTotal: res.data.lessons_total,
-        nextLesson: nextLesson
-          ? { id: nextLesson.id, title: nextLesson.title, duration_display: nextLesson.duration_display }
-          : null,
+        before:           res.data.course_progress_percentage_before ?? 0,
+        after:            res.data.course_progress_percentage_after  ?? 0,
+        lessonsCompleted: res.data.lessons_completed ?? 0,
+        lessonsTotal:     res.data.lessons_total     ?? 0,
+        nextLesson: next ? { id: next.id, title: next.title, duration_display: next.duration_display } : null,
       })
     }
   }
 
+  // ── Resources ──
   function toggleResource(id: string) {
     setSelectedResources((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
 
   function toggleSelectAll(resources: LessonResource[]) {
     setSelectedResources((prev) =>
-      prev.size === resources.length ? new Set() : new Set(resources.map((r) => r.id)),
+      prev.size === resources.length ? new Set() : new Set(resources.map((r) => r.id))
     )
   }
 
-  function downloadResource(r: LessonResource) {
-    window.open(r.file_url, '_blank')
+  async function downloadResource(r: LessonResource) {
+    if (!slug || !lessonId) return
+    const res = await coursesAPI.getResourceDownloadUrl(slug, lessonId, r.id)
+    if (res.success) window.open(res.data.download_url, '_blank')
   }
 
-  function downloadAll(resources: LessonResource[]) {
-    resources.forEach((r) => window.open(r.file_url, '_blank'))
+  async function downloadAll(resources: LessonResource[]) {
+    await Promise.all(resources.map((r) => downloadResource(r)))
   }
 
-  const totalSizeLabel = lesson?.resources?.length
-    ? `${lesson.resources.length} file${lesson.resources.length !== 1 ? 's' : ''}`
-    : null
+  // ── Resource display helpers ──
+  // Your LessonResource type uses file_format (not file_type).
+  // Map it so the icon helpers still work.
+  function getFileTypeLabel(r: LessonResource): string {
+    return r.file_format ?? r.resource_type ?? 'file'
+  }
+
+  function formatBytes(bytes: number): string {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const hasVideo   = Boolean(lesson?.video_url)
+  const prevLesson = lesson?.previous_lesson ?? null
+  const nextLesson = lesson?.next_lesson ?? null
 
   return (
     <>
       <style>{CSS}</style>
       <div className="db-root">
+
         {/* Navbar */}
         <nav className="navbar">
           <div className="navbar-logo"><img src="/Logo.png" alt="The Global Project Leaders" /></div>
@@ -468,18 +620,12 @@ export default function CourseLearnPage() {
               <div className="bell-dot" />
             </div>
             <div className="profile-menu-wrap">
-              <button
-                className="profile-trigger"
-                onClick={() => setProfileOpen((o) => !o)}
-                aria-haspopup="true"
-                aria-expanded={profileOpen}
-                aria-label="Open profile menu"
-              >
+              <button className="profile-trigger" onClick={() => setProfileOpen(o => !o)}>
                 <div className="topbar-avatar">{initials}</div>
                 <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
               </button>
               {profileOpen && (
-                <div className="profile-dropdown" role="menu">
+                <div className="profile-dropdown">
                   <div className="profile-dropdown-header">
                     <div className="user-avatar">{initials}</div>
                     <div style={{ overflow: 'hidden' }}>
@@ -500,6 +646,7 @@ export default function CourseLearnPage() {
         </nav>
 
         <div className="db-body">
+
           {/* Sidebar */}
           <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
             <div className="sidebar-top">
@@ -532,13 +679,39 @@ export default function CourseLearnPage() {
 
               {!loading && !error && lesson && (
                 <>
-                  {/* Video player */}
+                  {/* ── Video player ── */}
                   <div className="player-card">
-                    <div className="video-wrap">
-                      <img src="/imagee2.png" alt={lesson.title} />
+                    <div className="video-wrap" onClick={togglePlay}>
+
+                      {/* Always render video so videoRef attaches and controls work */}
+                      <video
+                        ref={videoRef}
+                        src={lesson.video_url || undefined}
+                        preload="metadata"
+                        playsInline
+                        muted={muted}
+                        style={{ display: hasVideo ? 'block' : 'none' }}
+                      />
+                      {!hasVideo && (
+                        <div className="no-video">
+                          {thumbnailUrl && (
+                            <img className="no-video-thumb" src={thumbnailUrl} alt="" />
+                          )}
+                          <div className="no-video-label">
+                            <div className="no-video-icon">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2">
+                                <rect x="2" y="6" width="16" height="12" rx="2" />
+                                <path d="M22 8l-4 4 4 4V8z" fill="rgba(255,255,255,0.9)" stroke="none"/>
+                              </svg>
+                            </div>
+                            <span>Video not available yet</span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="video-overlay" />
 
-                      <button className="video-back" onClick={() => navigate(RouteBuilder.course(slug as string))}>
+                      <button className="video-back" onClick={(e) => { e.stopPropagation(); navigate(RouteBuilder.course(slug as string)) }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                           <polyline points="15,18 9,12 15,6" />
                         </svg>
@@ -546,68 +719,146 @@ export default function CourseLearnPage() {
 
                       <div className="video-title-overlay">
                         <div className="vt-title">{lesson.title}</div>
-                        <div className="vt-sub">{lesson.module.title} · {lesson.course.title}</div>
+                        {(moduleTitle || courseTitle) && (
+                          <div className="vt-sub">{[moduleTitle, courseTitle].filter(Boolean).join(' · ')}</div>
+                        )}
                       </div>
 
-                      <div className="center-controls">
-                        <button className="ctrl-btn" onClick={() => setProgress((p) => Math.max(0, p - 5))}>
-                          <SkipBack size={22} />
-                        </button>
-                        <button className="play-main" onClick={() => setIsPlaying((p) => !p)}>
+                      {buffering && (
+                        <div className="buffering">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5">
+                            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <div className="center-controls" onClick={(e) => e.stopPropagation()}>
+                        <button className="ctrl-btn" onClick={() => seekBy(-10)}><SkipBack size={22} /></button>
+                        <button className="play-main" onClick={togglePlay} disabled={!hasVideo}>
                           {isPlaying
-                            ? <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
-                            : <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />}
+                            ? <Pause size={20} fill="currentColor" />
+                            : <Play  size={20} fill="currentColor" style={{ marginLeft: 2 }} />}
                         </button>
-                        <button className="ctrl-btn" onClick={() => setProgress((p) => Math.min(100, p + 5))}>
-                          <SkipForward size={22} />
-                        </button>
+                        <button className="ctrl-btn" onClick={() => seekBy(10)}><SkipForward size={22} /></button>
                       </div>
 
-                      <div className="video-controls">
-                        <div
-                          className="progress-wrap"
-                          onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setProgress(Math.round(((e.clientX - rect.left) / rect.width) * 100))
-                          }}
-                        >
-                          <div className="progress-fill" style={{ width: `${progress}%` }}>
+                      <div className="video-controls" onClick={(e) => e.stopPropagation()}>
+                        <div className="progress-wrap" onClick={handleProgressClick}>
+                          <div className="progress-fill" style={{ width: `${progressPct}%` }}>
                             <div className="progress-thumb" />
                           </div>
                         </div>
                         <div className="controls-row">
                           <span className="time">
-                            {fmtTime((progress / 100) * lesson.duration_seconds)} / {lesson.duration_display}
+                            {fmtTime(currentTime)} / {duration > 0 ? fmtTime(duration) : lesson.duration_display}
                           </span>
+
+                          {/* ── RIGHT CONTROLS: Volume → Subtitles → Quality → Fullscreen ── */}
                           <div className="controls-right">
-                            <button className="ctrl-btn" onClick={() => setMuted((m) => !m)}>
-                              {!muted ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                            </button>
 
-                            <button className="ctrl-btn" onClick={() => { setCcOpen((o) => !o); setQualityOpen(false) }}>
-                              <Captions size={16} />
-                            </button>
-                            {ccOpen && (
-                              <div className="popover" style={{ right: 64 }}>
-                                <div className={`popover-item${!ccOn ? ' active' : ''}`} onClick={() => { setCcOn(false); setCcOpen(false) }}>Off</div>
-                                <div className={`popover-item${ccOn ? ' active' : ''}`} onClick={() => { setCcOn(true); setCcOpen(false) }}>English</div>
-                              </div>
-                            )}
+                            {/* 1. Volume */}
+                            <div className="volume-wrap">
+                              <button className="ctrl-btn" onClick={toggleMute}>
+                                {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                              </button>
+                              <input
+                                className="volume-slider"
+                                type="range" min={0} max={1} step={0.05}
+                                value={muted ? 0 : volume}
+                                onChange={handleVolumeChange}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
 
-                            <button className="ctrl-btn quality-trigger" onClick={() => { setQualityOpen((o) => !o); setCcOpen(false) }}>
-                              <Settings2 size={14} />{quality}
-                            </button>
-                            {qualityOpen && (
-                              <div className="popover">
-                                {QUALITY_OPTIONS.map((q) => (
-                                  <div key={q} className={`popover-item${quality === q ? ' active' : ''}`} onClick={() => { setQuality(q); setQualityOpen(false) }}>
-                                    {q}
+                            {/* 2. Subtitles / CC */}
+                            <div style={{ position: 'relative' }}>
+                              <button className="ctrl-btn" onClick={() => { setCcOpen(o => !o); setQualityOpen(false) }}>
+                                <Captions size={16} style={{ opacity: ccOn ? 1 : 0.6 }} />
+                              </button>
+                              {ccOpen && (
+                                <div className="popover">
+                                  <div className={`popover-item${!ccOn ? ' active' : ''}`} onClick={() => { setCcOn(false); setCcOpen(false) }}>Off</div>
+                                  <div className={`popover-item${ccOn  ? ' active' : ''}`} onClick={() => { setCcOn(true);  setCcOpen(false) }}>English</div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 3. Quality (Auto) */}
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                className="ctrl-btn quality-trigger"
+                                onClick={() => { setQualityOpen(o => !o); setCcOpen(false) }}
+                              >
+                                <Settings2 size={14} style={{ marginRight: 3 }} />{quality}
+                              </button>
+                              {qualityOpen && (
+                                <div className="quality-popover">
+                                  {/* Save data toggle */}
+                                  <div className="qp-save">
+                                    <div className="qp-save-left">
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                                        <path d="M1.5 8.5C5 4 10 2 12 2s7 2 10.5 6.5"/>
+                                        <path d="M5 12c1.8-2.4 4.2-4 7-4s5.2 1.6 7 4"/>
+                                        <path d="M8.5 15.5c.9-1.2 2.1-2 3.5-2s2.6.8 3.5 2"/>
+                                        <circle cx="12" cy="19" r="1.5" fill="#9CA3AF"/>
+                                      </svg>
+                                      <div>
+                                        <div className="qp-save-title">Save data</div>
+                                        <div className="qp-save-sub">Sets quality to 240p</div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      className="qp-toggle"
+                                      style={{ background: saveData ? '#2563EB' : '#374151' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSaveData(s => {
+                                          if (!s) setQuality('240p')
+                                          return !s
+                                        })
+                                      }}
+                                    >
+                                      <div className="qp-toggle-thumb" style={{ left: saveData ? '21px' : '3px' }} />
+                                    </button>
                                   </div>
-                                ))}
-                              </div>
-                            )}
 
-                            <button className="ctrl-btn">
+                                  {/* Quality options */}
+                                  <div className="qp-section-label">Video Quality</div>
+                                  {QUALITY_OPTIONS.map((q) => {
+                                    const active = quality === q.label
+                                    return (
+                                      <div
+                                        key={q.label}
+                                        className="qp-item"
+                                        onClick={() => { setQuality(q.label); setQualityOpen(false); setSaveData(false) }}
+                                      >
+                                        <div className="qp-item-left">
+                                          <span className={`qp-item-label${active ? ' active' : ''}`}>{q.label}</span>
+                                          <span className="qp-item-sub">{q.sub}</span>
+                                        </div>
+                                        <div className="qp-item-right">
+                                          <span className="qp-kbps">{q.kbps}</span>
+                                          {active
+                                            ? (
+                                              <div className="qp-check-ring">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5">
+                                                  <polyline points="20,6 9,17 4,12" />
+                                                </svg>
+                                              </div>
+                                            ) : (
+                                              <div className="qp-check-ring-empty" />
+                                            )
+                                          }
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 4. Fullscreen */}
+                            <button className="ctrl-btn" onClick={handleFullscreen}>
                               <Maximize size={16} />
                             </button>
                           </div>
@@ -616,19 +867,20 @@ export default function CourseLearnPage() {
                     </div>
                   </div>
 
-                  {/* Breadcrumb + title */}
+                  {/* ── Breadcrumb + title ── */}
                   <div className="lesson-meta">
                     <div className="crumb">
                       <span className="crumb-link" onClick={() => navigate(RouteBuilder.course(slug as string))}>
-                        {lesson.course.title}
+                        {courseTitle ?? slug}
                       </span>
-                      {' › '}
-                      <span className="crumb-current">{lesson.module.title}</span>
+                      {moduleTitle && <>{' › '}<span>{moduleTitle}</span></>}
                     </div>
                     <div className="lesson-title-row">
                       <div>
                         <div className="lesson-title">{lesson.title}</div>
-                        <div className="lesson-sub">{lesson.module.title} — {lesson.duration_display}</div>
+                        <div className="lesson-sub">
+                          {moduleTitle ? `${moduleTitle} — ` : ''}{lesson.duration_display}
+                        </div>
                       </div>
                       <button
                         className={`mark-done-btn${lesson.status === 'completed' ? ' done' : ''}`}
@@ -641,10 +893,10 @@ export default function CourseLearnPage() {
                     </div>
                   </div>
 
-                  {/* Tabs */}
+                  {/* ── Tabs ── */}
                   <div>
                     <div className="tabs-row">
-                      <button className={`tab-btn${activeTab === 'notes' ? ' active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
+                      <button className={`tab-btn${activeTab === 'notes'     ? ' active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
                       <button className={`tab-btn${activeTab === 'resources' ? ' active' : ''}`} onClick={() => setActiveTab('resources')}>Resources</button>
                       <button className="tab-btn" disabled>
                         Discussion <span className="tab-lock-label">LIVE CLASSES ONLY</span>
@@ -661,7 +913,7 @@ export default function CourseLearnPage() {
                             onChange={(e) => setNotes(e.target.value)}
                           />
                           <div className="notes-hint-row">
-                            <span className="notes-hint">Notes are saved per lesson and available in this same section even after lesson completion.</span>
+                            <span className="notes-hint">Notes are saved per lesson and available even after completion.</span>
                             {(savingNotes || justSaved) && (
                               <span className="notes-save-status">
                                 {savingNotes ? 'Saving…' : <><CheckCircle size={14} />Saved</>}
@@ -685,37 +937,35 @@ export default function CourseLearnPage() {
                                 />
                                 Select all
                               </label>
-
                               <div className="resources-grid">
-                                {lesson.resources.map((r) => (
-                                  <div className="resource-card" key={r.id}>
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedResources.has(r.id)}
-                                      onChange={() => toggleResource(r.id)}
-                                    />
-                                    <div className="resource-icon-wrap" style={{ background: resourceIconBg(r.file_type) }}>
-                                      {resourceIcon(r.file_type)}
-                                    </div>
-                                    <div className="resource-info">
-                                      <div className="resource-title">{r.title}</div>
-                                      <div className="resource-meta">
-                                        {r.file_type}
-                                        <span className="resource-meta-light"> · {new Date(r.uploaded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                {lesson.resources.map((r) => {
+                                  const fileType = getFileTypeLabel(r)
+                                  return (
+                                    <div className="resource-card" key={r.id}>
+                                      <input type="checkbox" checked={selectedResources.has(r.id)} onChange={() => toggleResource(r.id)} />
+                                      <div className="resource-icon-wrap" style={{ background: resourceIconBg(fileType) }}>
+                                        {resourceIcon(fileType)}
                                       </div>
-                                      <div className="resource-meta-light" style={{ marginTop: 2 }}>{r.size_display}</div>
-                                      <div className="resource-module">{r.module_title}</div>
+                                      <div className="resource-info">
+                                        <div className="resource-title">{r.title}</div>
+                                        <div className="resource-meta">
+                                          {fileType.toUpperCase()}
+                                          <span className="resource-meta-light"> · {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        </div>
+                                        {r.file_size > 0 && (
+                                          <div className="resource-meta-light" style={{ marginTop: 2 }}>{formatBytes(r.file_size)}</div>
+                                        )}
+                                      </div>
+                                      <button className="resource-download" onClick={() => downloadResource(r)}>
+                                        <Download size={16} />
+                                      </button>
                                     </div>
-                                    <button className="resource-download" onClick={() => downloadResource(r)} aria-label={`Download ${r.title}`}>
-                                      <Download size={16} />
-                                    </button>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                               </div>
-
                               <div className="resources-footer">
-                                <div>
-                                  <div className="resources-footer-text">{totalSizeLabel}</div>
+                                <div className="resources-footer-text">
+                                  {lesson.resources.length} file{lesson.resources.length !== 1 ? 's' : ''}
                                 </div>
                                 <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)}>
                                   <Download size={16} />Download all
@@ -736,40 +986,45 @@ export default function CourseLearnPage() {
                     </div>
                   </div>
 
-                  {/* Prev / Up next + Ask for help */}
+                  {/* ── Prev / Next (full width row) ── */}
                   <div className="nav-row">
                     <div
-                      className={`nav-card${!lesson.previous_lesson ? ' disabled' : ''}`}
-                      onClick={() => lesson.previous_lesson && goToLesson(lesson.previous_lesson.id)}
+                      className={`nav-card${!prevLesson ? ' disabled' : ''}`}
+                      onClick={() => prevLesson && goToLesson(prevLesson.id)}
                     >
                       <span className="nav-card-label">‹ Previous</span>
-                      <span className="nav-card-title">{lesson.previous_lesson?.title ?? 'No previous lesson'}</span>
-                      {lesson.previous_lesson && <span className="nav-card-sub">{lesson.previous_lesson.duration_display}</span>}
+                      <span className="nav-card-title">{prevLesson?.title ?? 'No previous lesson'}</span>
+                      {prevLesson && <span className="nav-card-sub">{prevLesson.duration_display}</span>}
                     </div>
 
                     <div
-                      className={`nav-card up-next${!lesson.next_lesson ? ' disabled' : ''}`}
-                      onClick={() => lesson.next_lesson && goToLesson(lesson.next_lesson.id)}
+                      className={`nav-card up-next${!nextLesson ? ' disabled' : ''}`}
+                      onClick={() => nextLesson && goToLesson(nextLesson.id)}
                     >
                       <span className="nav-card-label">Up next <ChevronRight size={12} /></span>
-                      <span className="nav-card-title">{lesson.next_lesson?.title ?? 'No more lessons'}</span>
-                      {lesson.next_lesson && <span className="nav-card-sub">{lesson.next_lesson.duration_display}</span>}
+                      <span className="nav-card-title">{nextLesson?.title ?? 'No more lessons'}</span>
+                      {nextLesson && <span className="nav-card-sub">{nextLesson.duration_display}</span>}
                     </div>
+                  </div>
 
+                  {/* ── Ask for help (below prev/next, right-aligned) ── */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <div className="ask-help-wrap">
-                      <button className="ask-help-btn" onClick={() => setAskHelpOpen((o) => !o)}>
+                      <button className="ask-help-btn" onClick={() => setAskHelpOpen(o => !o)}>
                         <Headphones size={16} />Ask for help
                       </button>
-                      {askHelpOpen && (
-                        <div className="ask-help-popover">
-                          <button className="ask-help-item" onClick={() => { setAskHelpOpen(false); navigate(ROUTES.TUTOR_BOOKING) }}>
-                            <UserIcon size={16} />Book a session
-                          </button>
-                          <button className="ask-help-item" onClick={() => setAskHelpOpen(false)}>
-                            <Headphones size={16} />Ask in community forum
-                          </button>
-                        </div>
-                      )}
+                     {askHelpOpen && (
+  <div className="ask-help-popover">
+    <div className="ask-help-popover-title">Get help from a tutor</div>
+    <div className="ask-help-popover-sub">Book a 1-on-1 session with Amara Osei or a course assistant.</div>
+    <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); navigate(ROUTES.TUTOR_BOOKING) }}>
+      Book a session
+    </button>
+    <button className="ask-help-item secondary" onClick={() => setAskHelpOpen(false)}>
+      Ask in community forum
+    </button>
+  </div>
+)}
                     </div>
                   </div>
                 </>
@@ -791,20 +1046,21 @@ export default function CourseLearnPage() {
         </div>
       </div>
 
-      {/* Lesson complete modal */}
-      {completeInfo && (
+      {/* ── Lesson complete modal ── */}
+      {completeInfo && lesson && (
         <div className="modal-backdrop" onClick={() => setCompleteInfo(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setCompleteInfo(null)} aria-label="Close">
-              <X size={16} />
-            </button>
+            <button className="modal-close" onClick={() => setCompleteInfo(null)}><X size={16} /></button>
 
             <div className="modal-check">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                <polyline points="20,6 9,17 4,12" />
+              </svg>
             </div>
+
             <div style={{ textAlign: 'center' }}>
               <div className="modal-title">Lesson complete!</div>
-              <div className="modal-sub">{lesson?.title}</div>
+              <div className="modal-sub">{lesson.title}</div>
             </div>
 
             <div className="modal-progress-card">
@@ -833,9 +1089,7 @@ export default function CourseLearnPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="modal-countdown">Starting in <b>{countdown}s</b></div>
-
                 <div className="modal-actions">
                   <button className="modal-cancel" onClick={() => { if (countdownRef.current) clearInterval(countdownRef.current); setCompleteInfo(null) }}>Cancel</button>
                   <button className="modal-start-now" onClick={goToNext}>Start now <ChevronRight size={15} /></button>
