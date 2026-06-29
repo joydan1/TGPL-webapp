@@ -26,6 +26,7 @@ import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
 import AssignmentDetailPage from './pages/app/CourseCatalgue/AssignmentDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
+import NotificationsPage from './pages/NotificationsPage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -117,6 +118,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route
           path={ROUTES.COURSES}
           element={

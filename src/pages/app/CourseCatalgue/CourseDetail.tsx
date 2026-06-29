@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Clock, BookOpen, BarChart2, Award, Users,
-  Home, Radio, Settings, Search, Bell,
-  ChevronDown, PanelLeftClose, PanelLeftOpen,
-  Play, CheckCircle, Lock, LogOut, User as UserIcon,
+  ChevronDown,
+  Play, CheckCircle, Lock,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { apiClient, coursesAPI } from '../../../services/api'
 import type { CourseProgressResponse, EnrollmentStatusResponse, LessonStatus } from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
+import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 
 // ─── API types ────────────────────────────────────────────────────────────────
 interface Trainer {
@@ -56,7 +56,7 @@ interface CourseDetail {
   enrolled_count: number
   trainer: Trainer
   modules: Module[]
-  thumbnail_url?: string | null   // ← added
+  thumbnail_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -207,92 +207,8 @@ const PUBLIC_CSS = `
   }
 `
 
-// ─── CSS — Enrolled overview ──────────────────────────────────────────────────
-const ENROLLED_CSS = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  .db-root { display: flex; flex-direction: column; min-height: 100vh; background: #F5F5F5; font-family: inherit; }
-
-  /* ── Navbar ── */
-  .navbar {
-    height: 64px; background: #fff; border-bottom: 1px solid #F3F4F6;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 2rem; gap: 1rem; position: sticky; top: 0; z-index: 200; width: 100%;
-  }
-  .navbar-logo img { height: 2.25rem; display: block; }
-  .navbar-right { display: flex; align-items: center; gap: 1rem; }
-  .search-wrap {
-    display: flex; align-items: center; gap: 0.5rem;
-    background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 2rem;
-    padding: 0.45rem 1.1rem; width: 240px;
-  }
-  .search-wrap input { background: none; border: none; outline: none; font-size: 0.875rem; color: #111; width: 100%; }
-  .search-wrap input::placeholder { color: #9CA3AF; }
-  .topbar-bell {
-    width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB;
-    display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative;
-  }
-  .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
-
-  /* ── Profile dropdown ── */
-  .profile-menu-wrap { position: relative; }
-  .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
-  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
-  .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
-  .profile-chevron.open { transform: rotate(180deg); }
-  .profile-dropdown {
-    position: absolute; top: calc(100% + 0.625rem); right: 0; background: #fff;
-    border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-    width: 220px; padding: 0.5rem; z-index: 300;
-  }
-  .profile-dropdown-header { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.625rem 0.75rem; border-bottom: 1px solid #F3F4F6; margin-bottom: 0.375rem; }
-  .profile-dropdown-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .profile-dropdown-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .profile-dropdown-item {
-    display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.625rem;
-    border-radius: 0.6rem; border: none; background: none; font-size: 0.8125rem; font-weight: 500;
-    color: #374151; cursor: pointer; text-align: left; transition: background 0.15s;
-  }
-  .profile-dropdown-item:hover { background: #F9FAFB; }
-  .profile-dropdown-item.danger { color: #EF4444; }
-  .profile-dropdown-item.danger:hover { background: #FEF2F2; }
-
-  /* ── Layout ── */
-  .db-body { display: flex; flex: 1; }
-  .sidebar {
-    width: 220px; min-width: 220px; background: #fff; border-right: 1px solid #F3F4F6;
-    display: flex; flex-direction: column; position: sticky; top: 64px;
-    height: calc(100vh - 64px); flex-shrink: 0;
-    transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s; overflow: hidden;
-  }
-  .sidebar.collapsed { width: 64px; min-width: 64px; }
-  .sidebar-top { display: flex; justify-content: flex-end; padding: 0.75rem 0.75rem 0.25rem; }
-  .collapse-btn {
-    width: 32px; height: 32px; border-radius: 0.5rem; background: #fff; border: 1px solid #E5E7EB;
-    display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.07); transition: background 0.15s; flex-shrink: 0;
-  }
-  .collapse-btn:hover { background: #F3F4F6; }
-  .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden; }
-  .nav-item {
-    display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem;
-    cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap;
-    transition: background 0.15s, color 0.15s;
-  }
-  .nav-item:hover { background: #F9FAFB; color: #111; }
-  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
-  .nav-item .nav-label { flex: 1; }
-  .sidebar.collapsed .nav-label { display: none; }
-  .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
-  .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
-  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
-  .user-text { overflow: hidden; }
-  .user-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .user-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sidebar.collapsed .user-text { display: none; }
-
-  /* ── Main content ── */
-  .main { flex: 1; min-width: 0; overflow-y: auto; }
+// ─── CSS — Enrolled overview page content only ────────────────────────────────
+const ENROLLED_PAGE_CSS = `
   .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; width: 100%; }
 
   /* ── Course hero ── */
@@ -335,21 +251,13 @@ const ENROLLED_CSS = `
   .modules-header { display: flex; align-items: baseline; justify-content: space-between; }
   .modules-title { font-size: 1.0625rem; font-weight: 700; color: #111; }
   .modules-sub { font-size: 0.8125rem; color: #9CA3AF; }
-  .modules-empty {
-    background: #fff; border: 1px dashed #E5E7EB; border-radius: 0.875rem;
-    padding: 2.5rem 1.5rem; display: flex; flex-direction: column; align-items: center;
-    gap: 0.375rem; text-align: center;
-  }
+  .modules-empty { background: #fff; border: 1px dashed #E5E7EB; border-radius: 0.875rem; padding: 2.5rem 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.375rem; text-align: center; }
   .modules-empty-title { font-size: 0.9375rem; font-weight: 700; color: #374151; }
   .modules-empty-sub { font-size: 0.8125rem; color: #9CA3AF; max-width: 360px; line-height: 1.55; }
   .module-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; overflow: hidden; }
   .module-card.current { border-color: #2563EB; box-shadow: 0 0 0 1px #2563EB; }
   .module-row { display: flex; align-items: center; gap: 0.875rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; }
-  .module-num {
-    width: 1.75rem; height: 1.75rem; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.8125rem; font-weight: 700; background: #F3F4F6; color: #9CA3AF;
-  }
+  .module-num { width: 1.75rem; height: 1.75rem; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8125rem; font-weight: 700; background: #F3F4F6; color: #9CA3AF; }
   .module-num.done { background: #ECFDF3; color: #22C55E; }
   .module-num.current { background: #2563EB; color: #fff; }
   .module-info { flex: 1; min-width: 0; }
@@ -389,31 +297,15 @@ const ENROLLED_CSS = `
   .continue-title { font-size: 0.9375rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .continue-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
   .continue-pct { font-size: 0.875rem; font-weight: 700; opacity: 0.9; white-space: nowrap; }
-  .continue-btn {
-    display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none;
-    border-radius: 2rem; padding: 0.6rem 1.4rem; font-size: 0.875rem; font-weight: 700;
-    cursor: pointer; white-space: nowrap;
-  }
+  .continue-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.6rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .continue-btn:hover { opacity: 0.92; }
 
-  /* ── Mobile tab bar ── */
-  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
-  .mobile-tabbar-inner { display: flex; height: 100%; }
-  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
-  .tab-item.active { color: #2563EB; }
-  .tab-item span { font-size: 0.65rem; }
-
-  /* ── Responsive ── */
   @media (max-width: 900px) {
     .ov-stats { grid-template-columns: 1fr; }
     .content { padding: 1.5rem 1.25rem 2rem; }
   }
   @media (max-width: 640px) {
-    .sidebar { display: none; }
-    .search-wrap { display: none; }
     .content { padding: 1.25rem 1rem 5rem; }
-    .navbar { padding: 0 1rem; }
-    .mobile-tabbar { display: block; }
     .course-hero { aspect-ratio: 16/9; }
     .hero-course-title { font-size: 1.125rem; }
     .continue-bar { flex-direction: column; align-items: flex-start; gap: 1rem; }
@@ -421,13 +313,6 @@ const ENROLLED_CSS = `
     .continue-btn { flex: 1; justify-content: center; }
   }
 `
-
-const NAV_ITEMS = [
-  { key: 'home',     label: 'Home',         Icon: Home     },
-  { key: 'courses',  label: 'Courses',      Icon: BookOpen },
-  { key: 'live',     label: 'Live Classes', Icon: Radio    },
-  { key: 'settings', label: 'Settings',     Icon: Settings },
-]
 
 function lessonIcon(status: LessonStatus) {
   switch (status) {
@@ -535,7 +420,7 @@ export default function CourseDetailPage() {
   return <PublicCourseOverview course={course} />
 }
 
-// ─── Public sales page ─────────────────────────────────────────────────────────
+// ─── Public sales page ────────────────────────────────────────────────────────
 function PublicCourseOverview({ course }: { course: CourseDetail }) {
   const navigate = useNavigate()
 
@@ -656,7 +541,7 @@ function PublicCourseOverview({ course }: { course: CourseDetail }) {
   )
 }
 
-// ─── Enrolled overview ─────────────────────────────────────────────────────────
+// ─── Enrolled overview ────────────────────────────────────────────────────────
 function EnrolledCourseOverview({
   course,
   progress,
@@ -665,29 +550,20 @@ function EnrolledCourseOverview({
   progress: CourseProgressResponse | null
 }) {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const [collapsed, setCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState('courses')
-  const [profileOpen, setProfileOpen] = useState(false)
   const [expandedModule, setExpandedModule] = useState<string | null>(null)
 
-  if (!user) return null
-
-  const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
-  const completedLessonIds = new Set(progress?.completed_lesson_ids ?? [])
+  const completedLessonIds     = new Set(progress?.completed_lesson_ids ?? [])
   const nextIncompleteLessonId = progress?.overall.next_incomplete_lesson?.id ?? null
 
-  const safeModules = Array.isArray(course.modules) ? course.modules : []
-  const pct = progress?.overall.percent ?? 0
+  const safeModules      = Array.isArray(course.modules) ? course.modules : []
+  const pct              = progress?.overall.percent ?? 0
   const lessonsCompleted = progress?.overall.lessons_completed ?? 0
-  const lessonsTotal =
+  const lessonsTotal     =
     progress?.overall.lessons_total ??
     safeModules.reduce((sum, m) => sum + (Array.isArray(m.lessons) ? m.lessons.length : 0), 0)
-
-  const timeSpent = progress
-    ? formatTimeSpent(
-        course.total_duration_seconds - (progress.overall.estimated_seconds_remaining ?? 0),
-      )
+  const timeSpent        = progress
+    ? formatTimeSpent(course.total_duration_seconds - (progress.overall.estimated_seconds_remaining ?? 0))
     : '0m'
 
   const courseModules = safeModules.map((m) => ({
@@ -701,309 +577,161 @@ function EnrolledCourseOverview({
             : lesson.id === nextIncompleteLessonId
               ? 'current'
               : 'available'
-          return {
-            id: lesson.id,
-            title: lesson.title,
-            duration_display: lesson.duration_display,
-            status,
-          }
+          return { id: lesson.id, title: lesson.title, duration_display: lesson.duration_display, status }
         })
       : [],
   }))
 
   const currentModule = courseModules.find((m) => m.lessons.some((l) => l.status === 'current'))
   const currentLesson = currentModule?.lessons.find((l) => l.status === 'current')
-  const hasModules = courseModules.length > 0
+  const hasModules    = courseModules.length > 0
 
-  function handleNav(key: string) {
-    setActiveNav(key)
-    if (key === 'home') navigate(ROUTES.DASHBOARD)
-    if (key === 'courses') navigate(ROUTES.COURSES)
-  }
-
-  async function handleLogout() {
-    setProfileOpen(false)
-    await logout()
-    navigate(ROUTES.LOGIN)
-  }
-
-  // ── Navigate to lesson — all lessons are accessible (re-watch completed, continue current/available) ──
-  // locked status is never set in this page, but guard just in case
   function goToLesson(lessonId: string, status: LessonStatus, moduleTitle: string) {
     if (status === 'locked' || !course.slug) return
     navigate(RouteBuilder.courseLearn(course.slug, lessonId), {
-      state: {
-        courseTitle: course.title,
-        moduleTitle,
-        thumbnailUrl: course.thumbnail_url ?? undefined,  // ← pass thumbnail
-      },
+      state: { courseTitle: course.title, moduleTitle, thumbnailUrl: course.thumbnail_url ?? undefined },
     })
   }
 
   return (
     <>
-      <style>{ENROLLED_CSS}</style>
-      <div className="db-root">
+      <style>{SHELL_CSS + ENROLLED_PAGE_CSS}</style>
+      <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
+        <div className="content">
 
-        {/* Navbar */}
-        <nav className="navbar">
-          <div className="navbar-logo">
-            <img src="/Logo.png" alt="The Global Project Leaders" />
-          </div>
-          <div className="navbar-right">
-            <div className="search-wrap">
-              <Search size={16} color="#9CA3AF" />
-              <input type="text" placeholder="Search anything" />
-            </div>
-            <div className="topbar-bell">
-              <Bell size={20} />
-              <div className="bell-dot" />
-            </div>
-            <div className="profile-menu-wrap">
-              <button
-                className="profile-trigger"
-                onClick={() => setProfileOpen((o) => !o)}
-                aria-haspopup="true"
-                aria-expanded={profileOpen}
-                aria-label="Open profile menu"
-              >
-                <div className="topbar-avatar">{initials}</div>
-                <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
+          {/* Course hero */}
+          <div className="course-hero">
+            {course.thumbnail_url
+              ? <img src={course.thumbnail_url} alt={course.title} />
+              : <div className="course-hero-placeholder" />
+            }
+            <div className="hero-top-row">
+              <button className="hero-back-btn" onClick={() => navigate(ROUTES.DASHBOARD)}>
+                <ChevronLeft />
               </button>
-              {profileOpen && (
-                <div className="profile-dropdown" role="menu">
-                  <div className="profile-dropdown-header">
-                    <div className="user-avatar">{initials}</div>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div className="profile-dropdown-name">{user.name || user.email}</div>
-                      <div className="profile-dropdown-email">{user.email}</div>
-                    </div>
-                  </div>
-                  <button
-                    className="profile-dropdown-item"
-                    onClick={() => { setProfileOpen(false); navigate(ROUTES.SETTINGS) }}
-                  >
-                    <UserIcon size={16} />
-                    Profile settings
-                  </button>
-                  <button className="profile-dropdown-item danger" onClick={handleLogout}>
-                    <LogOut size={16} />
-                    Log out
-                  </button>
-                </div>
-              )}
+              <div className="hero-trainer">
+                <div className="hero-trainer-avatar">{course.trainer.name.charAt(0).toUpperCase()}</div>
+                {course.trainer.name}
+              </div>
+            </div>
+            <div className="hero-bottom">
+              <span className="hero-eyebrow">{course.category} · Enrolled</span>
+              <span className="hero-course-title">{course.title}</span>
+              <div className="hero-progress-wrap">
+                <div className="hero-progress-fill" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+            <span className="hero-pct">{pct}% complete</span>
+          </div>
+
+          {/* Stats */}
+          <div className="ov-stats">
+            <div className="ov-stat-card">
+              <div className="ov-stat-icon" style={{ background: '#EFF6FF' }}>
+                <BookOpen size={18} color="#2563EB" />
+              </div>
+              <span className="ov-stat-value">{lessonsCompleted} of {lessonsTotal}</span>
+              <span className="ov-stat-label">Lessons done</span>
+            </div>
+            <div className="ov-stat-card">
+              <div className="ov-stat-icon" style={{ background: '#F5F3FF' }}>
+                <Clock size={18} color="#8B5CF6" />
+              </div>
+              <span className="ov-stat-value">{timeSpent}</span>
+              <span className="ov-stat-label">Time spent</span>
             </div>
           </div>
-        </nav>
 
-        {/* Body */}
-        <div className="db-body">
-
-          {/* Sidebar */}
-          <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
-            <div className="sidebar-top">
-              <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-              </button>
+          {/* Modules */}
+          <div>
+            <div className="modules-header" style={{ marginBottom: '0.875rem' }}>
+              <span className="modules-title">Course Modules</span>
+              <span className="modules-sub">{courseModules.length || course.module_count} modules · {lessonsTotal} lessons</span>
             </div>
-            <nav className="sidebar-nav">
-              {NAV_ITEMS.map(({ key, label, Icon }) => (
-                <div
-                  key={key}
-                  className={`nav-item${activeNav === key ? ' active' : ''}`}
-                  onClick={() => handleNav(key)}
-                >
-                  <Icon size={18} />
-                  <span className="nav-label">{label}</span>
-                  {key === 'settings' && !collapsed && (
-                    <span style={{ marginLeft: 'auto', opacity: 0.5 }}>
-                      <ChevronDown size={14} />
-                    </span>
-                  )}
-                </div>
-              ))}
-            </nav>
-            <div className="sidebar-user">
-              <div className="user-avatar">{initials}</div>
-              <div className="user-text">
-                <div className="user-name">{user.name || user.email}</div>
-                <div className="user-email">{user.email}</div>
+
+            {!hasModules ? (
+              <div className="modules-empty">
+                <BookOpen size={28} color="#D1D5DB" />
+                <span className="modules-empty-title">No modules added yet</span>
+                <span className="modules-empty-sub">This course doesn't have any modules or lessons yet — check back soon.</span>
               </div>
-            </div>
-          </aside>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {courseModules.map((mod, mi) => {
+                  const doneCount  = mod.lessons.filter((l) => l.status === 'completed').length
+                  const total      = mod.lessons.length
+                  const hasCurrent = mod.lessons.some((l) => l.status === 'current')
+                  const allDone    = total > 0 && doneCount === total
+                  const isExpanded = expandedModule === mod.id
 
-          {/* Main */}
-          <main className="main">
-            <div className="content">
-
-              {/* Course hero */}
-              <div className="course-hero">
-                {course.thumbnail_url
-                  ? <img src={course.thumbnail_url} alt={course.title} />
-                  : <div className="course-hero-placeholder" />
-                }
-                <div className="hero-top-row">
-                  <button className="hero-back-btn" onClick={() => navigate(ROUTES.DASHBOARD)}>
-                    <ChevronLeft />
-                  </button>
-                  <div className="hero-trainer">
-                    <div className="hero-trainer-avatar">
-                      {course.trainer.name.charAt(0).toUpperCase()}
-                    </div>
-                    {course.trainer.name}
-                  </div>
-                </div>
-                <div className="hero-bottom">
-                  <span className="hero-eyebrow">{course.category} · Enrolled</span>
-                  <span className="hero-course-title">{course.title}</span>
-                  <div className="hero-progress-wrap">
-                    <div className="hero-progress-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-                <span className="hero-pct">{pct}% complete</span>
-              </div>
-
-              {/* Stats */}
-              <div className="ov-stats">
-                <div className="ov-stat-card">
-                  <div className="ov-stat-icon" style={{ background: '#EFF6FF' }}>
-                    <BookOpen size={18} color="#2563EB" />
-                  </div>
-                  <span className="ov-stat-value">{lessonsCompleted} of {lessonsTotal}</span>
-                  <span className="ov-stat-label">Lessons done</span>
-                </div>
-                <div className="ov-stat-card">
-                  <div className="ov-stat-icon" style={{ background: '#F5F3FF' }}>
-                    <Clock size={18} color="#8B5CF6" />
-                  </div>
-                  <span className="ov-stat-value">{timeSpent}</span>
-                  <span className="ov-stat-label">Time spent</span>
-                </div>
-              </div>
-
-              {/* Modules */}
-              <div>
-                <div className="modules-header" style={{ marginBottom: '0.875rem' }}>
-                  <span className="modules-title">Course Modules</span>
-                  <span className="modules-sub">
-                    {courseModules.length || course.module_count} modules · {lessonsTotal} lessons
-                  </span>
-                </div>
-
-                {!hasModules ? (
-                  <div className="modules-empty">
-                    <BookOpen size={28} color="#D1D5DB" />
-                    <span className="modules-empty-title">No modules added yet</span>
-                    <span className="modules-empty-sub">
-                      This course doesn't have any modules or lessons yet — check back soon.
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {courseModules.map((mod, mi) => {
-                      const doneCount = mod.lessons.filter((l) => l.status === 'completed').length
-                      const total = mod.lessons.length
-                      const hasCurrent = mod.lessons.some((l) => l.status === 'current')
-                      const allDone = total > 0 && doneCount === total
-                      const isExpanded = expandedModule === mod.id
-
-                      return (
-                        <div key={mod.id} className={`module-card${hasCurrent ? ' current' : ''}`}>
-                          <div
-                            className="module-row"
-                            onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
-                          >
-                            <div className={`module-num${allDone ? ' done' : hasCurrent ? ' current' : ''}`}>
-                              {allDone ? <CheckCircle size={16} /> : mi + 1}
-                            </div>
-                            <div className="module-info">
-                              <div className="module-title-row">
-                                <span className="module-title">{mod.title}</span>
-                                {hasCurrent && (
-                                  <span className="module-current-pill">CURRENT</span>
-                                )}
-                              </div>
-                              <div className="module-prog-bar">
-                                <div
-                                  className={`module-prog-fill ${allDone ? 'done' : hasCurrent ? 'current' : 'todo'}`}
-                                  style={{ width: total ? `${(doneCount / total) * 100}%` : '0%' }}
-                                />
-                              </div>
-                            </div>
-                            <span className="module-count">{doneCount}/{total}</span>
-                            <ChevronDown
-                              size={16}
-                              className={`module-chevron${isExpanded ? ' open' : ''}`}
+                  return (
+                    <div key={mod.id} className={`module-card${hasCurrent ? ' current' : ''}`}>
+                      <div className="module-row" onClick={() => setExpandedModule(isExpanded ? null : mod.id)}>
+                        <div className={`module-num${allDone ? ' done' : hasCurrent ? ' current' : ''}`}>
+                          {allDone ? <CheckCircle size={16} /> : mi + 1}
+                        </div>
+                        <div className="module-info">
+                          <div className="module-title-row">
+                            <span className="module-title">{mod.title}</span>
+                            {hasCurrent && <span className="module-current-pill">CURRENT</span>}
+                          </div>
+                          <div className="module-prog-bar">
+                            <div
+                              className={`module-prog-fill ${allDone ? 'done' : hasCurrent ? 'current' : 'todo'}`}
+                              style={{ width: total ? `${(doneCount / total) * 100}%` : '0%' }}
                             />
                           </div>
-
-                          {isExpanded && (
-                            <div className="lessons-list">
-                              {mod.lessons.map((lesson) => (
-                                <div
-                                  key={lesson.id}
-                                  className={`lesson-row ${lesson.status}${lesson.status === 'locked' ? '' : ''}`}
-                                  onClick={() => goToLesson(lesson.id, lesson.status, mod.title)}
-                                >
-                                  <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
-                                  <span className="lesson-title-col">
-                                    {lesson.title}
-                                    {lesson.status === 'current' && (
-                                      <div className="lesson-up-next">Up next</div>
-                                    )}
-                                  </span>
-                                  <span className="lesson-duration">{lesson.duration_display}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        <span className="module-count">{doneCount}/{total}</span>
+                        <ChevronDown size={16} className={`module-chevron${isExpanded ? ' open' : ''}`} />
+                      </div>
+
+                      {isExpanded && (
+                        <div className="lessons-list">
+                          {mod.lessons.map((lesson) => (
+                            <div
+                              key={lesson.id}
+                              className={`lesson-row ${lesson.status}`}
+                              onClick={() => goToLesson(lesson.id, lesson.status, mod.title)}
+                            >
+                              <span className="lesson-icon">{lessonIcon(lesson.status)}</span>
+                              <span className="lesson-title-col">
+                                {lesson.title}
+                                {lesson.status === 'current' && <div className="lesson-up-next">Up next</div>}
+                              </span>
+                              <span className="lesson-duration">{lesson.duration_display}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-
-              {/* Continue bar — only shown when there's a current lesson */}
-              {currentLesson && (
-                <div className="continue-bar">
-                  <div className="continue-text">
-                    <span className="continue-label">Continue where you left off</span>
-                    <span className="continue-title">{currentLesson.title}</span>
-                  </div>
-                  <div className="continue-right">
-                    <span className="continue-pct">{pct}% complete</span>
-                    <button
-                      className="continue-btn"
-                      onClick={() => goToLesson(currentLesson.id, currentLesson.status, currentModule?.title ?? '')}
-                    >
-                      <Play size={14} fill="#2563EB" /> Resume
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </main>
-        </div>
-
-        {/* Mobile tab bar */}
-        <div className="mobile-tabbar">
-          <div className="mobile-tabbar-inner">
-            {NAV_ITEMS.map(({ key, label, Icon }) => (
-              <button
-                key={key}
-                className={`tab-item${activeNav === key ? ' active' : ''}`}
-                onClick={() => handleNav(key)}
-              >
-                <Icon size={20} />
-                <span>{label === 'Live Classes' ? 'Live' : label}</span>
-              </button>
-            ))}
+            )}
           </div>
-        </div>
 
-      </div>
+          {/* Continue bar */}
+          {currentLesson && (
+            <div className="continue-bar">
+              <div className="continue-text">
+                <span className="continue-label">Continue where you left off</span>
+                <span className="continue-title">{currentLesson.title}</span>
+              </div>
+              <div className="continue-right">
+                <span className="continue-pct">{pct}% complete</span>
+                <button
+                  className="continue-btn"
+                  onClick={() => goToLesson(currentLesson.id, currentLesson.status, currentModule?.title ?? '')}
+                >
+                  <Play size={14} fill="#2563EB" /> Resume
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </AppShell>
     </>
   )
 }

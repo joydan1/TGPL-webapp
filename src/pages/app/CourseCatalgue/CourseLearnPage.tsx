@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  Home, BookOpen, Radio, Settings, Search, Bell,
-  ChevronDown, PanelLeftClose, PanelLeftOpen,
-  Play, Pause, CheckCircle, Lock, LogOut, User as UserIcon,
+  Play, Pause, CheckCircle, Lock,
   Volume2, VolumeX, Captions, Settings2, Maximize, SkipBack, SkipForward,
   FileText, FileSpreadsheet, Presentation, Download, Headphones,
   X, Coffee, ChevronRight,
@@ -12,6 +10,7 @@ import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI } from '../../../services/api'
 import type { LessonDetailResponse, LessonResource } from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
+import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtTime(seconds: number): string {
@@ -35,78 +34,20 @@ function resourceIconBg(fileType: string) {
   return '#F5F0FF'
 }
 
-const NAV_ITEMS = [
-  { key: 'home',     label: 'Home',         Icon: Home     },
-  { key: 'courses',  label: 'Courses',      Icon: BookOpen },
-  { key: 'live',     label: 'Live Classes', Icon: Radio    },
-  { key: 'settings', label: 'Settings',     Icon: Settings },
-]
-
 const QUALITY_OPTIONS = [
-  { label: 'Auto', sub: 'Adjusts automatically', kbps: '—'         },
-  { label: '720p', sub: 'High quality',          kbps: '~2500 kbps' },
-  { label: '480p', sub: 'Standard quality',      kbps: '~1000 kbps' },
-  { label: '240p', sub: 'Low data usage',        kbps: '~300 kbps'  },
+  { label: 'Auto', sub: 'Adjusts automatically', kbps: '—'          },
+  { label: '720p', sub: 'High quality',           kbps: '~2500 kbps' },
+  { label: '480p', sub: 'Standard quality',       kbps: '~1000 kbps' },
+  { label: '240p', sub: 'Low data usage',         kbps: '~300 kbps'  },
 ]
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-const CSS = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  .db-root { display: flex; flex-direction: column; min-height: 100vh; background: #F5F5F5; font-family: inherit; }
-
-  /* Navbar */
-  .navbar { height: 64px; background: #fff; border-bottom: 1px solid #F3F4F6; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; gap: 1rem; position: sticky; top: 0; z-index: 200; width: 100%; }
-  .navbar-logo img { height: 2.25rem; display: block; }
-  .navbar-right { display: flex; align-items: center; gap: 1rem; }
-  .search-wrap { display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 2rem; padding: 0.45rem 1.1rem; width: 240px; }
-  .search-wrap input { background: none; border: none; outline: none; font-size: 0.875rem; color: #111; width: 100%; }
-  .search-wrap input::placeholder { color: #9CA3AF; }
-  .topbar-bell { width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative; }
-  .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
-
-  .profile-menu-wrap { position: relative; }
-  .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
-  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
-  .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
-  .profile-chevron.open { transform: rotate(180deg); }
-  .profile-dropdown { position: absolute; top: calc(100% + 0.625rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 220px; padding: 0.5rem; z-index: 300; }
-  .profile-dropdown-header { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.625rem 0.75rem; border-bottom: 1px solid #F3F4F6; margin-bottom: 0.375rem; }
-  .profile-dropdown-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .profile-dropdown-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .profile-dropdown-item { display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.625rem; border-radius: 0.6rem; border: none; background: none; font-size: 0.8125rem; font-weight: 500; color: #374151; cursor: pointer; text-align: left; transition: background 0.15s; }
-  .profile-dropdown-item:hover { background: #F9FAFB; }
-  .profile-dropdown-item.danger { color: #EF4444; }
-  .profile-dropdown-item.danger:hover { background: #FEF2F2; }
-
-  /* Layout */
-  .db-body { display: flex; flex: 1; }
-  .sidebar { width: 220px; min-width: 220px; background: #fff; border-right: 1px solid #F3F4F6; display: flex; flex-direction: column; position: sticky; top: 64px; height: calc(100vh - 64px); flex-shrink: 0; transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s; overflow: hidden; }
-  .sidebar.collapsed { width: 64px; min-width: 64px; }
-  .sidebar-top { display: flex; justify-content: flex-end; padding: 0.75rem 0.75rem 0.25rem; }
-  .collapse-btn { width: 32px; height: 32px; border-radius: 0.5rem; background: #fff; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; box-shadow: 0 1px 3px rgba(0,0,0,0.07); transition: background 0.15s; flex-shrink: 0; }
-  .collapse-btn:hover { background: #F3F4F6; }
-  .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden; }
-  .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
-  .nav-item:hover { background: #F9FAFB; color: #111; }
-  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
-  .nav-item .nav-label { flex: 1; }
-  .sidebar.collapsed .nav-label { display: none; }
-  .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
-  .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
-  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
-  .user-text { overflow: hidden; }
-  .user-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .user-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sidebar.collapsed .user-text { display: none; }
-
-  .main { flex: 1; min-width: 0; overflow-y: auto; }
+const PAGE_CSS = `
   .content { padding: 2rem 2.5rem 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; width: 100%; }
 
   .state-screen { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #9CA3AF; font-size: 0.9375rem; }
   .state-screen.error { color: #EF4444; }
 
-  /* Video player */
   .player-card { width: 100%; background: #111827; border-radius: 1.25rem; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.12); }
   .video-wrap { position: relative; width: 100%; aspect-ratio: 16/7.2; overflow: hidden; background: #000; cursor: pointer; }
   .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
@@ -130,31 +71,28 @@ const CSS = `
   .time { font-size: 0.75rem; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
   .controls-right { display: flex; align-items: center; gap: 0.875rem; position: relative; }
 
-  /* Buffering */
   .buffering { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 15; pointer-events: none; }
   .buffering svg { animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* No video */
   .no-video { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.625rem; color: rgba(255,255,255,0.7); font-size: 0.875rem; pointer-events: none; }
   .no-video-thumb { position: absolute; inset: 0; object-fit: cover; width: 100%; height: 100%; opacity: 0.35; display: block; }
   .no-video-label { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
   .no-video-icon { width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
 
-  /* CC popover */
-  .popover { position: absolute; bottom: calc(100% + 0.625rem); right: 0; background: #1F2937; border: 1px solid #374151; border-radius: 0.75rem; padding: 0.5rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 30; }
+  /* ── CC popover ── */
+  .popover { position: absolute; bottom: calc(100% + 0.625rem); left: 50%; transform: translateX(-50%); background: #1F2937; border: 1px solid #374151; border-radius: 0.75rem; padding: 0.5rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 30; }
   .popover-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.625rem; border-radius: 0.5rem; font-size: 0.8125rem; color: #D1D5DB; cursor: pointer; white-space: nowrap; }
   .popover-item:hover { background: #2D3748; }
   .popover-item.active { color: #fff; font-weight: 600; }
 
-  /* Quality trigger button */
   .quality-trigger { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; color: #fff; opacity: 0.85; }
   .quality-trigger:hover { opacity: 1; }
 
-  /* Quality popover — matches Figma */
-  .quality-popover { position: absolute; bottom: calc(100% + 0.625rem); right: 0; background: #1a2030; border: 1px solid #2d3748; border-radius: 1rem; width: 280px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 30; }
+  /* ── Quality popover — centred and clamped so it never overflows on mobile ── */
+  .quality-popover { position: absolute; bottom: calc(100% + 0.625rem); left: 50%; transform: translateX(-50%); background: #1a2030; border: 1px solid #2d3748; border-radius: 1rem; width: min(280px, calc(100vw - 2rem)); overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 30; }
   .qp-save { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.875rem 1rem; border-bottom: 1px solid #2d3748; }
-  .qp-save-left { display: flex; align-items: center; gap: 0.625rem; }
+  .qp-save-left { display: flex; align-items: center; gap: 0.625rem; min-width: 0; }
   .qp-save-title { font-size: 0.9375rem; font-weight: 700; color: #fff; }
   .qp-save-sub { font-size: 0.8125rem; color: #9CA3AF; }
   .qp-toggle { width: 40px; height: 22px; border-radius: 99px; border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; padding: 0; }
@@ -168,11 +106,10 @@ const CSS = `
   .qp-item-sub { font-size: 0.8125rem; color: #6B7280; }
   .qp-item-right { display: flex; align-items: center; gap: 0.625rem; }
   .qp-kbps { font-size: 0.8125rem; color: #6B7280; }
-  /* Circle check — outline ring with filled inner dot when active */
   .qp-check-ring { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2563EB; background: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .qp-check-ring-empty { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #4B5563; background: transparent; flex-shrink: 0; }
 
-  /* Volume */
+  /* ── Volume ── */
   .volume-wrap { display: flex; align-items: center; gap: 0.5rem; }
   .volume-slider { -webkit-appearance: none; appearance: none; width: 64px; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; outline: none; cursor: pointer; vertical-align: middle; }
   .volume-slider::-webkit-slider-runnable-track { -webkit-appearance: none; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; border: none; }
@@ -182,7 +119,6 @@ const CSS = `
   .volume-slider:focus { outline: none; }
   .volume-slider:focus::-webkit-slider-thumb { box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
 
-  /* Lesson meta */
   .lesson-meta { padding: 1.25rem 0 0; display: flex; flex-direction: column; gap: 0.25rem; }
   .crumb { font-size: 0.8125rem; color: #9CA3AF; }
   .crumb .crumb-link { color: #2563EB; font-weight: 600; cursor: pointer; }
@@ -194,7 +130,6 @@ const CSS = `
   .mark-done-btn.done { border-color: #22C55E; color: #22C55E; background: #ECFDF3; }
   .mark-done-btn:disabled { opacity: 0.6; cursor: default; }
 
-  /* Tabs */
   .tabs-row { display: flex; gap: 2rem; border-bottom: 1px solid #E5E7EB; }
   .tab-btn { padding: 0.875rem 0; background: none; border: none; border-bottom: 2px solid transparent; font-size: 0.9375rem; font-weight: 600; color: #9CA3AF; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
   .tab-btn.active { color: #2563EB; border-bottom-color: #2563EB; }
@@ -202,7 +137,6 @@ const CSS = `
   .tab-btn .tab-lock-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #D1D5DB; margin-left: 0.375rem; }
   .tab-panel { display: flex; flex-direction: column; gap: 1rem; }
 
-  /* Notes */
   .notes-textarea { width: 100%; min-height: 180px; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; font-size: 0.9375rem; color: #111; font-family: inherit; resize: vertical; outline: none; transition: border-color 0.15s; background: #fff; }
   .notes-textarea:focus { border-color: #2563EB; }
   .notes-textarea::placeholder { color: #9CA3AF; }
@@ -210,7 +144,6 @@ const CSS = `
   .notes-hint { font-size: 0.8125rem; color: #9CA3AF; }
   .notes-save-status { font-size: 0.8125rem; color: #22C55E; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; }
 
-  /* Resources */
   .resources-select-all { display: flex; align-items: center; gap: 0.625rem; font-size: 0.875rem; color: #374151; font-weight: 500; cursor: pointer; }
   .resources-select-all input { width: 16px; height: 16px; accent-color: #2563EB; cursor: pointer; }
   .resources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -221,7 +154,6 @@ const CSS = `
   .resource-title { font-size: 0.9375rem; font-weight: 700; color: #111; margin-bottom: 0.25rem; }
   .resource-meta { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; color: #9CA3AF; text-transform: uppercase; }
   .resource-meta-light { font-size: 0.8125rem; color: #9CA3AF; font-weight: 400; text-transform: none; }
-  .resource-module { font-size: 0.78rem; color: #B0B5BD; margin-top: 0.25rem; }
   .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
   .resource-download:hover { background: #DBEAFE; }
   .resources-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
@@ -230,12 +162,10 @@ const CSS = `
   .download-all-btn:hover { opacity: 0.9; }
   .resources-empty { padding: 2.5rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9375rem; }
 
-  /* Discussion */
   .discussion-locked { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem 1rem; color: #9CA3AF; text-align: center; }
   .discussion-locked-title { font-size: 0.9375rem; font-weight: 700; color: #6B7280; }
   .discussion-locked-sub { font-size: 0.8125rem; max-width: 320px; line-height: 1.6; }
 
-  /* Nav row — prev/next only, full width */
   .nav-row { display: flex; align-items: stretch; gap: 1rem; }
   .nav-card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; padding: 1rem 1.25rem; border-radius: 0.875rem; border: 1px solid #E5E7EB; background: #fff; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
   .nav-card:hover { border-color: #D1D5DB; }
@@ -249,20 +179,18 @@ const CSS = `
   .nav-card-sub { font-size: 0.8125rem; color: #9CA3AF; }
   .nav-card.up-next .nav-card-sub { text-align: right; }
 
-  /* Ask for help — sits below prev/next row */
   .ask-help-wrap { position: relative; }
   .ask-help-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; white-space: nowrap; letter-spacing: 0.01em; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
-.ask-help-btn:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.45); }
+  .ask-help-btn:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.45); }
   .ask-help-popover { position: absolute; bottom: calc(100% + 0.75rem); right: 0; background: #1a2030; border-radius: 1.25rem; box-shadow: 0 12px 40px rgba(0,0,0,0.45); width: 320px; padding: 1.5rem; z-index: 50; display: flex; flex-direction: column; gap: 0.75rem; }
-.ask-help-popover-title { font-size: 1.125rem; font-weight: 700; color: #fff; }
-.ask-help-popover-sub { font-size: 0.875rem; color: #9CA3AF; line-height: 1.5; margin-top: -0.25rem; }
-.ask-help-item { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.875rem 1rem; border-radius: 2rem; border: none; font-size: 0.9375rem; font-weight: 700; cursor: pointer; text-align: center; transition: opacity 0.15s; }
-.ask-help-item.primary { background: #2563EB; color: #fff; }
-.ask-help-item.primary:hover { opacity: 0.9; }
-.ask-help-item.secondary { background: #2d3748; color: #fff; }
-.ask-help-item.secondary:hover { opacity: 0.85; }
+  .ask-help-popover-title { font-size: 1.125rem; font-weight: 700; color: #fff; }
+  .ask-help-popover-sub { font-size: 0.875rem; color: #9CA3AF; line-height: 1.5; margin-top: -0.25rem; }
+  .ask-help-item { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.875rem 1rem; border-radius: 2rem; border: none; font-size: 0.9375rem; font-weight: 700; cursor: pointer; text-align: center; transition: opacity 0.15s; }
+  .ask-help-item.primary { background: #2563EB; color: #fff; }
+  .ask-help-item.primary:hover { opacity: 0.9; }
+  .ask-help-item.secondary { background: #2d3748; color: #fff; }
+  .ask-help-item.secondary:hover { opacity: 0.85; }
 
-  /* Modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1.5rem; }
   .modal-card { width: 100%; max-width: 460px; background: #fff; border-radius: 1.25rem; padding: 2rem 1.75rem 1.75rem; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
   .modal-close { position: absolute; top: 1rem; right: 1rem; width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: #F3F4F6; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -292,28 +220,26 @@ const CSS = `
   .modal-start-now { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .modal-break-link { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8438rem; color: #6B7280; text-decoration: underline; cursor: pointer; background: none; border: none; }
 
-  /* Mobile tab bar */
-  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
-  .mobile-tabbar-inner { display: flex; height: 100%; }
-  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
-  .tab-item.active { color: #2563EB; }
-
   @media (max-width: 900px) {
     .content { padding: 1.5rem 1.25rem 2rem; }
     .resources-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
-    .sidebar { display: none; }
-    .search-wrap { display: none; }
     .content { padding: 1.25rem 1rem 5rem; }
-    .navbar { padding: 0 1rem; }
-    .mobile-tabbar { display: block; }
     .video-wrap { aspect-ratio: 16/9; }
     .video-title-overlay { display: none; }
     .nav-row { flex-direction: column; }
     .ask-help-wrap { align-self: stretch; }
     .ask-help-btn { width: 100%; justify-content: center; }
-    .volume-slider { display: none; }
+    /* Hide the entire volume control (icon + slider) on mobile */
+    .volume-wrap { display: none; }
+    /* Tighten the right controls gap */
+    .controls-right { gap: 0.5rem; }
+    /* Ensure popovers never overflow the screen width */
+    .quality-popover { width: min(260px, calc(100vw - 1.5rem)); }
+    .popover { min-width: 120px; }
+    /* Ask-for-help popover: clamp width on small screens */
+    .ask-help-popover { width: min(320px, calc(100vw - 2rem)); right: 0; left: auto; }
   }
 `
 
@@ -331,7 +257,7 @@ export default function CourseLearnPage() {
   const navigate = useNavigate()
   const { slug, lessonId } = useParams<{ slug: string; lessonId: string }>()
   const location = useLocation()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   const { courseTitle, moduleTitle, thumbnailUrl } =
     (location.state as { courseTitle?: string; moduleTitle?: string; thumbnailUrl?: string }) ?? {}
@@ -339,10 +265,7 @@ export default function CourseLearnPage() {
   const [lesson, setLesson]   = useState<LessonDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
-
-  const [collapsed, setCollapsed]     = useState(false)
-  const [activeNav, setActiveNav]     = useState('courses')
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [activeNav, setActiveNav] = useState('courses')
 
   // ── Video ──
   const videoRef                              = useRef<HTMLVideoElement | null>(null)
@@ -357,6 +280,7 @@ export default function CourseLearnPage() {
   const [saveData, setSaveData]               = useState(false)
   const [ccOpen, setCcOpen]                   = useState(false)
   const [ccOn, setCcOn]                       = useState(false)
+  const positionTimerRef                      = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
@@ -413,6 +337,11 @@ export default function CourseLearnPage() {
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
+    const resumePos = lesson?.resume_position_seconds
+    if (resumePos && resumePos > 0) {
+      const onMeta = () => { v.currentTime = resumePos }
+      v.addEventListener('loadedmetadata', onMeta, { once: true })
+    }
     const onPlay         = () => setIsPlaying(true)
     const onPause        = () => setIsPlaying(false)
     const onTimeUpdate   = () => setCurrentTime(v.currentTime)
@@ -420,7 +349,6 @@ export default function CourseLearnPage() {
     const onWaiting      = () => setBuffering(true)
     const onCanPlay      = () => setBuffering(false)
     const onVolumeChange = () => { setVolume(v.volume); setMuted(v.muted) }
-
     v.addEventListener('play',           onPlay)
     v.addEventListener('pause',          onPause)
     v.addEventListener('timeupdate',     onTimeUpdate)
@@ -442,6 +370,19 @@ export default function CourseLearnPage() {
       v.removeEventListener('volumechange',   onVolumeChange)
     }
   }, [lesson])
+
+  // ── Position heartbeat ──
+  useEffect(() => {
+    if (!slug || !lessonId) return
+    if (positionTimerRef.current) clearInterval(positionTimerRef.current)
+    positionTimerRef.current = setInterval(() => {
+      const v = videoRef.current
+      if (!v || v.paused || v.ended) return
+      const pos = Math.floor(v.currentTime)
+      if (pos > 0) coursesAPI.savePosition(slug, lessonId, pos).catch(() => {})
+    }, 10_000)
+    return () => { if (positionTimerRef.current) clearInterval(positionTimerRef.current) }
+  }, [slug, lessonId])
 
   // ── Notes autosave ──
   useEffect(() => {
@@ -473,14 +414,19 @@ export default function CourseLearnPage() {
   }, [completeInfo])
 
   if (!user) return null
-  const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
 
   // ── Video controls ──
   const togglePlay = useCallback(() => {
     const v = videoRef.current
     if (!v) return
-    v.paused ? v.play().catch(() => {}) : v.pause()
-  }, [])
+    if (v.paused) {
+      v.play().catch(() => {})
+    } else {
+      v.pause()
+      const pos = Math.floor(v.currentTime)
+      if (slug && lessonId && pos > 0) coursesAPI.savePosition(slug, lessonId, pos).catch(() => {})
+    }
+  }, [slug, lessonId])
 
   const seekBy = useCallback((secs: number) => {
     const v = videoRef.current
@@ -514,19 +460,6 @@ export default function CourseLearnPage() {
     document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : v.requestFullscreen().catch(() => {})
   }, [])
 
-  // ── Navigation ──
-  function handleNav(key: string) {
-    setActiveNav(key)
-    if (key === 'home')    navigate(ROUTES.DASHBOARD)
-    if (key === 'courses') navigate(ROUTES.COURSES)
-  }
-
-  async function handleLogout() {
-    setProfileOpen(false)
-    await logout()
-    navigate(ROUTES.LOGIN)
-  }
-
   function goToLesson(id: string) {
     if (!slug) return
     setCompleteInfo(null)
@@ -540,7 +473,6 @@ export default function CourseLearnPage() {
     else setCompleteInfo(null)
   }
 
-  // ── Mark done ──
   async function handleMarkDone() {
     if (!slug || !lessonId || lesson?.status === 'completed') return
     setMarking(true)
@@ -559,7 +491,6 @@ export default function CourseLearnPage() {
     }
   }
 
-  // ── Resources ──
   function toggleResource(id: string) {
     setSelectedResources((prev) => {
       const next = new Set(prev)
@@ -584,9 +515,6 @@ export default function CourseLearnPage() {
     await Promise.all(resources.map((r) => downloadResource(r)))
   }
 
-  // ── Resource display helpers ──
-  // Your LessonResource type uses file_format (not file_type).
-  // Map it so the icon helpers still work.
   function getFileTypeLabel(r: LessonResource): string {
     return r.file_format ?? r.resource_type ?? 'file'
   }
@@ -604,465 +532,339 @@ export default function CourseLearnPage() {
 
   return (
     <>
-      <style>{CSS}</style>
-      <div className="db-root">
+      <style>{SHELL_CSS + PAGE_CSS}</style>
+      <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
+        <div className="content">
+          {loading && <div className="state-screen">Loading lesson…</div>}
+          {error && !loading && <div className="state-screen error">{error}</div>}
 
-        {/* Navbar */}
-        <nav className="navbar">
-          <div className="navbar-logo"><img src="/Logo.png" alt="The Global Project Leaders" /></div>
-          <div className="navbar-right">
-            <div className="search-wrap">
-              <Search size={16} color="#9CA3AF" />
-              <input type="text" placeholder="Search anything" />
-            </div>
-            <div className="topbar-bell">
-              <Bell size={20} />
-              <div className="bell-dot" />
-            </div>
-            <div className="profile-menu-wrap">
-              <button className="profile-trigger" onClick={() => setProfileOpen(o => !o)}>
-                <div className="topbar-avatar">{initials}</div>
-                <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
-              </button>
-              {profileOpen && (
-                <div className="profile-dropdown">
-                  <div className="profile-dropdown-header">
-                    <div className="user-avatar">{initials}</div>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div className="profile-dropdown-name">{user.name || user.email}</div>
-                      <div className="profile-dropdown-email">{user.email}</div>
-                    </div>
-                  </div>
-                  <button className="profile-dropdown-item" onClick={() => { setProfileOpen(false); navigate(ROUTES.SETTINGS) }}>
-                    <UserIcon size={16} />Profile settings
-                  </button>
-                  <button className="profile-dropdown-item danger" onClick={handleLogout}>
-                    <LogOut size={16} />Log out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </nav>
+          {!loading && !error && lesson && (
+            <>
+              {/* ── Video player ── */}
+              <div className="player-card">
+                <div className="video-wrap" onClick={togglePlay}>
+                  <video
+                    ref={videoRef}
+                    src={lesson.video_url || undefined}
+                    preload="metadata"
+                    playsInline
+                    muted={muted}
+                    style={{ display: hasVideo ? 'block' : 'none' }}
+                  />
 
-        <div className="db-body">
-
-          {/* Sidebar */}
-          <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
-            <div className="sidebar-top">
-              <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-              </button>
-            </div>
-            <nav className="sidebar-nav">
-              {NAV_ITEMS.map(({ key, label, Icon }) => (
-                <div key={key} className={`nav-item${activeNav === key ? ' active' : ''}`} onClick={() => handleNav(key)}>
-                  <Icon size={18} />
-                  <span className="nav-label">{label}</span>
-                </div>
-              ))}
-            </nav>
-            <div className="sidebar-user">
-              <div className="user-avatar">{initials}</div>
-              <div className="user-text">
-                <div className="user-name">{user.name || user.email}</div>
-                <div className="user-email">{user.email}</div>
-              </div>
-            </div>
-          </aside>
-
-          {/* Main */}
-          <main className="main">
-            <div className="content">
-              {loading && <div className="state-screen">Loading lesson…</div>}
-              {error && !loading && <div className="state-screen error">{error}</div>}
-
-              {!loading && !error && lesson && (
-                <>
-                  {/* ── Video player ── */}
-                  <div className="player-card">
-                    <div className="video-wrap" onClick={togglePlay}>
-
-                      {/* Always render video so videoRef attaches and controls work */}
-                      <video
-                        ref={videoRef}
-                        src={lesson.video_url || undefined}
-                        preload="metadata"
-                        playsInline
-                        muted={muted}
-                        style={{ display: hasVideo ? 'block' : 'none' }}
-                      />
-                      {!hasVideo && (
-                        <div className="no-video">
-                          {thumbnailUrl && (
-                            <img className="no-video-thumb" src={thumbnailUrl} alt="" />
-                          )}
-                          <div className="no-video-label">
-                            <div className="no-video-icon">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2">
-                                <rect x="2" y="6" width="16" height="12" rx="2" />
-                                <path d="M22 8l-4 4 4 4V8z" fill="rgba(255,255,255,0.9)" stroke="none"/>
-                              </svg>
-                            </div>
-                            <span>Video not available yet</span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="video-overlay" />
-
-                      <button className="video-back" onClick={(e) => { e.stopPropagation(); navigate(RouteBuilder.course(slug as string)) }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <polyline points="15,18 9,12 15,6" />
-                        </svg>
-                      </button>
-
-                      <div className="video-title-overlay">
-                        <div className="vt-title">{lesson.title}</div>
-                        {(moduleTitle || courseTitle) && (
-                          <div className="vt-sub">{[moduleTitle, courseTitle].filter(Boolean).join(' · ')}</div>
-                        )}
-                      </div>
-
-                      {buffering && (
-                        <div className="buffering">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5">
-                            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                  {!hasVideo && (
+                    <div className="no-video">
+                      {thumbnailUrl && <img className="no-video-thumb" src={thumbnailUrl} alt="" />}
+                      <div className="no-video-label">
+                        <div className="no-video-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2">
+                            <rect x="2" y="6" width="16" height="12" rx="2" />
+                            <path d="M22 8l-4 4 4 4V8z" fill="rgba(255,255,255,0.9)" stroke="none"/>
                           </svg>
                         </div>
-                      )}
-
-                      <div className="center-controls" onClick={(e) => e.stopPropagation()}>
-                        <button className="ctrl-btn" onClick={() => seekBy(-10)}><SkipBack size={22} /></button>
-                        <button className="play-main" onClick={togglePlay} disabled={!hasVideo}>
-                          {isPlaying
-                            ? <Pause size={20} fill="currentColor" />
-                            : <Play  size={20} fill="currentColor" style={{ marginLeft: 2 }} />}
-                        </button>
-                        <button className="ctrl-btn" onClick={() => seekBy(10)}><SkipForward size={22} /></button>
-                      </div>
-
-                      <div className="video-controls" onClick={(e) => e.stopPropagation()}>
-                        <div className="progress-wrap" onClick={handleProgressClick}>
-                          <div className="progress-fill" style={{ width: `${progressPct}%` }}>
-                            <div className="progress-thumb" />
-                          </div>
-                        </div>
-                        <div className="controls-row">
-                          <span className="time">
-                            {fmtTime(currentTime)} / {duration > 0 ? fmtTime(duration) : lesson.duration_display}
-                          </span>
-
-                          {/* ── RIGHT CONTROLS: Volume → Subtitles → Quality → Fullscreen ── */}
-                          <div className="controls-right">
-
-                            {/* 1. Volume */}
-                            <div className="volume-wrap">
-                              <button className="ctrl-btn" onClick={toggleMute}>
-                                {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                              </button>
-                              <input
-                                className="volume-slider"
-                                type="range" min={0} max={1} step={0.05}
-                                value={muted ? 0 : volume}
-                                onChange={handleVolumeChange}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-
-                            {/* 2. Subtitles / CC */}
-                            <div style={{ position: 'relative' }}>
-                              <button className="ctrl-btn" onClick={() => { setCcOpen(o => !o); setQualityOpen(false) }}>
-                                <Captions size={16} style={{ opacity: ccOn ? 1 : 0.6 }} />
-                              </button>
-                              {ccOpen && (
-                                <div className="popover">
-                                  <div className={`popover-item${!ccOn ? ' active' : ''}`} onClick={() => { setCcOn(false); setCcOpen(false) }}>Off</div>
-                                  <div className={`popover-item${ccOn  ? ' active' : ''}`} onClick={() => { setCcOn(true);  setCcOpen(false) }}>English</div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 3. Quality (Auto) */}
-                            <div style={{ position: 'relative' }}>
-                              <button
-                                className="ctrl-btn quality-trigger"
-                                onClick={() => { setQualityOpen(o => !o); setCcOpen(false) }}
-                              >
-                                <Settings2 size={14} style={{ marginRight: 3 }} />{quality}
-                              </button>
-                              {qualityOpen && (
-                                <div className="quality-popover">
-                                  {/* Save data toggle */}
-                                  <div className="qp-save">
-                                    <div className="qp-save-left">
-                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
-                                        <path d="M1.5 8.5C5 4 10 2 12 2s7 2 10.5 6.5"/>
-                                        <path d="M5 12c1.8-2.4 4.2-4 7-4s5.2 1.6 7 4"/>
-                                        <path d="M8.5 15.5c.9-1.2 2.1-2 3.5-2s2.6.8 3.5 2"/>
-                                        <circle cx="12" cy="19" r="1.5" fill="#9CA3AF"/>
-                                      </svg>
-                                      <div>
-                                        <div className="qp-save-title">Save data</div>
-                                        <div className="qp-save-sub">Sets quality to 240p</div>
-                                      </div>
-                                    </div>
-                                    <button
-                                      className="qp-toggle"
-                                      style={{ background: saveData ? '#2563EB' : '#374151' }}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSaveData(s => {
-                                          if (!s) setQuality('240p')
-                                          return !s
-                                        })
-                                      }}
-                                    >
-                                      <div className="qp-toggle-thumb" style={{ left: saveData ? '21px' : '3px' }} />
-                                    </button>
-                                  </div>
-
-                                  {/* Quality options */}
-                                  <div className="qp-section-label">Video Quality</div>
-                                  {QUALITY_OPTIONS.map((q) => {
-                                    const active = quality === q.label
-                                    return (
-                                      <div
-                                        key={q.label}
-                                        className="qp-item"
-                                        onClick={() => { setQuality(q.label); setQualityOpen(false); setSaveData(false) }}
-                                      >
-                                        <div className="qp-item-left">
-                                          <span className={`qp-item-label${active ? ' active' : ''}`}>{q.label}</span>
-                                          <span className="qp-item-sub">{q.sub}</span>
-                                        </div>
-                                        <div className="qp-item-right">
-                                          <span className="qp-kbps">{q.kbps}</span>
-                                          {active
-                                            ? (
-                                              <div className="qp-check-ring">
-                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5">
-                                                  <polyline points="20,6 9,17 4,12" />
-                                                </svg>
-                                              </div>
-                                            ) : (
-                                              <div className="qp-check-ring-empty" />
-                                            )
-                                          }
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 4. Fullscreen */}
-                            <button className="ctrl-btn" onClick={handleFullscreen}>
-                              <Maximize size={16} />
-                            </button>
-                          </div>
-                        </div>
+                        <span>Video not available yet</span>
                       </div>
                     </div>
+                  )}
+
+                  <div className="video-overlay" />
+
+                  <button className="video-back" onClick={(e) => { e.stopPropagation(); navigate(RouteBuilder.course(slug as string)) }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="15,18 9,12 15,6" />
+                    </svg>
+                  </button>
+
+                  <div className="video-title-overlay">
+                    <div className="vt-title">{lesson.title}</div>
+                    {(moduleTitle || courseTitle) && (
+                      <div className="vt-sub">{[moduleTitle, courseTitle].filter(Boolean).join(' · ')}</div>
+                    )}
                   </div>
 
-                  {/* ── Breadcrumb + title ── */}
-                  <div className="lesson-meta">
-                    <div className="crumb">
-                      <span className="crumb-link" onClick={() => navigate(RouteBuilder.course(slug as string))}>
-                        {courseTitle ?? slug}
+                  {buffering && (
+                    <div className="buffering">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5">
+                        <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  )}
+
+                  <div className="center-controls" onClick={(e) => e.stopPropagation()}>
+                    <button className="ctrl-btn" onClick={() => seekBy(-10)}><SkipBack size={22} /></button>
+                    <button className="play-main" onClick={togglePlay} disabled={!hasVideo}>
+                      {isPlaying
+                        ? <Pause size={20} fill="currentColor" />
+                        : <Play  size={20} fill="currentColor" style={{ marginLeft: 2 }} />}
+                    </button>
+                    <button className="ctrl-btn" onClick={() => seekBy(10)}><SkipForward size={22} /></button>
+                  </div>
+
+                  <div className="video-controls" onClick={(e) => e.stopPropagation()}>
+                    <div className="progress-wrap" onClick={handleProgressClick}>
+                      <div className="progress-fill" style={{ width: `${progressPct}%` }}>
+                        <div className="progress-thumb" />
+                      </div>
+                    </div>
+                    <div className="controls-row">
+                      <span className="time">
+                        {fmtTime(currentTime)} / {duration > 0 ? fmtTime(duration) : lesson.duration_display}
                       </span>
-                      {moduleTitle && <>{' › '}<span>{moduleTitle}</span></>}
-                    </div>
-                    <div className="lesson-title-row">
-                      <div>
-                        <div className="lesson-title">{lesson.title}</div>
-                        <div className="lesson-sub">
-                          {moduleTitle ? `${moduleTitle} — ` : ''}{lesson.duration_display}
-                        </div>
-                      </div>
-                      <button
-                        className={`mark-done-btn${lesson.status === 'completed' ? ' done' : ''}`}
-                        onClick={handleMarkDone}
-                        disabled={marking || lesson.status === 'completed'}
-                      >
-                        <CheckCircle size={16} />
-                        {lesson.status === 'completed' ? 'Completed' : marking ? 'Marking…' : 'Mark done'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* ── Tabs ── */}
-                  <div>
-                    <div className="tabs-row">
-                      <button className={`tab-btn${activeTab === 'notes'     ? ' active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
-                      <button className={`tab-btn${activeTab === 'resources' ? ' active' : ''}`} onClick={() => setActiveTab('resources')}>Resources</button>
-                      <button className="tab-btn" disabled>
-                        Discussion <span className="tab-lock-label">LIVE CLASSES ONLY</span>
-                      </button>
-                    </div>
-
-                    <div style={{ paddingTop: '1.25rem' }}>
-                      {activeTab === 'notes' && (
-                        <div className="tab-panel">
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Take notes while you watch — they're saved automatically."
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
+                      <div className="controls-right">
+                        {/* Volume — hidden entirely on mobile via CSS */}
+                        <div className="volume-wrap">
+                          <button className="ctrl-btn" onClick={toggleMute}>
+                            {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                          </button>
+                          <input
+                            className="volume-slider"
+                            type="range" min={0} max={1} step={0.05}
+                            value={muted ? 0 : volume}
+                            onChange={handleVolumeChange}
+                            onClick={(e) => e.stopPropagation()}
                           />
-                          <div className="notes-hint-row">
-                            <span className="notes-hint">Notes are saved per lesson and available even after completion.</span>
-                            {(savingNotes || justSaved) && (
-                              <span className="notes-save-status">
-                                {savingNotes ? 'Saving…' : <><CheckCircle size={14} />Saved</>}
-                              </span>
-                            )}
-                          </div>
                         </div>
-                      )}
 
-                      {activeTab === 'resources' && (
-                        <div className="tab-panel">
-                          {!lesson.resources || lesson.resources.length === 0 ? (
-                            <div className="resources-empty">No resources attached to this lesson yet.</div>
-                          ) : (
-                            <>
-                              <label className="resources-select-all">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedResources.size === lesson.resources.length}
-                                  onChange={() => toggleSelectAll(lesson.resources)}
-                                />
-                                Select all
-                              </label>
-                              <div className="resources-grid">
-                                {lesson.resources.map((r) => {
-                                  const fileType = getFileTypeLabel(r)
-                                  return (
-                                    <div className="resource-card" key={r.id}>
-                                      <input type="checkbox" checked={selectedResources.has(r.id)} onChange={() => toggleResource(r.id)} />
-                                      <div className="resource-icon-wrap" style={{ background: resourceIconBg(fileType) }}>
-                                        {resourceIcon(fileType)}
-                                      </div>
-                                      <div className="resource-info">
-                                        <div className="resource-title">{r.title}</div>
-                                        <div className="resource-meta">
-                                          {fileType.toUpperCase()}
-                                          <span className="resource-meta-light"> · {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                        </div>
-                                        {r.file_size > 0 && (
-                                          <div className="resource-meta-light" style={{ marginTop: 2 }}>{formatBytes(r.file_size)}</div>
-                                        )}
-                                      </div>
-                                      <button className="resource-download" onClick={() => downloadResource(r)}>
-                                        <Download size={16} />
-                                      </button>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                              <div className="resources-footer">
-                                <div className="resources-footer-text">
-                                  {lesson.resources.length} file{lesson.resources.length !== 1 ? 's' : ''}
-                                </div>
-                                <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)}>
-                                  <Download size={16} />Download all
-                                </button>
-                              </div>
-                            </>
+                        {/* CC */}
+                        <div style={{ position: 'relative' }}>
+                          <button className="ctrl-btn" onClick={() => { setCcOpen(o => !o); setQualityOpen(false) }}>
+                            <Captions size={16} style={{ opacity: ccOn ? 1 : 0.6 }} />
+                          </button>
+                          {ccOpen && (
+                            <div className="popover">
+                              <div className={`popover-item${!ccOn ? ' active' : ''}`} onClick={() => { setCcOn(false); setCcOpen(false) }}>Off</div>
+                              <div className={`popover-item${ccOn  ? ' active' : ''}`} onClick={() => { setCcOn(true);  setCcOpen(false) }}>English</div>
+                            </div>
                           )}
                         </div>
-                      )}
 
-                      {activeTab === 'discussion' && (
-                        <div className="discussion-locked">
-                          <Lock size={28} color="#D1D5DB" />
-                          <div className="discussion-locked-title">Discussion is available in Live Classes</div>
-                          <div className="discussion-locked-sub">Join a live session to ask questions and discuss this topic with your trainer and peers in real time.</div>
+                        {/* Quality */}
+                        <div style={{ position: 'relative' }}>
+                          <button className="ctrl-btn quality-trigger" onClick={() => { setQualityOpen(o => !o); setCcOpen(false) }}>
+                            <Settings2 size={14} style={{ marginRight: 3 }} />{quality}
+                          </button>
+                          {qualityOpen && (
+                            <div className="quality-popover">
+                              <div className="qp-save">
+                                <div className="qp-save-left">
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" style={{ flexShrink: 0 }}>
+                                    <path d="M1.5 8.5C5 4 10 2 12 2s7 2 10.5 6.5"/>
+                                    <path d="M5 12c1.8-2.4 4.2-4 7-4s5.2 1.6 7 4"/>
+                                    <path d="M8.5 15.5c.9-1.2 2.1-2 3.5-2s2.6.8 3.5 2"/>
+                                    <circle cx="12" cy="19" r="1.5" fill="#9CA3AF"/>
+                                  </svg>
+                                  <div>
+                                    <div className="qp-save-title">Save data</div>
+                                    <div className="qp-save-sub">Sets quality to 240p</div>
+                                  </div>
+                                </div>
+                                <button
+                                  className="qp-toggle"
+                                  style={{ background: saveData ? '#2563EB' : '#374151' }}
+                                  onClick={(e) => { e.stopPropagation(); setSaveData(s => { if (!s) setQuality('240p'); return !s }) }}
+                                >
+                                  <div className="qp-toggle-thumb" style={{ left: saveData ? '21px' : '3px' }} />
+                                </button>
+                              </div>
+                              <div className="qp-section-label">Video Quality</div>
+                              {QUALITY_OPTIONS.map((q) => {
+                                const active = quality === q.label
+                                return (
+                                  <div key={q.label} className="qp-item" onClick={() => { setQuality(q.label); setQualityOpen(false); setSaveData(false) }}>
+                                    <div className="qp-item-left">
+                                      <span className={`qp-item-label${active ? ' active' : ''}`}>{q.label}</span>
+                                      <span className="qp-item-sub">{q.sub}</span>
+                                    </div>
+                                    <div className="qp-item-right">
+                                      <span className="qp-kbps">{q.kbps}</span>
+                                      {active
+                                        ? <div className="qp-check-ring"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><polyline points="20,6 9,17 4,12" /></svg></div>
+                                        : <div className="qp-check-ring-empty" />}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
+
+                        <button className="ctrl-btn" onClick={handleFullscreen}>
+                          <Maximize size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Breadcrumb + title ── */}
+              <div className="lesson-meta">
+                <div className="crumb">
+                  <span className="crumb-link" onClick={() => navigate(RouteBuilder.course(slug as string))}>
+                    {courseTitle ?? slug}
+                  </span>
+                  {moduleTitle && <>{' › '}<span>{moduleTitle}</span></>}
+                </div>
+                <div className="lesson-title-row">
+                  <div>
+                    <div className="lesson-title">{lesson.title}</div>
+                    <div className="lesson-sub">{moduleTitle ? `${moduleTitle} — ` : ''}{lesson.duration_display}</div>
+                  </div>
+                  <button
+                    className={`mark-done-btn${lesson.status === 'completed' ? ' done' : ''}`}
+                    onClick={handleMarkDone}
+                    disabled={marking || lesson.status === 'completed'}
+                  >
+                    <CheckCircle size={16} />
+                    {lesson.status === 'completed' ? 'Completed' : marking ? 'Marking…' : 'Mark done'}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Tabs ── */}
+              <div>
+                <div className="tabs-row">
+                  <button className={`tab-btn${activeTab === 'notes'     ? ' active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
+                  <button className={`tab-btn${activeTab === 'resources' ? ' active' : ''}`} onClick={() => setActiveTab('resources')}>Resources</button>
+                  <button className="tab-btn" disabled>
+                    Discussion <span className="tab-lock-label">LIVE CLASSES ONLY</span>
+                  </button>
+                </div>
+
+                <div style={{ paddingTop: '1.25rem' }}>
+                  {activeTab === 'notes' && (
+                    <div className="tab-panel">
+                      <textarea
+                        className="notes-textarea"
+                        placeholder="Take notes while you watch — they're saved automatically."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
+                      <div className="notes-hint-row">
+                        <span className="notes-hint">Notes are saved per lesson and available even after completion.</span>
+                        {(savingNotes || justSaved) && (
+                          <span className="notes-save-status">
+                            {savingNotes ? 'Saving…' : <><CheckCircle size={14} />Saved</>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'resources' && (
+                    <div className="tab-panel">
+                      {!lesson.resources || lesson.resources.length === 0 ? (
+                        <div className="resources-empty">No resources attached to this lesson yet.</div>
+                      ) : (
+                        <>
+                          <label className="resources-select-all">
+                            <input
+                              type="checkbox"
+                              checked={selectedResources.size === lesson.resources.length}
+                              onChange={() => toggleSelectAll(lesson.resources)}
+                            />
+                            Select all
+                          </label>
+                          <div className="resources-grid">
+                            {lesson.resources.map((r) => {
+                              const fileType = getFileTypeLabel(r)
+                              return (
+                                <div className="resource-card" key={r.id}>
+                                  <input type="checkbox" checked={selectedResources.has(r.id)} onChange={() => toggleResource(r.id)} />
+                                  <div className="resource-icon-wrap" style={{ background: resourceIconBg(fileType) }}>
+                                    {resourceIcon(fileType)}
+                                  </div>
+                                  <div className="resource-info">
+                                    <div className="resource-title">{r.title}</div>
+                                    <div className="resource-meta">
+                                      {fileType.toUpperCase()}
+                                      <span className="resource-meta-light"> · {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                    </div>
+                                    {r.file_size > 0 && (
+                                      <div className="resource-meta-light" style={{ marginTop: 2 }}>{formatBytes(r.file_size)}</div>
+                                    )}
+                                  </div>
+                                  <button className="resource-download" onClick={() => downloadResource(r)}>
+                                    <Download size={16} />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="resources-footer">
+                            <div className="resources-footer-text">{lesson.resources.length} file{lesson.resources.length !== 1 ? 's' : ''}</div>
+                            <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)}>
+                              <Download size={16} />Download all
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
-                  </div>
+                  )}
 
-                  {/* ── Prev / Next (full width row) ── */}
-                  <div className="nav-row">
-                    <div
-                      className={`nav-card${!prevLesson ? ' disabled' : ''}`}
-                      onClick={() => prevLesson && goToLesson(prevLesson.id)}
-                    >
-                      <span className="nav-card-label">‹ Previous</span>
-                      <span className="nav-card-title">{prevLesson?.title ?? 'No previous lesson'}</span>
-                      {prevLesson && <span className="nav-card-sub">{prevLesson.duration_display}</span>}
+                  {activeTab === 'discussion' && (
+                    <div className="discussion-locked">
+                      <Lock size={28} color="#D1D5DB" />
+                      <div className="discussion-locked-title">Discussion is available in Live Classes</div>
+                      <div className="discussion-locked-sub">Join a live session to ask questions and discuss this topic with your trainer and peers in real time.</div>
                     </div>
+                  )}
+                </div>
+              </div>
 
-                    <div
-                      className={`nav-card up-next${!nextLesson ? ' disabled' : ''}`}
-                      onClick={() => nextLesson && goToLesson(nextLesson.id)}
-                    >
-                      <span className="nav-card-label">Up next <ChevronRight size={12} /></span>
-                      <span className="nav-card-title">{nextLesson?.title ?? 'No more lessons'}</span>
-                      {nextLesson && <span className="nav-card-sub">{nextLesson.duration_display}</span>}
-                    </div>
-                  </div>
+              {/* ── Prev / Next ── */}
+              <div className="nav-row">
+                <div className={`nav-card${!prevLesson ? ' disabled' : ''}`} onClick={() => prevLesson && goToLesson(prevLesson.id)}>
+                  <span className="nav-card-label">‹ Previous</span>
+                  <span className="nav-card-title">{prevLesson?.title ?? 'No previous lesson'}</span>
+                  {prevLesson && <span className="nav-card-sub">{prevLesson.duration_display}</span>}
+                </div>
+                <div className={`nav-card up-next${!nextLesson ? ' disabled' : ''}`} onClick={() => nextLesson && goToLesson(nextLesson.id)}>
+                  <span className="nav-card-label">Up next <ChevronRight size={12} /></span>
+                  <span className="nav-card-title">{nextLesson?.title ?? 'No more lessons'}</span>
+                  {nextLesson && <span className="nav-card-sub">{nextLesson.duration_display}</span>}
+                </div>
+              </div>
 
-                  {/* ── Ask for help (below prev/next, right-aligned) ── */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div className="ask-help-wrap">
-                      <button className="ask-help-btn" onClick={() => setAskHelpOpen(o => !o)}>
-                        <Headphones size={16} />Ask for help
+              {/* ── Ask for help ── */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div className="ask-help-wrap">
+                  <button className="ask-help-btn" onClick={() => setAskHelpOpen(o => !o)}>
+                    <Headphones size={16} />Ask for help
+                  </button>
+                  {askHelpOpen && (
+                    <div className="ask-help-popover">
+                      <div className="ask-help-popover-title">Get help from a tutor</div>
+                      <div className="ask-help-popover-sub">Book a 1-on-1 session with Amara Osei or a course assistant.</div>
+                      <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); navigate(ROUTES.TUTOR_BOOKING) }}>
+                        Book a session
                       </button>
-                     {askHelpOpen && (
-  <div className="ask-help-popover">
-    <div className="ask-help-popover-title">Get help from a tutor</div>
-    <div className="ask-help-popover-sub">Book a 1-on-1 session with Amara Osei or a course assistant.</div>
-    <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); navigate(ROUTES.TUTOR_BOOKING) }}>
-      Book a session
-    </button>
-    <button className="ask-help-item secondary" onClick={() => setAskHelpOpen(false)}>
-      Ask in community forum
-    </button>
-  </div>
-)}
+                      <button className="ask-help-item secondary" onClick={() => setAskHelpOpen(false)}>
+                        Ask in community forum
+                      </button>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </main>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
-
-        {/* Mobile tab bar */}
-        <div className="mobile-tabbar">
-          <div className="mobile-tabbar-inner">
-            {NAV_ITEMS.map(({ key, label, Icon }) => (
-              <button key={key} className={`tab-item${activeNav === key ? ' active' : ''}`} onClick={() => handleNav(key)}>
-                <Icon size={20} />
-                <span>{label === 'Live Classes' ? 'Live' : label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      </AppShell>
 
       {/* ── Lesson complete modal ── */}
       {completeInfo && lesson && (
         <div className="modal-backdrop" onClick={() => setCompleteInfo(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setCompleteInfo(null)}><X size={16} /></button>
-
             <div className="modal-check">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
                 <polyline points="20,6 9,17 4,12" />
               </svg>
             </div>
-
             <div style={{ textAlign: 'center' }}>
               <div className="modal-title">Lesson complete!</div>
               <div className="modal-sub">{lesson.title}</div>
             </div>
-
             <div className="modal-progress-card">
               <div className="modal-progress-row">
                 <span>Course progress</span>
@@ -1076,7 +878,6 @@ export default function CourseLearnPage() {
                 <span className="after">{completeInfo.after}% complete</span>
               </div>
             </div>
-
             {completeInfo.nextLesson && (
               <>
                 <div className="modal-upnext-card">
@@ -1096,7 +897,6 @@ export default function CourseLearnPage() {
                 </div>
               </>
             )}
-
             <button className="modal-break-link" onClick={() => navigate(ROUTES.DASHBOARD)}>
               <Coffee size={14} />Take a break — go to dashboard
             </button>

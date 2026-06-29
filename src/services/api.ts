@@ -313,37 +313,20 @@ export const authAPI = {
   },
 
   login: async (payload: LoginPayload): Promise<LoginResult> => {
-  try {
-    const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
-      API_ENDPOINTS.LOGIN,
-      payload,
-    )
-
-    const { access, refresh, user } = response.data
-
-    useAuthStore.getState().setToken(access)
-    useAuthStore.getState().setRefreshToken(refresh)
-
-    return {
-      success: true as const,
-      access,
-      refresh,
-      user,
+    try {
+      const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
+        API_ENDPOINTS.LOGIN,
+        payload,
+      )
+      const { access, refresh, user } = response.data
+      useAuthStore.getState().setToken(access)
+      useAuthStore.getState().setRefreshToken(refresh)
+      return { success: true as const, access, refresh, user }
+    } catch (error) {
+      const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
+      return { success: false as const, error: message, statusCode, code }
     }
-  } catch (error) {
-    const { message, statusCode, code } = parseApiError(
-      error,
-      'Invalid email or password',
-    )
-
-    return {
-      success: false as const,
-      error: message,
-      statusCode,
-      code,
-    }
-  }
-},
+  },
 
   getCurrentUser: async () => {
     try {
@@ -371,30 +354,30 @@ export const authAPI = {
   },
 
   requestPasswordReset: async (payload: PasswordResetPayload) => {
-  try {
-    await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
-    return { success: true as const }
-  } catch (error) {
-    const { message, statusCode } = parseApiError(error, 'Password reset request failed')
-    if (statusCode === 429) {
-      return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
+    try {
+      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET, payload)
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Password reset request failed')
+      if (statusCode === 429) {
+        return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
+      }
+      return { success: false as const, error: message }
     }
-    return { success: false as const, error: message }
-  }
-},
+  },
 
-confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
-  try {
-    await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
-    return { success: true as const }
-  } catch (error) {
-    const { message, statusCode } = parseApiError(error, 'Password reset failed')
-    if (statusCode === 429) {
-      return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
+  confirmPasswordReset: async (payload: PasswordResetConfirmPayload) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, payload)
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Password reset failed')
+      if (statusCode === 429) {
+        return { success: false as const, error: 'Too many attempts. Please wait a moment before trying again.' }
+      }
+      return { success: false as const, error: message }
     }
-    return { success: false as const, error: message }
-  }
-},
+  },
 
   ...(import.meta.env.DEV && {
     testLearnerOnly: async () => {
@@ -443,11 +426,10 @@ export const paymentAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
+
   getStatus: async (reference: string) => {
     try {
-      const response = await apiClient.get<PaymentStatusResponse>(
-        `/v1/payments/${reference}/`,
-      )
+      const response = await apiClient.get<PaymentStatusResponse>(`/v1/payments/${reference}/`)
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message } = parseApiError(error, 'Failed to get payment status')
@@ -483,7 +465,7 @@ export const learnerProfileAPI = {
   },
 }
 
-// ─── Course Types ───────────────────────────────────────────────────────────
+// ─── Course Types ─────────────────────────────────────────────────────────────
 
 export interface EnrollmentStatusResponse {
   enrolled: boolean
@@ -537,7 +519,7 @@ export interface LessonResource {
   title: string
   resource_type: 'template' | 'worksheet' | 'slides' | 'document' | 'other'
   file_format: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'zip' | 'image' | 'other' | null
-  file_size: number   // raw bytes — format client-side
+  file_size: number
   created_at: string
 }
 
@@ -560,6 +542,7 @@ export interface LessonDetailResponse {
   resources: LessonResource[]
   previous_lesson: AdjacentLesson | null
   next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
+  resume_position_seconds: number | null   // ← added
 }
 
 export interface LessonCompleteRawResponse {
@@ -573,6 +556,12 @@ export interface LessonCompleteResponse extends LessonCompleteRawResponse {
   lessons_completed?: number
   lessons_total?: number
   next_lesson?: (AdjacentLesson & { thumbnail?: string | null }) | null
+}
+
+export interface SavePositionResponse {
+  lesson_id: string
+  position_seconds: number
+  updated_at: string
 }
 
 // ─── Courses API ──────────────────────────────────────────────────────────────
@@ -625,16 +614,15 @@ export const coursesAPI = {
       const afterResponse = await apiClient.get<CourseProgressResponse>(
         `/v1/courses/${courseSlug}/progress/`,
       )
-
       return {
         success: true as const,
         data: {
           ...response.data,
           course_progress_percentage_before: beforeResponse.data.overall.percent,
-          course_progress_percentage_after: afterResponse.data.overall.percent,
+          course_progress_percentage_after:  afterResponse.data.overall.percent,
           lessons_completed: afterResponse.data.overall.lessons_completed,
-          lessons_total: afterResponse.data.overall.lessons_total,
-          next_lesson: response.data.next_lesson ?? null,
+          lessons_total:     afterResponse.data.overall.lessons_total,
+          next_lesson:       response.data.next_lesson ?? null,
         },
       }
     } catch (error) {
@@ -655,19 +643,32 @@ export const coursesAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
-getResourceDownloadUrl: async (courseSlug: string, lessonId: string, resourceId: string) => {
-  try {
-    const response = await apiClient.get<{ download_url: string; expires_in: number }>(
-      `/v1/courses/${courseSlug}/lessons/${lessonId}/resources/${resourceId}/download/`,
-    )
-    return { success: true as const, data: response.data }
-  } catch (error) {
-    const { message, statusCode } = parseApiError(error, 'Failed to get download URL')
-    return { success: false as const, error: message, statusCode }
-  }
-},
 
+  getResourceDownloadUrl: async (courseSlug: string, lessonId: string, resourceId: string) => {
+    try {
+      const response = await apiClient.get<{ download_url: string; expires_in: number }>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/resources/${resourceId}/download/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to get download URL')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
 
+  
+  savePosition: async (courseSlug: string, lessonId: string, positionSeconds: number) => {
+    try {
+      const response = await apiClient.put<SavePositionResponse>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/position/`,
+        { position_seconds: positionSeconds },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to save position')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
 }
 
 export default apiClient
