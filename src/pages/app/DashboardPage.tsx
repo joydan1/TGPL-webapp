@@ -81,18 +81,38 @@ function SmallRing({ pct }: { pct: number }) {
   )
 }
 
-// ── Page CSS (no navbar/sidebar — those come from SHELL_CSS) ───────────────
+// ── Page CSS ───────────────────────────────────────────────────────────────
 const PAGE_CSS = `
   .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.75rem; }
 
   .greeting-line { font-size: 0.9375rem; color: #6B7280; }
   .greeting-name { font-size: 1.625rem; font-weight: 700; color: #111; margin-top: 0.125rem; }
 
-  .resume-banner { background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%); border-radius: 1rem; padding: 1.5rem 1.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; color: #fff; }
+  .resume-banner {
+    background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%);
+    border-radius: 1rem;
+    padding: 1.5rem 1.75rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    color: #fff;
+    min-height: 110px;
+  }
+  .resume-banner-left {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+  .resume-banner-top { display: flex; flex-direction: column; }
   .resume-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; margin-bottom: 0.35rem; }
-  .resume-module { font-size: 1.0625rem; font-weight: 700; margin-bottom: 0.875rem; }
-  .resume-progress-wrap { background: rgba(255,255,255,0.25); border-radius: 99px; height: 8px; width: 100%; max-width: 480px; }
-  .resume-progress-fill { height: 100%; background: #fff; border-radius: 99px; }
+  .resume-module { font-size: 1.0625rem; font-weight: 700; }
+ .resume-banner-bottom { display: flex; flex-direction: column; width: 100%; }
+.resume-progress-wrap { background: rgba(255,255,255,0.25); border-radius: 9999px; height: 12px; width: 100%; }
+.resume-progress-fill { height: 100%; background: #fff; border-radius: 9999px; }
   .resume-sub { font-size: 0.75rem; opacity: 0.75; margin-top: 0.4rem; }
   .resume-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.65rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .resume-btn:hover { opacity: 0.9; }
@@ -290,14 +310,20 @@ export default function DashboardPage() {
           {/* Resume banner (has progress) */}
           {showCourseDependentSections && resumeCourse && resumeCourse.completion_percentage > 0 && (
             <div className="resume-banner">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="resume-label">Continue where you left off</div>
-                <div className="resume-module">{resumeCourse.title}</div>
-                <div className="resume-progress-wrap">
-                  <div className="resume-progress-fill" style={{ width: `${resumeCourse.completion_percentage}%` }} />
+              {/* Left: label + title on top, progress bar on bottom */}
+              <div className="resume-banner-left">
+                <div className="resume-banner-top">
+                  <div className="resume-label">Continue where you left off</div>
+                  <div className="resume-module">{resumeCourse.title}</div>
                 </div>
-                <div className="resume-sub">{resumeCourse.completion_percentage}% complete</div>
+                <div className="resume-banner-bottom">
+                  <div className="resume-progress-wrap">
+                    <div className="resume-progress-fill" style={{ width: `${resumeCourse.completion_percentage}%` }} />
+                  </div>
+                  <div className="resume-sub">{resumeCourse.completion_percentage}% complete</div>
+                </div>
               </div>
+              {/* Right: Resume button pinned to top-right */}
               <button className="resume-btn" onClick={() => {
                 if (resumeCourse.resume_url) navigate(resumeCourse.resume_url)
                 else goToCourse(resumeCourse.course_slug)

@@ -312,22 +312,26 @@ export const authAPI = {
     }
   },
 
-  login: async (payload: LoginPayload): Promise<LoginResult> => {
-    try {
-      const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
-        API_ENDPOINTS.LOGIN,
-        payload,
-      )
-      const { access, refresh, user } = response.data
-      useAuthStore.getState().setToken(access)
-      useAuthStore.getState().setRefreshToken(refresh)
-      return { success: true as const, access, refresh, user }
-    } catch (error) {
-      const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
-      return { success: false as const, error: message, statusCode, code }
+ login: async (payload: LoginPayload): Promise<LoginResult> => {
+  try {
+    const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
+      API_ENDPOINTS.LOGIN,
+      payload,
+    )
+    const { access, refresh, user } = response.data
+    useAuthStore.getState().setToken(access)
+    useAuthStore.getState().setRefreshToken(refresh)
+    return { success: true as const, access, refresh, user }
+  } catch (error) {
+    const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
+    return {
+      success: false as const,
+      error: statusCode === 401 ? 'Invalid email or password' : message,
+      statusCode,
+      code,
     }
-  },
-
+  }
+},
   getCurrentUser: async () => {
     try {
       const response = await apiClient.get<UserResponse>(API_ENDPOINTS.ME)

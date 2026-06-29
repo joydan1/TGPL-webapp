@@ -12,6 +12,12 @@ export const API_ENDPOINTS = {
   EMAIL_VERIFICATION_CONFIRM: '/v1/auth/email-verification/confirm/',
   PASSWORD_RESET: '/v1/auth/password-reset/',
   PASSWORD_RESET_CONFIRM: '/v1/auth/password-reset/confirm/',
+  // Courses
+  COURSES_LIST: '/v1/courses/',
+  COURSE_DETAIL: (slug: string) => `/v1/courses/${slug}/`,
+  COURSE_ENROLL: (slug: string) => `/v1/courses/${slug}/enroll/`,
+  COURSE_ASSIGNMENTS: (slug: string) => `/v1/courses/${slug}/assignments/`,
+
 LEARNER_PROFILE: '/v1/users/me/learner-profile/',
   // Test endpoints — dev only
   ...(import.meta.env.DEV && {
