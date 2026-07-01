@@ -13,7 +13,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.paystack.co; style-src 'self' 'unsafe-inline' https://paystack.com https://checkout.paystack.com https://fonts.googleapis.com; font-src 'self' data: https://paystack.com https://checkout.paystack.com https://fonts.gstatic.com; img-src 'self' data: https://paystack.com https://checkout.paystack.com; frame-src https://checkout.paystack.com; connect-src 'self' https://api.paystack.co https://tgpl-webapp-backend-staging.up.railway.app; media-src 'self' https://pub-a647564adc1c472ab6e0ba76342f3ed2.r2.dev;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.paystack.co; style-src 'self' 'unsafe-inline' https://paystack.com https://checkout.paystack.com https://fonts.googleapis.com; font-src 'self' data: https://paystack.com https://checkout.paystack.com https://fonts.gstatic.com; img-src 'self' data: https://paystack.com https://checkout.paystack.com https://pub-a647564adc1c472ab6e0ba76342f3ed2.r2.dev; frame-src https://checkout.paystack.com; connect-src 'self' https://api.paystack.co https://tgpl-webapp-backend-staging.up.railway.app; media-src 'self' https://pub-a647564adc1c472ab6e0ba76342f3ed2.r2.dev;"
         }
       ]
     }
