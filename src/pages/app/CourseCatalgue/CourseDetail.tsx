@@ -69,6 +69,10 @@ async function fetchCourse(slug: string): Promise<CourseDetail> {
   } catch (err: unknown) {
     const status = (err as { response?: { status?: number } })?.response?.status
     if (status === 404) throw new Error('not_found')
+    // Backend returns 403 for unpublished/draft/archived courses, or courses
+    // not yet available to this account — this is an expected, recoverable
+    // state, not a global auth failure.
+    if (status === 403) throw new Error('forbidden')
     throw new Error('fetch_failed')
   }
 }
@@ -373,7 +377,13 @@ export default function CourseDetailPage() {
       } catch (e: unknown) {
         if (cancelled) return
         const err = e as Error
-        setError(err.message === 'not_found' ? 'Course not found.' : 'Failed to load course.')
+        setError(
+          err.message === 'not_found'
+            ? 'Course not found.'
+            : err.message === 'forbidden'
+              ? 'This course isn\u2019t available right now.'
+              : 'Failed to load course.'
+        )
       } finally {
         if (!cancelled) setLoading(false)
       }

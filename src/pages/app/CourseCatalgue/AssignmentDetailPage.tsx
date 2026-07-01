@@ -9,179 +9,12 @@ import {
 import { RouteBuilder } from '../../../constants/routes'
 import { useAuth } from '../../../hooks/useAuth'
 import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Replace this entire mock layer with a real `assignmentsAPI`
-// in services/api.ts once the endpoint exists. Function signatures and the
-// `{ success, data } | { success, error }` result shape are intentionally
-// modeled after the real `coursesAPI` so the swap is mechanical:
-//
-//   assignmentsAPI.getAssignment(id)              -> GET  /v1/assignments/:id/
-//   assignmentsAPI.submitAssignment(id, files)    -> POST /v1/assignments/:id/submit/
-//
-// Everything below this banner down to MOCK DATA END should be deleted wholesale
-// and imported from services/api.ts instead.
-// ─────────────────────────────────────────────────────────────────────────────
-
-export type AssignmentStatus = 'not_started' | 'in_progress' | 'graded'
-
-export interface AssignmentScenario {
-  id: string
-  order: number
-  text: string
-}
-
-export interface AssignmentDeliverable {
-  id: string
-  order: number
-  text: string
-}
-
-export interface GradingCriterion {
-  id: string
-  label: string
-  points: number
-}
-
-export interface AssignmentResource {
-  id: string
-  title: string
-  file_type: string
-  file_url: string
-  size_display: string
-  size_tag?: 'SMALL' | 'MEDIUM' | 'LARGE'
-}
-
-export interface SubmittedFile {
-  id: string
-  filename: string
-  file_url: string
-  uploaded_at: string
-}
-
-export interface AssignmentFeedback {
-  type: 'revision_requested' | 'graded'
-  grader_name: string
-  comment: string
-  date: string
-  score?: number
-}
-
-export interface AssignmentDetail {
-  id: string
-  title: string
-  course_slug: string
-  course_title: string
-  module_title: string
-  due_at: string
-  points: number
-  grade_weight_percent: number
-  status: AssignmentStatus
-  instructions: {
-    intro: string
-    example_image_url: string | null
-    example_image_caption: string | null
-    what_youll_do: string[]
-    scenarios: AssignmentScenario[]
-    deliverables: AssignmentDeliverable[]
-    grading_criteria: GradingCriterion[]
-  }
-  resources: AssignmentResource[]
-  submitted_files: SubmittedFile[]
-  feedback: AssignmentFeedback | null
-  submission_requirements: {
-    accepted_file_types: string
-    max_file_size: string
-    word_count: string | null
-    max_files: number
-  }
-}
-
-type Result<T> = { success: true; data: T } | { success: false; error: string; statusCode?: number }
-
-const MOCK_ASSIGNMENT: AssignmentDetail = {
-  id: 'asn_stakeholder_map',
-  title: 'Stakeholder Map Project',
-  course_slug: 'project-management',
-  course_title: 'Project Management',
-  module_title: 'Module 5 — Stakeholder Management',
-  due_at: '2025-06-05T23:59:00+01:00',
-  points: 100,
-  grade_weight_percent: 25,
-  status: 'not_started',
-  instructions: {
-    intro: "In this assignment you will create a comprehensive stakeholder map for a real or hypothetical project. Stakeholder mapping is a core project management skill that directly shapes how you communicate, manage expectations, and maintain buy-in throughout a project lifecycle.",
-    example_image_url: '/stakeholder.png',
-    example_image_caption: 'Example: influence vs. interest stakeholder grid',
-    what_youll_do: [
-      'Identify all key stakeholders for your chosen project',
-      'Classify each stakeholder by influence and interest using the 2×2 grid',
-      'Define a tailored communication strategy for each stakeholder group',
-      'Document potential stakeholder-related risks in a risk register',
-    ],
-    scenarios: [
-      { id: 's1', order: 1, text: 'A new community health clinic opening in a mid-size Nigerian city' },
-      { id: 's2', order: 2, text: 'A digital payments rollout across a microfinance institution' },
-      { id: 's3', order: 3, text: 'A university introducing an online degree programme for the first time' },
-    ],
-    deliverables: [
-      { id: 'd1', order: 1, text: 'Completed stakeholder map using the provided template' },
-      { id: 'd2', order: 2, text: 'Stakeholder communication plan (400–600 words)' },
-      { id: 'd3', order: 3, text: 'Risk register with a minimum of 3 stakeholder-related risks' },
-    ],
-    grading_criteria: [
-      { id: 'g1', label: 'Stakeholder identification & classification', points: 40 },
-      { id: 'g2', label: 'Communication plan quality', points: 35 },
-      { id: 'g3', label: 'Risk register completeness', points: 25 },
-    ],
-  },
-  resources: [
-    { id: 'r1', title: 'Stakeholder Map Template', file_type: 'XLSX', file_url: '#', size_display: '198 KB', size_tag: 'SMALL' },
-    { id: 'r2', title: 'Communication Plan Template', file_type: 'DOCX', file_url: '#', size_display: '124 KB', size_tag: 'SMALL' },
-    { id: 'r3', title: 'Example Stakeholder Map (Done)', file_type: 'PDF', file_url: '#', size_display: '680 KB' },
-    { id: 'r4', title: 'Module 5 Reading — Stakeholders', file_type: 'PDF', file_url: '#', size_display: '340 KB', size_tag: 'SMALL' },
-  ],
-  submitted_files: [],
-  feedback: null,
-  submission_requirements: {
-    accepted_file_types: 'PDF, DOCX, XLSX',
-    max_file_size: '10 MB per file',
-    word_count: '400–600 words',
-    max_files: 3,
-  },
-}
-
-async function mockGetAssignment(_id: string): Promise<Result<AssignmentDetail>> {
-  await new Promise((r) => setTimeout(r, 300))
-  return { success: true, data: MOCK_ASSIGNMENT }
-}
-
-async function mockSubmitAssignment(
-  _id: string,
-  files: File[],
-): Promise<Result<{ submitted_files: SubmittedFile[] }>> {
-  await new Promise((r) => setTimeout(r, 600))
-  return {
-    success: true,
-    data: {
-      submitted_files: files.map((f, i) => ({
-        id: `sub_${i}_${Date.now()}`,
-        filename: f.name,
-        file_url: '#',
-        uploaded_at: new Date().toISOString(),
-      })),
-    },
-  }
-}
-
-const assignmentsAPI = {
-  getAssignment: mockGetAssignment,
-  submitAssignment: mockSubmitAssignment,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA END
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  assignmentsAPI,
+  type AssignmentDetail,
+  type AssignmentRequirement,
+  type SubmittedFile,
+} from '../../../services/api'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDueDate(iso: string): string {
@@ -207,6 +40,10 @@ function resourceIconBg(fileType: string) {
   if (t.includes('xls') || t.includes('sheet')) return '#ECFDF3'
   if (t.includes('ppt') || t.includes('slide')) return '#FFF4ED'
   return '#F5F0FF'
+}
+
+function sortedRequirements(reqs: AssignmentRequirement[]): AssignmentRequirement[] {
+  return [...reqs].sort((a, b) => a.order - b.order)
 }
 
 // ─── Page CSS (page-specific only — shell handled by AppShell) ────────────────
@@ -340,19 +177,26 @@ const PAGE_CSS = `
   .modal-body-row { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
   .dropzone { flex: 1; min-width: 200px; border: 2px dashed #93C5FD; border-radius: 0.875rem; padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: #fff; text-align: center; }
   .dropzone:hover, .dropzone.dragover { background: #EFF6FF; border-color: #2563EB; }
+  .dropzone.disabled { opacity: 0.5; cursor: not-allowed; }
   .dropzone-icon { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; }
   .dropzone-text { font-size: 0.9375rem; font-weight: 600; color: #374151; }
   .dropzone-sub { font-size: 0.78rem; color: #9CA3AF; }
   .criteria-list { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.25rem; }
   .criteria-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; color: #374151; }
+  .criteria-row .criteria-label-wrap { display: flex; flex-direction: column; }
+  .criteria-row .criteria-hint { font-size: 0.72rem; color: #9CA3AF; }
   .criteria-status { flex-shrink: 0; display: flex; align-items: center; }
   .file-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .file-list-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.875rem; border-radius: 0.625rem; background: #F9FAFB; }
   .file-list-name { flex: 1; min-width: 0; font-size: 0.875rem; color: #111; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-list-req { font-size: 0.72rem; color: #6B7280; flex-shrink: 0; }
   .file-list-size { font-size: 0.78rem; color: #9CA3AF; flex-shrink: 0; }
   .file-list-remove { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: none; background: none; color: #9CA3AF; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .file-list-remove:hover { background: #FEE2E2; color: #DC2626; }
   .submit-error { font-size: 0.8438rem; color: #DC2626; background: #FEF2F2; border-radius: 0.625rem; padding: 0.625rem 0.875rem; }
+
+  /* Upload progress indicator */
+  .upload-progress { font-size: 0.8438rem; color: #2563EB; background: #EFF6FF; border-radius: 0.625rem; padding: 0.625rem 0.875rem; text-align: center; }
 
   @media (max-width: 900px) {
     .content { padding: 1.5rem 1.25rem 2rem; }
@@ -378,9 +222,15 @@ function SubmissionModal({
   const [files, setFiles] = useState<File[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [uploadStep, setUploadStep] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const maxFiles = assignment.submission_requirements.max_files
+
+  // Requirements define both how many files we can accept and which
+  // requirement_id each uploaded file must be tagged with. Files are
+  // auto-mapped to requirements in the order they're added.
+  const requirements = sortedRequirements(assignment.requirements)
+  const maxFiles = requirements.length
 
   function addFiles(list: FileList | null) {
     if (!list) return
@@ -395,10 +245,18 @@ function SubmissionModal({
     if (files.length === 0) return
     setSubmitting(true)
     setError(null)
-    const res = await assignmentsAPI.submitAssignment(assignment.id, files)
+    setUploadStep(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}…`)
+
+    const res = await assignmentsAPI.submitAssignment(assignment.id, files, requirements)
+
     setSubmitting(false)
-    if (res.success) onSubmitted(res.data.submitted_files)
-    else setError(res.error)
+    setUploadStep(null)
+
+    if (res.success) {
+      onSubmitted(res.data.submitted_files)
+    } else {
+      setError(res.error)
+    }
   }
 
   return (
@@ -416,22 +274,31 @@ function SubmissionModal({
 
         <div className="modal-body-row">
           <div
-            className={`dropzone${dragOver ? ' dragover' : ''}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            className={`dropzone${dragOver ? ' dragover' : ''}${files.length >= maxFiles ? ' disabled' : ''}`}
+            onClick={() => files.length < maxFiles && fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); if (files.length < maxFiles) setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragOver(false)
+              if (files.length < maxFiles) addFiles(e.dataTransfer.files)
+            }}
           >
             <div className="dropzone-icon"><Plus size={20} /></div>
-            <span className="dropzone-text">Click to add file(s)</span>
+            <span className="dropzone-text">
+              {files.length >= maxFiles ? 'All slots filled' : 'Click to add file(s)'}
+            </span>
             <span className="dropzone-sub">{assignment.submission_requirements.accepted_file_types}</span>
             <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
           </div>
 
           <div className="criteria-list">
-            {assignment.instructions.grading_criteria.map((c, i) => (
-              <div className="criteria-row" key={c.id}>
-                <span>{c.label}</span>
+            {requirements.map((req, i) => (
+              <div className="criteria-row" key={req.id}>
+                <div className="criteria-label-wrap">
+                  <span>{req.label}{req.required ? '' : ' (optional)'}</span>
+                  <span className="criteria-hint">{req.allowed_file_types}</span>
+                </div>
                 <span className="criteria-status">
                   {files.length > i
                     ? <CheckCircle2 size={18} color="#16A34A" />
@@ -448,6 +315,7 @@ function SubmissionModal({
               <div className="file-list-item" key={`${f.name}-${i}`}>
                 <FileText size={16} color="#6B7280" />
                 <span className="file-list-name">{f.name}</span>
+                <span className="file-list-req">→ {requirements[i]?.label}</span>
                 <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
                 <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
                   <X size={14} />
@@ -457,6 +325,7 @@ function SubmissionModal({
           </div>
         )}
 
+        {uploadStep && <div className="upload-progress">{uploadStep}</div>}
         {error && <div className="submit-error">{error}</div>}
 
         <button
@@ -498,6 +367,17 @@ export default function AssignmentDetailPage() {
   }, [id, load])
 
   if (!user) return null
+
+  // ── Resource download: use presigned URL endpoint ─────────────────────────
+  async function handleResourceDownload(resourceId: string, resourceTitle: string) {
+    if (!assignment) return
+    const res = await assignmentsAPI.getResourceDownloadUrl(assignment.id, resourceId)
+    if (res.success) {
+      window.open(res.data.download_url, '_blank')
+    } else {
+      console.error(`Failed to download "${resourceTitle}":`, res.error)
+    }
+  }
 
   function handleSubmitted(submittedFiles: SubmittedFile[]) {
     setModalOpen(false)
@@ -674,7 +554,11 @@ export default function AssignmentDetailPage() {
                             {r.size_tag && <span className="size-tag"> · {r.size_tag}</span>}
                           </div>
                         </div>
-                        <button className="resource-download" onClick={() => window.open(r.file_url, '_blank')} aria-label={`Download ${r.title}`}>
+                        <button
+                          className="resource-download"
+                          onClick={() => handleResourceDownload(r.id, r.title)}
+                          aria-label={`Download ${r.title}`}
+                        >
                           <Download size={16} />
                         </button>
                       </div>

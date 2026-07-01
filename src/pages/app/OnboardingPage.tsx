@@ -19,6 +19,21 @@ interface OnboardingData {
   learningHours: string
 }
 
+// ── Responsive helper ────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
+  )
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= breakpoint)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [breakpoint])
+
+  return isMobile
+}
+
 // ── Step dots ──────────────────────────────────────────────────────────────
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -43,9 +58,9 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 // ── List option (Step 1) ───────────────────────────────────────────────────
 function ListOption({
-  icon, label, selected, onClick,
+  icon, label, selected, onClick, isMobile,
 }: {
-  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; isMobile: boolean
 }) {
   return (
     <button
@@ -53,29 +68,32 @@ function ListOption({
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        width: '100%', padding: '1rem 1.25rem', borderRadius: '12px',
+        width: '100%', padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem', borderRadius: '12px',
         border: selected ? '2px solid var(--primary-500)' : '1.5px solid #E5E7EB',
         background: selected ? '#EFF6FF' : '#fff', cursor: 'pointer',
         transition: 'all 0.15s ease', marginBottom: '0.75rem',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.75rem' : '0.875rem', minWidth: 0 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 8,
+          width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 8,
           background: selected ? 'var(--primary-500)' : '#F3F4F6',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: selected ? '#fff' : '#6B7280', flexShrink: 0,
         }}>
           {icon}
         </div>
-        <span style={{ fontSize: '1rem', fontWeight: 500, color: selected ? 'var(--primary-500)' : '#111827' }}>
+        <span style={{
+          fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 500,
+          color: selected ? 'var(--primary-500)' : '#111827', textAlign: 'left',
+        }}>
           {label}
         </span>
       </div>
       {selected && (
         <div style={{
           width: 22, height: 22, borderRadius: '50%', background: 'var(--primary-500)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '0.5rem',
         }}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -88,9 +106,9 @@ function ListOption({
 
 // ── Grid option (Step 2) ───────────────────────────────────────────────────
 function GridOption({
-  icon, label, selected, onClick, disabled = false,
+  icon, label, selected, onClick, disabled = false, isMobile,
 }: {
-  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; disabled?: boolean
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; disabled?: boolean; isMobile: boolean
 }) {
   return (
     <button
@@ -100,8 +118,8 @@ function GridOption({
       aria-disabled={disabled}
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
-        padding: '1.5rem 1rem', borderRadius: '12px',
+        alignItems: 'center', justifyContent: 'center', gap: isMobile ? '0.5rem' : '0.75rem',
+        padding: isMobile ? '1rem 0.75rem' : '1.5rem 1rem', borderRadius: '12px',
         border: selected
           ? '2px solid var(--primary-500)'
           : disabled
@@ -109,7 +127,7 @@ function GridOption({
             : '1.5px solid #E5E7EB',
         background: selected ? '#EFF6FF' : disabled ? '#FAFBFC' : '#fff',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'all 0.15s ease', minHeight: 130,
+        transition: 'all 0.15s ease', minHeight: isMobile ? 100 : 130,
       }}
     >
       {selected && (
@@ -124,7 +142,7 @@ function GridOption({
         </div>
       )}
       <div style={{
-        width: 44, height: 44, borderRadius: 10,
+        width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 10,
         background: selected ? 'var(--primary-500)' : disabled ? '#F9FAFB' : '#F3F4F6',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: selected ? '#fff' : disabled ? '#D1D5DB' : '#6B7280',
@@ -132,9 +150,9 @@ function GridOption({
         {icon}
       </div>
       <span style={{
-        fontSize: '0.9rem', fontWeight: 500,
+        fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: 500,
         color: selected ? 'var(--primary-500)' : disabled ? '#D1D5DB' : '#111827',
-        textAlign: 'center', lineHeight: 1.3,
+        textAlign: 'center', lineHeight: 1.3, whiteSpace: 'pre-line',
       }}>
         {label}
       </span>
@@ -144,14 +162,14 @@ function GridOption({
 
 // ── Select dropdown ────────────────────────────────────────────────────────
 function SelectField({
-  label, value, onChange, options,
+  label, value, onChange, options, isMobile,
 }: {
   label: string; value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[]
+  options: { value: string; label: string }[]; isMobile: boolean
 }) {
   return (
     <div style={{ marginBottom: '1.25rem' }}>
-      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, color: '#111827', marginBottom: '0.5rem' }}>
+      <label style={{ display: 'block', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 500, color: '#111827', marginBottom: '0.5rem' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
@@ -160,8 +178,9 @@ function SelectField({
           onChange={(e) => onChange(e.target.value)}
           style={{
             width: '100%', appearance: 'none',
-            padding: '0.875rem 2.5rem 0.875rem 1rem', borderRadius: '12px',
-            border: '1.5px solid #E5E7EB', background: '#fff', fontSize: '1rem',
+            padding: isMobile ? '0.75rem 2.25rem 0.75rem 0.875rem' : '0.875rem 2.5rem 0.875rem 1rem',
+            borderRadius: '12px',
+            border: '1.5px solid #E5E7EB', background: '#fff', fontSize: isMobile ? '0.9rem' : '1rem',
             color: value ? '#111827' : '#9CA3AF', cursor: 'pointer',
             outline: 'none', fontFamily: 'inherit',
           }}
@@ -184,6 +203,7 @@ function SelectField({
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const firstName = user?.name?.split(' ')[0] || 'there'
 
   const [step, setStep] = useState<Step>(1)
@@ -196,22 +216,27 @@ export default function OnboardingPage() {
   })
 
   // ── Check completion status on load ────────────────────────────────────
+  const learnerStatus = user?.learner_profile?.completion_status
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- goals/experience_level intentionally read only once, on status change
+  const learnerGoals = user?.learner_profile?.goals
+  const learnerExperienceLevel = user?.learner_profile?.experience_level
+
   useEffect(() => {
-    if (!user?.learner_profile) return
-    const status = user.learner_profile?.completion_status
-    if (status === 'complete') {
+    if (!learnerStatus) return
+    if (learnerStatus === 'complete') {
       navigate(RouteBuilder.dashboard())
-    } else if (status === 'partial') {
-      if (user.learner_profile?.goals) {
-        setData((prev) => ({
-          ...prev,
-          goals: user.learner_profile!.goals || [],
-          experienceLevel: user.learner_profile!.experience_level || 'beginner',
-        }))
-      }
-      setStep(3)
+    } else if (learnerStatus === 'partial') {
+      setData((prev) => ({
+        ...prev,
+        goals: learnerGoals || prev.goals,
+        experienceLevel: learnerExperienceLevel || prev.experienceLevel,
+      }))
+      setStep((prev) => (prev === 3 ? prev : 3))
     }
-  }, [user?.learner_profile?.completion_status, navigate, user?.learner_profile])
+    // learnerGoals/learnerExperienceLevel deliberately excluded: they're read once when
+    // status flips to 'partial', not tracked as ongoing deps (avoids re-trigger loops)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnerStatus, navigate])
 
   // ── Skip / save partial ─────────────────────────────────────────────────
   const skipOrFinish = async () => {
@@ -299,8 +324,17 @@ export default function OnboardingPage() {
   // ── Shared layout wrapper ────────────────────────────────────────────────
   const Layout = ({ children, showSkip = true }: { children: React.ReactNode; showSkip?: boolean }) => (
     <div style={{ minHeight: '100vh', background: 'var(--grey)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2.5rem' }}>
-        <img src="/Logo.png" alt="TGPL" style={{ height: '2.5rem' }} />
+      <div
+        style={{
+          display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center',
+          padding: isMobile ? '1rem 1.25rem' : '1.5rem 2.5rem', gap: '0.75rem',
+        }}
+      >
+        <img
+          src="/Logo.png"
+          alt="TGPL"
+          style={{ height: isMobile ? '1.75rem' : '2.5rem', flexShrink: 0 }}
+        />
         {showSkip && (
           <button
             type="button"
@@ -308,8 +342,9 @@ export default function OnboardingPage() {
             disabled={loading}
             style={{
               background: 'none', border: 'none', color: 'var(--primary-500)',
-              fontSize: '1rem', fontWeight: 500,
+              fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: 500,
               cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1,
+              flexShrink: 0, whiteSpace: 'nowrap', padding: 0,
             }}
           >
             {loading ? 'Saving...' : 'Skip for now'}
@@ -317,11 +352,17 @@ export default function OnboardingPage() {
         )}
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1rem 1.5rem 2rem' }}>
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: isMobile ? '0.5rem 1rem 1.5rem' : '1rem 1.5rem 2rem',
+      }}>
         {children}
       </div>
 
-      <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem', padding: '1.5rem' }}>
+      <p style={{
+        textAlign: 'center', color: '#9CA3AF', fontSize: isMobile ? '0.8rem' : '0.875rem',
+        padding: isMobile ? '1rem 1.25rem' : '1.5rem',
+      }}>
         Join 50,000+ learners building their project management careers
       </p>
     </div>
@@ -333,11 +374,16 @@ export default function OnboardingPage() {
       <Layout>
         <div style={{ width: '100%', maxWidth: '560px' }}>
           <StepIndicator current={1} total={3} />
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2rem' }}>
+            <h1 style={{
+              fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 700, color: '#111827',
+              marginBottom: '0.5rem', lineHeight: 1.3,
+            }}>
               Welcome, {firstName}<br />What brings you to TGPL?
             </h1>
-            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Select all that apply to personalize your learning journey</p>
+            <p style={{ color: '#6B7280', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+              Select all that apply to personalize your learning journey
+            </p>
           </div>
 
           {goals.map((g) => (
@@ -347,6 +393,7 @@ export default function OnboardingPage() {
               label={g.label}
               selected={data.goals.includes(g.id)}
               onClick={() => toggleGoal(g.id)}
+              isMobile={isMobile}
             />
           ))}
 
@@ -355,9 +402,9 @@ export default function OnboardingPage() {
             onClick={() => setStep(2)}
             disabled={data.goals.length === 0 || loading}
             style={{
-              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
+              width: '100%', padding: isMobile ? '0.8rem' : '0.9rem', borderRadius: '12px', border: 'none',
               background: data.goals.length > 0 && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff', fontSize: '1rem', fontWeight: 600,
+              color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600,
               cursor: data.goals.length > 0 && !loading ? 'pointer' : 'not-allowed',
               marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}
@@ -375,14 +422,22 @@ export default function OnboardingPage() {
       <Layout>
         <div style={{ width: '100%', maxWidth: '560px' }}>
           <StepIndicator current={2} total={3} />
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2rem' }}>
+            <h1 style={{
+              fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 700, color: '#111827',
+              marginBottom: '0.5rem', lineHeight: 1.3,
+            }}>
               Which PM level applies to you the most?
             </h1>
-            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Choose your experience level so we meet you at your exact need</p>
+            <p style={{ color: '#6B7280', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+              Choose your experience level so we meet you at your exact need
+            </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gap: isMobile ? '0.75rem' : '1rem', marginBottom: isMobile ? '1.25rem' : '1.5rem',
+          }}>
             {experienceLevels.map((item) => (
               <GridOption
                 key={item.id}
@@ -391,6 +446,7 @@ export default function OnboardingPage() {
                 selected={data.experienceLevel === item.id}
                 onClick={() => setExperienceLevel(item.id)}
                 disabled={!item.available}
+                isMobile={isMobile}
               />
             ))}
           </div>
@@ -400,9 +456,9 @@ export default function OnboardingPage() {
             onClick={() => setStep(3)}
             disabled={!data.experienceLevel || loading}
             style={{
-              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
+              width: '100%', padding: isMobile ? '0.8rem' : '0.9rem', borderRadius: '12px', border: 'none',
               background: data.experienceLevel && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff', fontSize: '1rem', fontWeight: 600,
+              color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600,
               cursor: data.experienceLevel && !loading ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}
@@ -415,7 +471,7 @@ export default function OnboardingPage() {
             disabled={loading}
             style={{
               width: '100%', background: 'none', border: 'none', color: '#6B7280',
-              fontSize: '1rem', marginTop: '0.75rem',
+              fontSize: isMobile ? '0.9rem' : '1rem', marginTop: '0.75rem',
               cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1,
             }}
           >
@@ -433,11 +489,16 @@ export default function OnboardingPage() {
       <Layout>
         <div style={{ width: '100%', maxWidth: '560px' }}>
           <StepIndicator current={3} total={3} />
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', marginBottom: '0.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2rem' }}>
+            <h1 style={{
+              fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 700, color: '#111827',
+              marginBottom: '0.5rem', lineHeight: 1.3,
+            }}>
               Tell us about yourself
             </h1>
-            <p style={{ color: '#6B7280', fontSize: '1rem' }}>Help us tailor your learning experience to your needs</p>
+            <p style={{ color: '#6B7280', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+              Help us tailor your learning experience to your needs
+            </p>
           </div>
 
           <SelectField
@@ -445,12 +506,14 @@ export default function OnboardingPage() {
             value={data.currentStatus}
             onChange={(v) => setData((prev) => ({ ...prev, currentStatus: v }))}
             options={statusOptions}
+            isMobile={isMobile}
           />
           <SelectField
             label="Preferred Learning Hours Per Week"
             value={data.learningHours}
             onChange={(v) => setData((prev) => ({ ...prev, learningHours: v }))}
             options={hoursOptions}
+            isMobile={isMobile}
           />
 
           <button
@@ -458,9 +521,9 @@ export default function OnboardingPage() {
             onClick={completeOnboarding}
             disabled={!isValid || loading}
             style={{
-              width: '100%', padding: '0.9rem', borderRadius: '12px', border: 'none',
+              width: '100%', padding: isMobile ? '0.8rem' : '0.9rem', borderRadius: '12px', border: 'none',
               background: isValid && !loading ? 'var(--primary-500)' : 'rgba(36,146,235,0.45)',
-              color: '#fff', fontSize: '1rem', fontWeight: 600,
+              color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600,
               cursor: isValid && !loading ? 'pointer' : 'not-allowed', marginTop: '0.5rem',
             }}
           >
@@ -472,7 +535,7 @@ export default function OnboardingPage() {
             disabled={loading}
             style={{
               width: '100%', background: 'none', border: 'none', color: '#6B7280',
-              fontSize: '1rem', marginTop: '0.75rem',
+              fontSize: isMobile ? '0.9rem' : '1rem', marginTop: '0.75rem',
               cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', opacity: loading ? 0.5 : 1,
             }}
           >

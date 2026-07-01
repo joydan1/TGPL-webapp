@@ -136,6 +136,15 @@ const SKIP_REFRESH_ROUTES = [
   API_ENDPOINTS.PASSWORD_RESET_CONFIRM,
 ]
 
+// ─── Routes where a 403 is an EXPECTED, recoverable response that the calling
+// page already handles gracefully (e.g. "this lesson isn't the free preview,
+// please enrol", "this course isn't available to you yet") — the global
+// hard-redirect must not hijack these. Covers the whole courses namespace:
+// course detail, lessons, enrollment-status, progress, etc.
+const SKIP_FORBIDDEN_REDIRECT_PATTERNS = [
+  /\/v1\/courses\//,
+]
+
 // ─── API Client ───────────────────────────────────────────────────────────────
 
 class ApiClient {
@@ -171,7 +180,10 @@ class ApiClient {
         }
 
         if (status === 403) {
-          if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
+          if (
+            SKIP_REFRESH_ROUTES.some((route) => url.includes(route)) ||
+            SKIP_FORBIDDEN_REDIRECT_PATTERNS.some((pattern) => pattern.test(url))
+          ) {
             return Promise.reject(error)
           }
           console.error('Access forbidden - insufficient permissions')
@@ -312,26 +324,27 @@ export const authAPI = {
     }
   },
 
- login: async (payload: LoginPayload): Promise<LoginResult> => {
-  try {
-    const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
-      API_ENDPOINTS.LOGIN,
-      payload,
-    )
-    const { access, refresh, user } = response.data
-    useAuthStore.getState().setToken(access)
-    useAuthStore.getState().setRefreshToken(refresh)
-    return { success: true as const, access, refresh, user }
-  } catch (error) {
-    const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
-    return {
-      success: false as const,
-      error: statusCode === 401 ? 'Invalid email or password' : message,
-      statusCode,
-      code,
+  login: async (payload: LoginPayload): Promise<LoginResult> => {
+    try {
+      const response = await apiClient.post<TokenResponse & { user: UserResponse }>(
+        API_ENDPOINTS.LOGIN,
+        payload,
+      )
+      const { access, refresh, user } = response.data
+      useAuthStore.getState().setToken(access)
+      useAuthStore.getState().setRefreshToken(refresh)
+      return { success: true as const, access, refresh, user }
+    } catch (error) {
+      const { message, statusCode, code } = parseApiError(error, 'Invalid email or password')
+      return {
+        success: false as const,
+        error: statusCode === 401 ? 'Invalid email or password' : message,
+        statusCode,
+        code,
+      }
     }
-  }
-},
+  },
+
   getCurrentUser: async () => {
     try {
       const response = await apiClient.get<UserResponse>(API_ENDPOINTS.ME)
@@ -546,7 +559,7 @@ export interface LessonDetailResponse {
   resources: LessonResource[]
   previous_lesson: AdjacentLesson | null
   next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
-  resume_position_seconds: number | null   // ← added
+  resume_position_seconds: number | null
 }
 
 export interface LessonCompleteRawResponse {
@@ -660,7 +673,6 @@ export const coursesAPI = {
     }
   },
 
-  
   savePosition: async (courseSlug: string, lessonId: string, positionSeconds: number) => {
     try {
       const response = await apiClient.put<SavePositionResponse>(
@@ -670,6 +682,263 @@ export const coursesAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to save position')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+
+// ─── Assignment Types ─────────────────────────────────────────────────────────
+
+export type AssignmentStatus = 'not_started' | 'in_progress' | 'graded'
+
+export interface AssignmentScenario {
+  id: string
+  order: number
+  text: string
+}
+
+export interface AssignmentDeliverable {
+  id: string
+  order: number
+  text: string
+}
+
+export interface GradingCriterion {
+  id: string
+  label: string
+  points: number
+}
+
+export interface AssignmentResource {
+  id: string
+  title: string
+  file_type: string
+  file_url: string
+  size_display: string
+  size_tag?: 'SMALL' | 'MEDIUM' | 'LARGE'
+}
+
+// One entry per file the learner must upload for this assignment.
+// This comes straight from the backend's `requirements` array on the
+// assignment-detail response, and its `id` is the `requirement_id`
+// that MUST be sent on every presign/confirm call for a file that
+// satisfies it.
+export interface AssignmentRequirement {
+  id: string
+  label: string
+  allowed_file_types: string
+  max_bytes: number
+  required: boolean
+  order: number
+}
+
+export interface SubmittedFile {
+  id: string
+  filename: string
+  file_url: string
+  uploaded_at: string
+}
+
+export interface AssignmentFeedback {
+  type: 'revision_requested' | 'graded'
+  grader_name: string
+  comment: string
+  date: string
+  score?: number
+}
+
+export interface AssignmentDetail {
+  id: string
+  title: string
+  course_slug: string
+  course_title: string
+  module_title: string
+  due_at: string
+  points: number
+  grade_weight_percent: number
+  status: AssignmentStatus
+  instructions: {
+    intro: string
+    example_image_url: string | null
+    example_image_caption: string | null
+    what_youll_do: string[]
+    scenarios: AssignmentScenario[]
+    deliverables: AssignmentDeliverable[]
+    grading_criteria: GradingCriterion[]
+  }
+  resources: AssignmentResource[]
+  // Per-file requirements — each has the requirement_id needed for upload.
+  requirements: AssignmentRequirement[]
+  submitted_files: SubmittedFile[]
+  feedback: AssignmentFeedback | null
+  submission_requirements: {
+    accepted_file_types: string
+    max_file_size: string
+    word_count: string | null
+    max_files: number
+  }
+}
+
+// Internal shapes — not exported (only used inside assignmentsAPI).
+// These mirror the ACTUAL backend response shapes from the Swagger spec,
+// not the previous (incorrect) guesses.
+
+interface SubmissionFileRecord {
+  id: string
+  requirement_id: string
+  file_name: string
+  file_size: number
+  content_type: string
+  download_url: string
+  created_at: string
+}
+
+interface SubmissionAttemptResponse {
+  id: string
+  assignment_id: string
+  attempt_number: number
+  state: string
+  submitted_at: string | null
+  is_late: boolean
+  files: SubmissionFileRecord[]
+  grade: Record<string, unknown> | null
+  created_at: string
+}
+
+interface PresignResponse {
+  upload_url: string
+  method: string
+  headers: Record<string, string>
+  object_key: string
+  expires_in: number
+}
+
+// ─── Assignments API ──────────────────────────────────────────────────────────
+
+export const assignmentsAPI = {
+  /** GET /v1/assignments/{assignment_id}/ */
+  getAssignment: async (assignmentId: string) => {
+    try {
+      const response = await apiClient.get<AssignmentDetail>(
+        `/v1/assignments/${assignmentId}/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load assignment')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/assignments/{assignment_id}/resources/{resource_id}/download/ */
+  getResourceDownloadUrl: async (assignmentId: string, resourceId: string) => {
+    try {
+      const response = await apiClient.get<{ download_url: string; expires_in: number }>(
+        `/v1/assignments/${assignmentId}/resources/${resourceId}/download/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to get download URL')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /**
+   * Full presigned-upload flow:
+   *   1. POST /assignments/{id}/submissions/                            → submission_id
+   *   2. For each file (matched to a requirement, in order):
+   *      a. POST /assignments/submissions/{sid}/files/presign/          → { upload_url, method, headers, object_key, expires_in }
+   *      b. Upload  →  upload_url, using the `method` and `headers` the backend gave us
+   *      c. POST /assignments/submissions/{sid}/files/confirm/          → records the file server-side
+   *   3. POST /assignments/submissions/{sid}/submit/                    → finalises, returns the submission
+   *      with its authoritative `files` array (id, download_url, etc.) — this is what we
+   *      use to build the SubmittedFile[] we hand back to the UI.
+   *
+   * `requirements` should be `assignment.requirements` sorted by `order`. Files are
+   * auto-mapped to requirements in the order they were added (files[0] → requirements[0], etc).
+   */
+  submitAssignment: async (
+    assignmentId: string,
+    files: File[],
+    requirements: AssignmentRequirement[],
+  ): Promise<
+    | { success: true; data: { submitted_files: SubmittedFile[] } }
+    | { success: false; error: string; statusCode?: number }
+  > => {
+    try {
+      if (files.length > requirements.length) {
+        return {
+          success: false as const,
+          error: `Too many files — this assignment only accepts ${requirements.length} file(s).`,
+        }
+      }
+
+      // Step 1 — create / resume submission attempt
+      const attemptRes = await apiClient.post<SubmissionAttemptResponse>(
+        `/v1/assignments/${assignmentId}/submissions/`,
+      )
+      const submissionId = attemptRes.data.id
+
+      // Step 2 — presign → upload → confirm per file, auto-mapped to requirements in order
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const requirementId = requirements[i].id
+
+        // 2a. presign
+        const presignRes = await apiClient.post<PresignResponse>(
+          `/v1/assignments/submissions/${submissionId}/files/presign/`,
+          {
+            requirement_id: requirementId,
+            filename: file.name,
+            content_type: file.type || 'application/octet-stream',
+            file_size: file.size,
+          },
+        )
+        const { upload_url, method, headers, object_key } = presignRes.data
+
+        // 2b. upload directly to storage, using the method/headers the backend returned
+        const uploadRes = await fetch(upload_url, {
+          method: method || 'PUT',
+          body: file,
+          headers:
+            headers && Object.keys(headers).length > 0
+              ? headers
+              : { 'Content-Type': file.type || 'application/octet-stream' },
+        })
+        if (!uploadRes.ok) {
+          throw new Error(`Upload failed for "${file.name}" (HTTP ${uploadRes.status})`)
+        }
+
+        // 2c. confirm
+        await apiClient.post(
+          `/v1/assignments/submissions/${submissionId}/files/confirm/`,
+          {
+            requirement_id: requirementId,
+            object_key,
+            file_name: file.name,
+            file_size: file.size,
+            content_type: file.type || 'application/octet-stream',
+          },
+        )
+      }
+
+      // Step 3 — finalise and read back the authoritative file records
+      const submitRes = await apiClient.post<SubmissionAttemptResponse>(
+        `/v1/assignments/submissions/${submissionId}/submit/`,
+      )
+
+      const submittedFiles: SubmittedFile[] = submitRes.data.files.map((f) => ({
+        id: f.id,
+        filename: f.file_name,
+        file_url: f.download_url,
+        uploaded_at: f.created_at,
+      }))
+
+      return { success: true as const, data: { submitted_files: submittedFiles } }
+    } catch (error) {
+      if (error instanceof Error && !(error as { response?: unknown }).response) {
+        return { success: false as const, error: error.message }
+      }
+      const { message, statusCode } = parseApiError(error, 'Submission failed')
       return { success: false as const, error: message, statusCode }
     }
   },

@@ -12,7 +12,9 @@ interface CourseListItem {
   level: 'beginner' | 'intermediate' | 'advanced' | 'expert'
   price_kobo: number
   price_naira: string
+  is_free: boolean
   trainer_name: string
+  thumbnail_url: string | null
 }
 
 interface PaginatedCourses {
@@ -33,6 +35,38 @@ async function fetchCatalogue(search: string): Promise<CourseListItem[]> {
   if (search.trim()) params.set('search', search.trim())
   const response = await apiClient.get<PaginatedCourses>(`/v1/courses/?${params}`)
   return response.data.results
+}
+
+// ─── Thumbnail ────────────────────────────────────────────────────────────────
+// Renders the real course thumbnail when available, falling back to the
+// gradient placeholder if the URL is missing or fails to load.
+function CourseThumb({ course, video }: { course: CourseListItem; video: boolean }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showImage = Boolean(course.thumbnail_url) && !imgFailed
+
+  return (
+    <div className="course-thumb">
+      {showImage ? (
+        <img
+          src={course.thumbnail_url!}
+          alt={course.title}
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <div className="course-thumb-placeholder" />
+      )}
+      {video && (
+        <div className="play-overlay">
+          <div className="play-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -147,18 +181,7 @@ export default function CourseCatalogPage() {
 
                 return (
                   <Link key={course.id} className="course-card" to={to}>
-                    <div className="course-thumb">
-                      <div className="course-thumb-placeholder" />
-                      {video && (
-                        <div className="play-overlay">
-                          <div className="play-btn">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <polygon points="5,3 19,12 5,21" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <CourseThumb course={course} video={video} />
                     <div className="course-body">
                       <p className="course-tag">{course.category}</p>
                       <p className="course-title">{course.title}</p>

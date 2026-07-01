@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BookOpen, ChevronRight,
@@ -40,6 +40,22 @@ interface CertificationProgress {
   requirements: CertRequirement[]
 }
 
+// Matches GET /v1/live/sessions/ — "LIVE + UPCOMING for the caller's
+// enrolled courses". This is a real, working endpoint (unlike the
+// dashboard's own `live_sessions` field, which is still scaffolded as []
+// until M2 ships), so we fetch it separately.
+interface LiveSessionSummary {
+  id: string
+  course_id: string
+  title: string
+  topic: string
+  starts_at: string
+  ends_at: string
+  status: string // documented example is "upcoming"; "live" is implied by the endpoint description
+  join_url: string
+  trainer_name: string
+}
+
 interface DashboardResponse {
   user: {
     id: string
@@ -79,6 +95,13 @@ function SmallRing({ pct }: { pct: number }) {
       <Ring pct={pct} size={44} stroke={4} />
     </div>
   )
+}
+
+function fmtSessionTime(iso: string): string {
+  const d = new Date(iso)
+  const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  const timePart = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return `${datePart} · ${timePart} WAT`
 }
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
@@ -225,23 +248,22 @@ const PAGE_CSS = `
   }
 `
 
-const ASSIGNMENTS = [
-  { id: 1, active: true,  title: 'Stakeholder Map Draft', course: 'Project Management', note: 'Due before the end of program' },
-  { id: 2, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
-  { id: 3, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
-  { id: 4, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
-  { id: 5, active: false, title: 'Data Viz Quiz',          course: 'Data Storytelling' },
-]
-
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
   const [activeNav, setActiveNav] = useState('home')
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
+  // `assignments` is scaffolded by the backend (always []) until M2 ships.
+  // We still read it into state so the UI is ready the moment real items
+  const [assignmentsActive, setAssignmentsActive] = useState<unknown[]>([])
+  const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<unknown[]>([])
+  const [liveSessions, setLiveSessions] = useState<LiveSessionSummary[]>([])
+  const [liveSessionsLoaded, setLiveSessionsLoaded] = useState(false)
+  const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+
 
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
@@ -255,6 +277,8 @@ export default function DashboardPage() {
         const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
         setCertProgress(response.data.certification_progress || [])
         setEnrolledCourses(response.data.enrolled_courses || [])
+        setAssignmentsActive(response.data.assignments?.active || [])
+        setAssignmentsUpcoming(response.data.assignments?.upcoming || [])
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
         setError('Failed to load courses')
@@ -263,6 +287,20 @@ export default function DashboardPage() {
       }
     }
     if (user) fetchDashboardData()
+  }, [user])
+
+  useEffect(() => {
+    const fetchLiveSessions = async () => {
+      try {
+        const response = await apiClient.get<LiveSessionSummary[]>('/v1/live/sessions/')
+        setLiveSessions(response.data || [])
+      } catch (err) {
+        console.error('Failed to fetch live sessions:', err)
+      } finally {
+        setLiveSessionsLoaded(true)
+      }
+    }
+    if (user) fetchLiveSessions()
   }, [user])
 
   if (!user) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Loading…</p></div>
@@ -274,6 +312,28 @@ export default function DashboardPage() {
   const hasCourses                  = enrolledCourses.length > 0
   const showEmptyState              = !loading && !error && !hasCourses
   const showCourseDependentSections = !loading && !error && hasCourses
+
+  // Always true today (M2 hasn't shipped), but written so this naturally
+  // starts working once the backend fills in real assignment items.
+  const hasAssignments = assignmentsActive.length > 0 || assignmentsUpcoming.length > 0
+
+  const liveNowSessions = liveSessions
+    .filter((s) => s.status === 'live')
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const upcomingSessions = liveSessions
+    .filter((s) => s.status !== 'live')
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const nextLiveSession     = liveNowSessions[0] ?? null
+  const nextUpcomingSession = upcomingSessions[0] ?? null
+  const hasLiveOrUpcoming   = liveNowSessions.length > 0 || upcomingSessions.length > 0
+
+  function toggleReminder(sessionId: string) {
+    setRemindedIds((prev) => {
+      const next = new Set(prev)
+      next.has(sessionId) ? next.delete(sessionId) : next.add(sessionId)
+      return next
+    })
+  }
 
   const resumeCourse = hasCourses
     ? [...enrolledCourses].sort((a, b) => {
@@ -289,10 +349,6 @@ export default function DashboardPage() {
   function goToCourse(slug: string) {
     if (!slug) return
     navigate(RouteBuilder.course(slug))
-  }
-
-  function goToAssignment(assignmentId: number | string) {
-    navigate(RouteBuilder.assignmentDetail(assignmentId))
   }
 
   return (
@@ -353,12 +409,12 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Assignments */}
+          {/* Assignments — real data only; backend scaffolds this as [] until M2 ships */}
           <div>
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
             </div>
-            {showEmptyState && (
+            {!loading && !error && !hasAssignments && (
               <div className="empty-inline">
                 <div className="empty-inline-icon" style={{ background: '#EFF6FF' }}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.8">
@@ -371,32 +427,14 @@ export default function DashboardPage() {
                 <div className="empty-inline-sub">Assignments will appear here once you start progressing through your course.</div>
               </div>
             )}
-            {showCourseDependentSections && (
-              <div className="assignments-wrap">
-                <div className="assignments-scroll" ref={scrollRef}>
-                  {ASSIGNMENTS.map((a) => (
-                    <div key={a.id} className={`asgn-card${a.active ? ' active' : ''}`}
-                      role="button" tabIndex={a.active ? 0 : -1}
-                      onClick={() => a.active && goToAssignment(a.id)}
-                      onKeyDown={(e) => { if (a.active && (e.key === 'Enter' || e.key === ' ')) goToAssignment(a.id) }}>
-                      <div className={`asgn-badge ${a.active ? 'active' : 'upcoming'}`}>
-                        {a.active ? '● Active' : '○ Upcoming'}
-                      </div>
-                      <div className="asgn-title">{a.title}</div>
-                      <div className="asgn-course">{a.course}</div>
-                      {a.active && a.note && <div className="asgn-due-note"><Clock size={12} />{a.note}</div>}
-                    </div>
-                  ))}
-                </div>
-                <button className="asgn-next-btn" onClick={() => { if (scrollRef.current) scrollRef.current.scrollLeft += 220 }}>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            )}
+            {/* TODO: once the backend documents real fields for assignments.active/upcoming
+                (M2), render actual cards here using assignmentsActive/assignmentsUpcoming
+                and RouteBuilder.assignmentDetail(<real uuid>). Do not reintroduce mock/
+                hardcoded ids — the assignment-detail API requires a real UUID. */}
           </div>
 
-          {/* Sessions */}
-          {showEmptyState && (
+          {/* Sessions — real data from GET /v1/live/sessions/ */}
+          {liveSessionsLoaded && !hasLiveOrUpcoming && (
             <div>
               <div className="section-header"><span className="section-title">Live Sessions</span></div>
               <div className="empty-inline">
@@ -411,36 +449,55 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {showCourseDependentSections && (
+          {liveSessionsLoaded && hasLiveOrUpcoming && (
             <div className="sessions-row">
               <div>
                 <div className="section-header">
                   <span className="section-title">Live Session</span>
-                  <button className="see-all">See all <ChevronRight size={14} /></button>
                 </div>
-                <div className="session-card">
-                  <div>
-                    <div className="live-badge"><div className="live-dot" /> Live</div>
-                    <div className="session-title">Q&A: Stakeholder Communication in Practice</div>
-                    <div className="session-sub">Amara Osei</div>
-                    <div className="session-time"><Clock size={12} /> Live now</div>
+                {nextLiveSession ? (
+                  <div className="session-card">
+                    <div>
+                      <div className="live-badge"><div className="live-dot" /> Live</div>
+                      <div className="session-title">{nextLiveSession.title}</div>
+                      <div className="session-sub">{nextLiveSession.trainer_name}</div>
+                      <div className="session-time"><Clock size={12} /> Live now</div>
+                    </div>
+                    <button
+                      className="join-btn"
+                      disabled={!nextLiveSession.join_url}
+                      style={{ opacity: nextLiveSession.join_url ? 1 : 0.5, cursor: nextLiveSession.join_url ? 'pointer' : 'default' }}
+                      onClick={() => nextLiveSession.join_url && window.open(nextLiveSession.join_url, '_blank')}
+                    >
+                      Join
+                    </button>
                   </div>
-                  <button className="join-btn">Join</button>
-                </div>
+                ) : (
+                  <div className="empty-inline" style={{ padding: '1.75rem 1rem' }}>
+                    <div className="empty-inline-sub">No session live right now.</div>
+                  </div>
+                )}
               </div>
               <div>
                 <div className="section-header">
                   <span className="section-title">Upcoming Session</span>
-                  <button className="see-all">See all <ChevronRight size={14} /></button>
                 </div>
-                <div className="session-card">
-                  <div>
-                    <div className="session-title">Masterclass: Building Your Lead…</div>
-                    <div className="session-sub">Kofi Mensah</div>
-                    <div className="session-time"><Calendar size={12} /> Wed, 4 Jun · 3:00 PM WAT</div>
+                {nextUpcomingSession ? (
+                  <div className="session-card">
+                    <div>
+                      <div className="session-title">{nextUpcomingSession.title}</div>
+                      <div className="session-sub">{nextUpcomingSession.trainer_name}</div>
+                      <div className="session-time"><Calendar size={12} /> {fmtSessionTime(nextUpcomingSession.starts_at)}</div>
+                    </div>
+                    <button className="remind-btn" onClick={() => toggleReminder(nextUpcomingSession.id)}>
+                      {remindedIds.has(nextUpcomingSession.id) ? 'Reminder set' : 'Remind me'}
+                    </button>
                   </div>
-                  <button className="remind-btn">Remind me</button>
-                </div>
+                ) : (
+                  <div className="empty-inline" style={{ padding: '1.75rem 1rem' }}>
+                    <div className="empty-inline-sub">Nothing scheduled yet.</div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -97,7 +97,7 @@ const Input: React.FC<InputProps> = ({
             fontSize: '0.875rem',
             marginTop: '0.25rem',
             marginBottom: 0,
-            color: 'var(--grey)',
+            color: '#6B7280',
           }}
         >
           {hint}
