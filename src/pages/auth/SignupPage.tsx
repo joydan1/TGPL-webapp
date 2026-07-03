@@ -144,11 +144,6 @@ export default function SignupPage() {
     clearError()
     setFormErrors({})
 
-    if (role === 'trainer') {
-      setFormErrors({ submit: 'Trainer signup is not available through this form. Please contact us.' })
-      return
-    }
-
     if (!validateForm()) return
 
     const result = await signup({
@@ -156,6 +151,7 @@ export default function SignupPage() {
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
+      role,
     })
 
     if (result.success) setEmailSent(true)
@@ -353,14 +349,6 @@ export default function SignupPage() {
               ))}
             </div>
 
-            {role === 'trainer' && (
-              <div style={{ marginBottom: '1rem' }}>
-                <Alert type="info" title="Trainer accounts">
-                  Trainer signup isn't available here. Please contact us to get started.
-                </Alert>
-              </div>
-            )}
-
             <form className="signup-form" onSubmit={handleSubmit}>
               <div className="name-row">
                 <Input label="First name" name="firstName" type="text" placeholder="Enter your first name" value={formData.firstName} onChange={handleInputChange} error={formErrors.firstName} />
@@ -417,7 +405,7 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                disabled={!isFormFilled || isLoading || role === 'trainer'}
+                disabled={!isFormFilled || isLoading}
                 className="submit-button"
                 icon={isLoading ? <Spinner /> : undefined}
                 iconPosition="left"

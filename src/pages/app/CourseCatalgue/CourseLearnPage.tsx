@@ -156,10 +156,13 @@ const PAGE_CSS = `
   .resource-meta-light { font-size: 0.8125rem; color: #9CA3AF; font-weight: 400; text-transform: none; }
   .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
   .resource-download:hover { background: #DBEAFE; }
+  .resource-download:disabled { opacity: 0.55; cursor: not-allowed; }
   .resources-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
   .resources-footer-text { font-size: 0.9375rem; color: #111; font-weight: 600; }
   .download-all-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .download-all-btn:hover { opacity: 0.9; }
+  .download-all-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .error-banner { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
   .resources-empty { padding: 2.5rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9375rem; }
 
   .discussion-locked { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem 1rem; color: #9CA3AF; text-align: center; }
@@ -293,6 +296,8 @@ export default function CourseLearnPage() {
   const notesLoadedRef                        = useRef(false)
 
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set())
+  const [resourceError, setResourceError]       = useState<string | null>(null)
+  const [downloadingResourceIds, setDownloadingResourceIds] = useState<Set<string>>(new Set())
   const [askHelpOpen, setAskHelpOpen]         = useState(false)
   const [marking, setMarking]                 = useState(false)
   const [completeInfo, setCompleteInfo]       = useState<CompleteInfo | null>(null)
@@ -393,7 +398,10 @@ export default function CourseLearnPage() {
       setSavingNotes(true)
       const res = await coursesAPI.saveLessonNotes(slug, lessonId, notes)
       setSavingNotes(false)
-      if (res.success) { setJustSaved(true); setTimeout(() => setJustSaved(false), 2000) }
+      if (res.success) {
+        setJustSaved(true)
+        setTimeout(() => setJustSaved(false), 2000)
+      }
     }, 800)
     return () => { if (notesTimer.current) clearTimeout(notesTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -507,11 +515,26 @@ export default function CourseLearnPage() {
 
   async function downloadResource(r: LessonResource) {
     if (!slug || !lessonId) return
+    setResourceError(null)
+    setDownloadingResourceIds((prev) => new Set(prev).add(r.id))
+
     const res = await coursesAPI.getResourceDownloadUrl(slug, lessonId, r.id)
-    if (res.success) window.open(res.data.download_url, '_blank')
+    setDownloadingResourceIds((prev) => {
+      const next = new Set(prev)
+      next.delete(r.id)
+      return next
+    })
+
+    if (res.success) {
+      window.open(res.data.download_url, '_blank')
+      return
+    }
+
+    setResourceError(res.error || 'Failed to get resource download link.')
   }
 
   async function downloadAll(resources: LessonResource[]) {
+    setResourceError(null)
     await Promise.all(resources.map((r) => downloadResource(r)))
   }
 
@@ -529,6 +552,7 @@ export default function CourseLearnPage() {
   const hasVideo   = Boolean(lesson?.video_url)
   const prevLesson = lesson?.previous_lesson ?? null
   const nextLesson = lesson?.next_lesson ?? null
+  const isDownloadingResource = downloadingResourceIds.size > 0
 
   return (
     <>
@@ -757,6 +781,7 @@ export default function CourseLearnPage() {
                         <div className="resources-empty">No resources attached to this lesson yet.</div>
                       ) : (
                         <>
+                          {resourceError && <div className="error-banner">{resourceError}</div>}
                           <label className="resources-select-all">
                             <input
                               type="checkbox"
@@ -768,6 +793,7 @@ export default function CourseLearnPage() {
                           <div className="resources-grid">
                             {lesson.resources.map((r) => {
                               const fileType = getFileTypeLabel(r)
+                              const downloading = downloadingResourceIds.has(r.id)
                               return (
                                 <div className="resource-card" key={r.id}>
                                   <input type="checkbox" checked={selectedResources.has(r.id)} onChange={() => toggleResource(r.id)} />
@@ -784,8 +810,12 @@ export default function CourseLearnPage() {
                                       <div className="resource-meta-light" style={{ marginTop: 2 }}>{formatBytes(r.file_size)}</div>
                                     )}
                                   </div>
-                                  <button className="resource-download" onClick={() => downloadResource(r)}>
-                                    <Download size={16} />
+                                  <button
+                                    className="resource-download"
+                                    onClick={() => downloadResource(r)}
+                                    disabled={downloading}
+                                  >
+                                    {downloading ? 'Waiting…' : <Download size={16} />}
                                   </button>
                                 </div>
                               )
@@ -793,8 +823,8 @@ export default function CourseLearnPage() {
                           </div>
                           <div className="resources-footer">
                             <div className="resources-footer-text">{lesson.resources.length} file{lesson.resources.length !== 1 ? 's' : ''}</div>
-                            <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)}>
-                              <Download size={16} />Download all
+                            <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)} disabled={isDownloadingResource}>
+                              <Download size={16} />{isDownloadingResource ? 'Downloading…' : 'Download all'}
                             </button>
                           </div>
                         </>

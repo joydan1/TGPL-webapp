@@ -1,20 +1,32 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Home, BookOpen, Radio, Settings,
+  Home, GraduationCap, BookOpen, Radio, Settings,
   Search, Bell, ChevronDown,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon,
+  LogOut, User as UserIcon, Shield, CreditCard, HelpCircle,
 } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
 import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 
 export const NAV_ITEMS = [
-  { key: 'home',     label: 'Home',         Icon: Home     },
-  { key: 'courses',  label: 'Courses',      Icon: BookOpen },
-  { key: 'live',     label: 'Live Classes', Icon: Radio    },
-  { key: 'settings', label: 'Settings',     Icon: Settings },
+  { key: 'home',      label: 'Home',         Icon: Home          },
+  { key: 'myCourse',  label: 'My Course',    Icon: GraduationCap },
+  { key: 'courses',   label: 'Courses',      Icon: BookOpen      },
+  { key: 'live',      label: 'Live Classes', Icon: Radio         },
+  { key: 'settings',  label: 'Settings',     Icon: Settings      },
+]
+
+// Sub-items shown when the Settings row is expanded. `route` is used for
+// navigation; `danger` is a red destructive-style row (Log out).
+export const SETTINGS_SUBITEMS = [
+  { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
+  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS }, // TODO: no dedicated /security route yet
+  { key: 'notifications', label: 'Notifications',   Icon: Bell,        route: ROUTES.NOTIFICATIONS },
+  { key: 'billing',       label: 'Billing',         Icon: CreditCard,  route: ROUTES.SETTINGS }, // TODO: no dedicated /billing route yet
+  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle,  route: ROUTES.SETTINGS }, // TODO: no dedicated /help route yet
+  { key: 'logout',        label: 'Log out',         Icon: LogOut,      route: null, danger: true },
 ]
 
 export const SHELL_CSS = `
@@ -56,13 +68,25 @@ export const SHELL_CSS = `
   .sidebar-top { display: flex; justify-content: flex-end; padding: 0.75rem 0.75rem 0.25rem; }
   .collapse-btn { width: 32px; height: 32px; border-radius: 0.5rem; background: #fff; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; box-shadow: 0 1px 3px rgba(0,0,0,0.07); transition: background 0.15s; flex-shrink: 0; }
   .collapse-btn:hover { background: #F3F4F6; }
-  .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden; }
+  .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; }
   .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
   .nav-item:hover { background: #F9FAFB; color: #111; }
   .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
   .nav-item .nav-label { flex: 1; }
+  .nav-item .nav-chevron { transition: transform 0.18s ease; flex-shrink: 0; }
+  .nav-item .nav-chevron.open { transform: rotate(180deg); }
   .sidebar.collapsed .nav-label { display: none; }
+  .sidebar.collapsed .nav-chevron { display: none; }
   .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
+
+  /* ── Settings accordion sub-items ── */
+  .nav-subitems { display: flex; flex-direction: column; gap: 2px; background: #F9FAFB; border-radius: 0.6rem; padding: 0.25rem; margin: 2px 0 0.25rem; overflow: hidden; }
+  .sidebar.collapsed .nav-subitems { display: none; }
+  .nav-subitem { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem 0.625rem 1.875rem; border-radius: 0.5rem; cursor: pointer; color: #4B5563; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; background: none; border: none; width: 100%; text-align: left; transition: background 0.15s; }
+  .nav-subitem:hover { background: #F1F3F5; color: #111; }
+  .nav-subitem.danger { color: #EF4444; }
+  .nav-subitem.danger:hover { background: #FEF2F2; }
+
   .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
   .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
   .user-text { overflow: hidden; }
@@ -100,16 +124,34 @@ export default function AppShell({ children, activeNav = 'home', onNavChange }: 
   const [collapsed,    setCollapsed]    = useState(false)
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [notifOpen,    setNotifOpen]    = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
 
   function handleNav(key: string) {
+    if (key === 'settings') {
+      setSettingsOpen((o) => !o)
+      onNavChange?.(key)
+      return
+    }
     onNavChange?.(key)
     if (key === 'home')     navigate(ROUTES.DASHBOARD)
+    // "My Course" has no dedicated route yet — sends to the course catalog
+    // for now. TODO: point this at the learner's active/most-recent course
+    // once there's a resolved route for it (e.g. RouteBuilder.course(slug)).
+    if (key === 'myCourse') navigate(ROUTES.COURSES)
     if (key === 'courses')  navigate(ROUTES.COURSES)
-    if (key === 'settings') navigate(ROUTES.SETTINGS)
+    if (key === 'live')     navigate(ROUTES.LIVE_SESSIONS)
+  }
+
+  function handleSubitemClick(sub: typeof SETTINGS_SUBITEMS[number]) {
+    if (sub.key === 'logout') {
+      handleLogout()
+      return
+    }
+    if (sub.route) navigate(sub.route)
   }
 
   async function handleLogout() {
@@ -209,13 +251,31 @@ export default function AppShell({ children, activeNav = 'home', onNavChange }: 
             </div>
             <nav className="sidebar-nav">
               {NAV_ITEMS.map(({ key, label, Icon }) => (
-                <div
-                  key={key}
-                  className={`nav-item${activeNav === key ? ' active' : ''}`}
-                  onClick={() => handleNav(key)}
-                >
-                  <Icon size={18} />
-                  <span className="nav-label">{label}</span>
+                <div key={key}>
+                  <div
+                    className={`nav-item${activeNav === key ? ' active' : ''}`}
+                    onClick={() => handleNav(key)}
+                  >
+                    <Icon size={18} />
+                    <span className="nav-label">{label}</span>
+                    {key === 'settings' && (
+                      <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
+                    )}
+                  </div>
+                  {key === 'settings' && settingsOpen && (
+                    <div className="nav-subitems">
+                      {SETTINGS_SUBITEMS.map((sub) => (
+                        <button
+                          key={sub.key}
+                          className={`nav-subitem${sub.danger ? ' danger' : ''}`}
+                          onClick={() => handleSubitemClick(sub)}
+                        >
+                          <sub.Icon size={15} />
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </nav>
@@ -241,10 +301,10 @@ export default function AppShell({ children, activeNav = 'home', onNavChange }: 
               <button
                 key={key}
                 className={`tab-item${activeNav === key ? ' active' : ''}`}
-                onClick={() => handleNav(key)}
+                onClick={() => key === 'settings' ? navigate(ROUTES.SETTINGS) : handleNav(key)}
               >
                 <Icon size={20} />
-                <span>{label === 'Live Classes' ? 'Live' : label}</span>
+                <span>{label === 'Live Classes' ? 'Live' : label === 'My Course' ? 'Course' : label}</span>
               </button>
             ))}
           </div>

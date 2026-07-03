@@ -26,8 +26,8 @@ interface PaginatedCourses {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isIntroVideo(course: CourseListItem) {
-  return course.title.toLowerCase().startsWith('introductory')
+function shouldUsePreviewRoute(course: CourseListItem) {
+  return course.is_free || course.title.toLowerCase().startsWith('introductory')
 }
 
 async function fetchCatalogue(search: string): Promise<CourseListItem[]> {
@@ -174,14 +174,14 @@ export default function CourseCatalogPage() {
           {!loading && !error && courses.length > 0 && (
             <div className="catalog-grid">
               {courses.map((course) => {
-                const video = isIntroVideo(course)
-                const to = video
+                const freePreview = shouldUsePreviewRoute(course)
+                const to = freePreview
                   ? `/courses/${course.slug}/preview`
                   : RouteBuilder.course(course.slug)
 
                 return (
                   <Link key={course.id} className="course-card" to={to}>
-                    <CourseThumb course={course} video={video} />
+                    <CourseThumb course={course} video={freePreview} />
                     <div className="course-body">
                       <p className="course-tag">{course.category}</p>
                       <p className="course-title">{course.title}</p>

@@ -42,6 +42,9 @@ interface CourseDetail {
   level: 'beginner' | 'intermediate' | 'advanced' | 'expert'
   price_kobo: number
   price_naira: string
+  // Drives the enroll-vs-checkout branch below. Present on the list endpoint
+  // (CourseListItem) already — this was just missing from the detail type.
+  is_free: boolean
   description: string
   duration_weeks: number
   expected_outcomes: string[]
@@ -191,6 +194,8 @@ const PUBLIC_CSS = `
   .enroll-sub { font-size: 0.72rem; color: #9CA3AF; }
   .enroll-btn { padding: 0.75rem 1.75rem; border-radius: 0.625rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .enroll-btn:hover { opacity: 0.88; }
+  .enroll-btn:disabled { opacity: 0.6; cursor: default; }
+  .enroll-error { font-size: 0.8125rem; color: #EF4444; margin-top: 0.375rem; }
   .footer { font-size: 0.85rem; color: #ABABAB; text-align: center; }
 
   @media (max-width: 768px) {
@@ -427,12 +432,20 @@ export default function CourseDetailPage() {
     return <EnrolledCourseOverview course={course} progress={progress} />
   }
 
-  return <PublicCourseOverview course={course} />
+  return <PublicCourseOverview course={course} isAuthenticated={isAuthenticated} />
 }
 
 // ─── Public sales page ────────────────────────────────────────────────────────
-function PublicCourseOverview({ course }: { course: CourseDetail }) {
+function PublicCourseOverview({
+  course,
+  isAuthenticated,
+}: {
+  course: CourseDetail
+  isAuthenticated: boolean
+}) {
   const navigate = useNavigate()
+  const [enrolling, setEnrolling] = useState(false)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
 
   const stats = [
     { icon: Clock,     value: course.total_duration_display || `${course.duration_weeks}w`, label: 'Duration' },
@@ -451,6 +464,42 @@ function PublicCourseOverview({ course }: { course: CourseDetail }) {
         trainerName: course.trainer?.name,
       },
     })
+  }
+
+  // Free courses self-enrol via POST /enroll/ 
+  // Paid courses still go through the existing checkout flow. If the
+  // backend disagrees that the course is free (402), we fall back to
+  // checkout rather than leaving the learner stuck.
+  const handleEnroll = async () => {
+    if (!isAuthenticated) {
+      navigate(ROUTES.LOGIN, { state: { redirectTo: `/courses/${course.slug}` } })
+      return
+    }
+
+    if (!course.is_free) {
+      goToCheckout()
+      return
+    }
+
+    setEnrollError(null)
+    setEnrolling(true)
+    const res = await coursesAPI.enrollFree(course.slug)
+    setEnrolling(false)
+
+    if (res.success) {
+      // Enrolled — CourseDetailPage will re-fetch enrollment status and
+      // render EnrolledCourseOverview on next mount/navigation.
+      navigate(RouteBuilder.course(course.slug), { replace: true })
+      window.location.reload()
+      return
+    }
+
+    if (res.statusCode === 402) {
+      goToCheckout()
+      return
+    }
+
+    setEnrollError(res.error)
   }
 
   return (
@@ -535,13 +584,18 @@ function PublicCourseOverview({ course }: { course: CourseDetail }) {
               )}
             </div>
 
-            <div className="enroll-bar">
-              <div>
-                <p className="enroll-label">Course price</p>
-                <p className="enroll-price">{formatNaira(course.price_naira)}</p>
-                <p className="enroll-sub">{course.enrolled_count.toLocaleString()} learners enrolled</p>
+            <div className="enroll-bar" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                <div>
+                  <p className="enroll-label">{course.is_free ? 'Course access' : 'Course price'}</p>
+                  <p className="enroll-price">{course.is_free ? 'Free' : formatNaira(course.price_naira)}</p>
+                  <p className="enroll-sub">{course.enrolled_count.toLocaleString()} learners enrolled</p>
+                </div>
+                <button className="enroll-btn" onClick={handleEnroll} disabled={enrolling}>
+                  {enrolling ? 'Enrolling…' : course.is_free ? 'Enrol for free' : 'Pay to Enroll'}
+                </button>
               </div>
-              <button className="enroll-btn" onClick={goToCheckout}>Pay to Enroll</button>
+              {enrollError && <p className="enroll-error">{enrollError}</p>}
             </div>
           </div>
         </div>

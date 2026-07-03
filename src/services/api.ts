@@ -40,12 +40,12 @@ export interface TokenResponse {
 }
 
 // ─── Payload Types ────────────────────────────────────────────────────────────
-
 export interface SignupPayload {
   email: string
   password: string
   firstName: string
   lastName: string
+  role: 'learner' | 'trainer'
 }
 
 export interface LoginPayload {
@@ -283,20 +283,21 @@ function parseApiError(error: unknown, fallback: string): { message: string; sta
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const authAPI = {
-  signup: async (payload: SignupPayload) => {
-    try {
-      const response = await apiClient.post<UserResponse>(API_ENDPOINTS.SIGNUP, {
-        email: payload.email,
-        password: payload.password,
-        first_name: payload.firstName,
-        last_name: payload.lastName,
-      })
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message } = parseApiError(error, 'Signup failed')
-      return { success: false as const, error: message }
-    }
-  },
+ signup: async (payload: SignupPayload) => {
+  try {
+    const response = await apiClient.post<UserResponse>(API_ENDPOINTS.SIGNUP, {
+      email: payload.email,
+      password: payload.password,
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      role: payload.role,
+    })
+    return { success: true as const, data: response.data }
+  } catch (error) {
+    const { message } = parseApiError(error, 'Signup failed')
+    return { success: false as const, error: message }
+  }
+},
 
   sendVerificationEmail: async (payload: EmailVerificationSendPayload) => {
     try {
@@ -596,6 +597,18 @@ export const coursesAPI = {
     }
   },
 
+  enrollFree: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.post<{ enrolled: boolean }>(
+        `/v1/courses/${courseSlug}/enroll/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to enroll in free course')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
   getCourseProgress: async (courseSlug: string) => {
     try {
       const response = await apiClient.get<CourseProgressResponse>(
@@ -650,8 +663,8 @@ export const coursesAPI = {
 
   saveLessonNotes: async (courseSlug: string, lessonId: string, notes: string) => {
     try {
-      const response = await apiClient.patch<{ notes: string }>(
-        `/v1/courses/${courseSlug}/lessons/${lessonId}/notes/`,
+      const response = await apiClient.patch<LessonDetailResponse>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/`,
         { notes },
       )
       return { success: true as const, data: response.data }

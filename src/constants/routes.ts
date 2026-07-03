@@ -36,7 +36,8 @@ export const ROUTES = {
   ASSIGNMENT_SUBMIT: '/assignments/:id/submit',
   ASSIGNMENT_FEEDBACK: '/assignments/:id/feedback',
   LIVE_SESSIONS: '/live-sessions',
-  LIVE_SESSION_JOIN: '/live-sessions/:id/join',
+LIVE_SESSION_DETAIL: '/live-sessions/:id',
+LIVE_SESSION_JOIN: '/live-sessions/:id/join',
   TUTOR_BOOKING: '/tutor-booking',
   TUTOR_AVAILABILITY: '/tutors/:tutorId/availability',
   PROFILE: '/profile',
@@ -284,8 +285,10 @@ courseAssignments: (slug: string) =>
   assignmentFeedback: (id: string | number) =>
     getRoute(ROUTES.ASSIGNMENT_FEEDBACK, { id }),
   liveSessions: () => ROUTES.LIVE_SESSIONS,
-  liveSessionJoin: (id: string | number) =>
-    getRoute(ROUTES.LIVE_SESSION_JOIN, { id }),
+liveSessionDetail: (id: string | number) =>
+  getRoute(ROUTES.LIVE_SESSION_DETAIL, { id }),
+liveSessionJoin: (id: string | number) =>
+  getRoute(ROUTES.LIVE_SESSION_JOIN, { id }),
   tutorBooking: () => ROUTES.TUTOR_BOOKING,
   tutorAvailability: (tutorId: string | number) =>
     getRoute(ROUTES.TUTOR_AVAILABILITY, { tutorId }),

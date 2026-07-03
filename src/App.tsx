@@ -27,6 +27,9 @@ import AssignmentDetailPage from './pages/app/CourseCatalgue/AssignmentDetailPag
 import NotFoundPage from './pages/NotFoundPage'
 import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
 import NotificationsPage from './pages/NotificationsPage'
+import LiveSessionsPage from './pages/app/LiveSessionsPage'
+import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
+import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -118,6 +121,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path={ROUTES.TRAINER_DASHBOARD}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerDashboardPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route
           path={ROUTES.COURSES}
@@ -159,7 +170,22 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+<Route
+  path={ROUTES.LIVE_SESSIONS}
+  element={
+    <ProtectedRoute requiredRole="learner">
+      <LiveSessionsPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.LIVE_SESSION_DETAIL}
+  element={
+    <ProtectedRoute requiredRole="learner">
+      <LiveSessionDetailPage />
+    </ProtectedRoute>
+  }
+/>
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
