@@ -254,7 +254,7 @@ export default function DashboardPage() {
   const [activeNav, setActiveNav] = useState('home')
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
-  // `assignments` is scaffolded by the backend (always []) until M2 ships.
+  // `assignments` is scaffolded by the backend (always []) until Sprint 5 ships.
   // We still read it into state so the UI is ready the moment real items
   const [assignmentsActive, setAssignmentsActive] = useState<unknown[]>([])
   const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<unknown[]>([])
@@ -313,8 +313,8 @@ export default function DashboardPage() {
   const showEmptyState              = !loading && !error && !hasCourses
   const showCourseDependentSections = !loading && !error && hasCourses
 
-  // Always true today (M2 hasn't shipped), but written so this naturally
-  // starts working once the backend fills in real assignment items.
+  // Always true today (Sprint 5 hasn't shipped), but written so this
+  // naturally starts working once the backend fills in real assignment items.
   const hasAssignments = assignmentsActive.length > 0 || assignmentsUpcoming.length > 0
 
   const liveNowSessions = liveSessions
@@ -391,7 +391,7 @@ export default function DashboardPage() {
 
          
 
-          {/* Assignments — real data only; backend scaffolds this as [] until M2 ships */}
+          {/* Assignments — real data only; backend scaffolds this as [] until Sprint 5 ships */}
           <div>
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
@@ -409,10 +409,12 @@ export default function DashboardPage() {
                 <div className="empty-inline-sub">Assignments will appear here once you start progressing through your course.</div>
               </div>
             )}
-            {/* TODO: once the backend documents real fields for assignments.active/upcoming
-                (M2), render actual cards here using assignmentsActive/assignmentsUpcoming
-                and RouteBuilder.assignmentDetail(<real uuid>). Do not reintroduce mock/
-                hardcoded ids — the assignment-detail API requires a real UUID. */}
+            {/* TODO: AssignmentsSection is documented as scaffolded — "both buckets
+                empty until Sprint 5" per Swagger. Once Sprint 5 ships and the item
+                shape is defined, render real cards here using assignmentsActive/
+                assignmentsUpcoming and RouteBuilder.assignmentDetail(<real uuid>).
+                Do not reintroduce mock/hardcoded ids — the assignment-detail API
+                requires a real UUID. */}
           </div>
 
           {/* Sessions — real data from GET /v1/live/sessions/ */}
@@ -436,6 +438,9 @@ export default function DashboardPage() {
               <div>
                 <div className="section-header">
                   <span className="section-title">Live Session</span>
+                  <button className="see-all" onClick={() => navigate(ROUTES.LIVE_SESSIONS)}>
+                    See all <ChevronRight size={14} />
+                  </button>
                 </div>
                 {nextLiveSession ? (
                   <div className="session-card">
@@ -463,6 +468,9 @@ export default function DashboardPage() {
               <div>
                 <div className="section-header">
                   <span className="section-title">Upcoming Session</span>
+                  <button className="see-all" onClick={() => navigate(ROUTES.LIVE_SESSIONS)}>
+                    See all <ChevronRight size={14} />
+                  </button>
                 </div>
                 {nextUpcomingSession ? (
                   <div className="session-card">

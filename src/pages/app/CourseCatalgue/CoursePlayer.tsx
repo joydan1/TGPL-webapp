@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
-import { apiClient } from '../../../services/api'
+import { apiClient, coursesAPI } from '../../../services/api'
 
 // ─── API types ────────────────────────────────────────────────────────────────
 interface Lesson {
@@ -41,7 +41,6 @@ interface LessonDetail {
   body: string
 }
 
-// Minimal shape needed from the catalogue to find a linked paid course.
 interface CatalogueCourseSummary {
   slug: string
   category: string
@@ -78,13 +77,6 @@ async function fetchLesson(slug: string, lessonId: string): Promise<LessonDetail
   }
 }
 
-// Finds the paid course in the same category as this intro video. There's
-// no backend field linking an intro video to a specific paid course, so we
-// match on category instead — this survives the paid course's slug (or
-// even title) changing, as long as the category stays the same. If more
-// than one paid course ever shares this category, we just take the first
-// match; that's an acceptable ambiguity for now given there's only one
-// paid course today.
 async function findLinkedCourseSlug(category: string): Promise<string | null> {
   try {
     const response = await apiClient.get<PaginatedCourses>(
@@ -369,18 +361,13 @@ export default function CoursePlayerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  // The paid course this intro video promotes, resolved by category match.
-  // Null while resolving, or if no matching paid course was found.
   const [linkedCourseSlug, setLinkedCourseSlug] = useState<string | null>(null)
   const [resolvingLink, setResolvingLink]       = useState(false)
 
-  // Active lesson being previewed
   const [activeLesson, setActiveLesson] = useState<PlaylistItem | null>(null)
-  // Fetched lesson detail (has video_url)
   const [lessonDetail, setLessonDetail]     = useState<LessonDetail | null>(null)
   const [lessonLoading, setLessonLoading]   = useState(false)
 
-  // Real video state
   const videoRef                            = useRef<HTMLVideoElement | null>(null)
   const [isPlaying, setIsPlaying]           = useState(false)
   const [currentTime, setCurrentTime]       = useState(0)
@@ -392,12 +379,7 @@ export default function CoursePlayerPage() {
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  // ── Load course, then resolve the linked paid course by category ──
-  // This page is purely an orientation/marketing player for the intro
-  // video course. It never enrols anyone in that course and never sends
-  // the learner to checkout for it — it only shows preview lessons and,
-  // once they're ready, hands off to the overview page of the actual
-  // paid course in the same category.
+  // Load course, auto-enrol if free, then resolve the linked paid course.
   useEffect(() => {
     if (!slug) return
     setLoading(true)
@@ -407,9 +389,21 @@ export default function CoursePlayerPage() {
     fetchPreview(slug)
       .then(async (data) => {
         setCourse(data)
+
+        if (data.is_free) {
+          const enrollResult = await coursesAPI.enrollFree(slug)
+          if (!enrollResult.success) {
+            if (enrollResult.statusCode === 401) {
+              navigate(`${ROUTES.LOGIN}?next=${encodeURIComponent(window.location.pathname)}`)
+              return
+            }
+            setError('Could not set up your access to this course. Please try again.')
+          }
+        }
+
         const playlist = buildPlaylist(data.modules)
         const firstPreviewLesson = playlist.find((lesson) => lesson.is_preview)
-        setActiveLesson(data.is_free ? playlist[0] ?? null : firstPreviewLesson ?? playlist[0] ?? null)
+        setActiveLesson(firstPreviewLesson ?? playlist[0] ?? null)
 
         setResolvingLink(true)
         const linked = await findLinkedCourseSlug(data.category)
@@ -420,9 +414,9 @@ export default function CoursePlayerPage() {
         setError(e.message === 'not_found' ? 'Course not found.' : 'Failed to load preview.')
       })
       .finally(() => setLoading(false))
-  }, [slug])
+  }, [slug, navigate])
 
-  // ── Fetch lesson detail when activeLesson changes ──
+  // Fetch lesson detail when activeLesson changes
   useEffect(() => {
     if (!slug || !activeLesson) return
     setLessonLoading(true)
@@ -437,7 +431,7 @@ export default function CoursePlayerPage() {
       .finally(() => setLessonLoading(false))
   }, [slug, activeLesson])
 
-  // ── Wire video events ──
+  // Wire video events
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
@@ -469,9 +463,8 @@ export default function CoursePlayerPage() {
       v.removeEventListener('playing',        onCanPlay)
       v.removeEventListener('volumechange',   onVolumeChange)
     }
-  }, [lessonDetail]) // re-wire when a new lesson detail loads (new video src)
+  }, [lessonDetail])
 
-  // ── Video controls ──
   const togglePlay = useCallback(() => {
     const v = videoRef.current
     if (!v) return
@@ -504,10 +497,6 @@ export default function CoursePlayerPage() {
     if (v) v.muted = !v.muted
   }, [])
 
-  // Sends the learner to the overview page of the paid course resolved by
-  // category match — never to this intro video's own slug, and never
-  // straight to checkout. Falls back to the course catalogue if no linked
-  // course could be resolved (e.g. category has no paid course yet).
   const goToCourseOverview = () => {
     if (linkedCourseSlug) {
       navigate(RouteBuilder.course(linkedCourseSlug))
@@ -526,7 +515,7 @@ export default function CoursePlayerPage() {
         <div className="logo"><img src="/Logo.png" alt="The Global Project Leaders" /></div>
 
         <div className="outer">
-          <h1 className="outer-title">Course Preview</h1>
+          <h1 className="outer-title"></h1>
 
           <div className="card">
             {loading && <div className="state-screen">Loading preview…</div>}
@@ -534,10 +523,8 @@ export default function CoursePlayerPage() {
 
             {!loading && !error && course && (
               <>
-                {/* ── Video ── */}
                 <div className="video-wrap" onClick={togglePlay}>
 
-                  {/* Real video element — always mounted so ref is stable */}
                   <video
                     ref={videoRef}
                     src={lessonDetail?.video_url ?? undefined}
@@ -547,7 +534,6 @@ export default function CoursePlayerPage() {
                     style={{ display: hasVideo ? 'block' : 'none' }}
                   />
 
-                  {/* Thumbnail: shown until user starts playing */}
                   {(!hasStarted || !hasVideo) && course.thumbnail_url && (
                     <img
                       className="video-thumb"
@@ -556,7 +542,6 @@ export default function CoursePlayerPage() {
                     />
                   )}
 
-                  {/* No video fallback */}
                   {!hasVideo && !lessonLoading && (
                     <div className="no-video">
                       <div className="no-video-icon">
@@ -657,7 +642,6 @@ export default function CoursePlayerPage() {
                   </div>
                 </div>
 
-                {/* ── Info ── */}
                 <div className="info">
                   <div className="info-row">
                     <div>
@@ -674,7 +658,6 @@ export default function CoursePlayerPage() {
                   </div>
                 </div>
 
-                {/* ── Playlist ── */}
                 {playlist.length > 0 && (
                   <div className="playlist">
                     <p className="playlist-label">Course Lessons</p>
@@ -699,14 +682,13 @@ export default function CoursePlayerPage() {
                   </div>
                 )}
 
-                {/* ── Enrol bar ── */}
                 <div className="enroll-bar">
                   <div>
                     <p className="enroll-label">
-                      {course.is_free ? 'Free course' : 'Ready to enrol?'}
+                      {course.is_free ? 'Ready to enroll?' : 'Ready to enrol?'}
                     </p>
                     <p className="enroll-price">
-                      {course.is_free ? 'Free' : formatNaira(course.price_naira)}
+                      {course.is_free ? '#49,999' : formatNaira(course.price_naira)}
                     </p>
                   </div>
                   <button
