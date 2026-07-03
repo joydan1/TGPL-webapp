@@ -8,6 +8,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  type LucideProps,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
@@ -16,7 +17,7 @@ type NavItem = {
   key: string
   label: string
   route: string
-  Icon: React.ComponentType<{ size?: number }>
+  Icon: React.ComponentType<LucideProps>
 }
 
 const NAV_ITEMS: NavItem[] = [
