@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Home, GraduationCap, BookOpen, Radio, Settings,
+  Home, BookOpen, Radio, Settings,
   Search, Bell, ChevronDown,
   PanelLeftClose, PanelLeftOpen,
   LogOut, User as UserIcon, Shield, CreditCard, HelpCircle,
@@ -12,7 +12,6 @@ import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 
 export const NAV_ITEMS = [
   { key: 'home',      label: 'Home',         Icon: Home          },
-  { key: 'myCourse',  label: 'My Course',    Icon: GraduationCap },
   { key: 'courses',   label: 'Courses',      Icon: BookOpen      },
   { key: 'live',      label: 'Live Classes', Icon: Radio         },
   { key: 'settings',  label: 'Settings',     Icon: Settings      },
@@ -304,7 +303,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange }: 
                 onClick={() => key === 'settings' ? navigate(ROUTES.SETTINGS) : handleNav(key)}
               >
                 <Icon size={20} />
-                <span>{label === 'Live Classes' ? 'Live' : label === 'My Course' ? 'Course' : label}</span>
+                <span>{label === 'Live Classes' ? 'Live' : label === ' Course' ? 'Course' : label}</span>
               </button>
             ))}
           </div>

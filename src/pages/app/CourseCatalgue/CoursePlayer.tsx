@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ROUTES } from '../../../constants/routes'
+import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { apiClient } from '../../../services/api'
 
 // ─── API types ────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ interface CoursePreview {
   category: string
   price_naira: string
   price_kobo: number
+  is_free: boolean
   thumbnail_url: string
   trainer: { id: string; name: string; credential: string }
   modules: Module[]
@@ -38,6 +39,20 @@ interface LessonDetail {
   is_preview: boolean
   video_url: string | null
   body: string
+}
+
+// Minimal shape needed from the catalogue to find a linked paid course.
+interface CatalogueCourseSummary {
+  slug: string
+  category: string
+  is_free: boolean
+}
+
+interface PaginatedCourses {
+  count: number
+  next: string | null
+  previous: string | null
+  results: CatalogueCourseSummary[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,6 +75,25 @@ async function fetchLesson(slug: string, lessonId: string): Promise<LessonDetail
     const status = (err as { response?: { status?: number } })?.response?.status
     if (status === 403) throw new Error('not_preview')
     throw new Error('fetch_failed')
+  }
+}
+
+// Finds the paid course in the same category as this intro video. There's
+// no backend field linking an intro video to a specific paid course, so we
+// match on category instead — this survives the paid course's slug (or
+// even title) changing, as long as the category stays the same. If more
+// than one paid course ever shares this category, we just take the first
+// match; that's an acceptable ambiguity for now given there's only one
+// paid course today.
+async function findLinkedCourseSlug(category: string): Promise<string | null> {
+  try {
+    const response = await apiClient.get<PaginatedCourses>(
+      `/v1/courses/?category=${encodeURIComponent(category)}`,
+    )
+    const match = response.data.results.find((c) => !c.is_free)
+    return match?.slug ?? null
+  } catch {
+    return null
   }
 }
 
@@ -306,6 +340,7 @@ const CSS = `
     font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
   .enroll-btn:hover { opacity: 0.88; }
+  .enroll-btn:disabled { opacity: 0.6; cursor: default; }
 
   .footer { font-size: 0.85rem; color: #ABABAB; text-align: center; }
 
@@ -334,6 +369,11 @@ export default function CoursePlayerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
+  // The paid course this intro video promotes, resolved by category match.
+  // Null while resolving, or if no matching paid course was found.
+  const [linkedCourseSlug, setLinkedCourseSlug] = useState<string | null>(null)
+  const [resolvingLink, setResolvingLink]       = useState(false)
+
   // Active lesson being previewed
   const [activeLesson, setActiveLesson] = useState<PlaylistItem | null>(null)
   // Fetched lesson detail (has video_url)
@@ -352,16 +392,29 @@ export default function CoursePlayerPage() {
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  // ── Load course ──
+  // ── Load course, then resolve the linked paid course by category ──
+  // This page is purely an orientation/marketing player for the intro
+  // video course. It never enrols anyone in that course and never sends
+  // the learner to checkout for it — it only shows preview lessons and,
+  // once they're ready, hands off to the overview page of the actual
+  // paid course in the same category.
   useEffect(() => {
     if (!slug) return
     setLoading(true)
     setError(null)
+    setLinkedCourseSlug(null)
+
     fetchPreview(slug)
-      .then((data) => {
+      .then(async (data) => {
         setCourse(data)
         const playlist = buildPlaylist(data.modules)
-        setActiveLesson(playlist[0] ?? null)
+        const firstPreviewLesson = playlist.find((lesson) => lesson.is_preview)
+        setActiveLesson(data.is_free ? playlist[0] ?? null : firstPreviewLesson ?? playlist[0] ?? null)
+
+        setResolvingLink(true)
+        const linked = await findLinkedCourseSlug(data.category)
+        setLinkedCourseSlug(linked)
+        setResolvingLink(false)
       })
       .catch((e: Error) => {
         setError(e.message === 'not_found' ? 'Course not found.' : 'Failed to load preview.')
@@ -451,16 +504,16 @@ export default function CoursePlayerPage() {
     if (v) v.muted = !v.muted
   }, [])
 
-  const goToCheckout = () => {
-    navigate(ROUTES.CHECKOUT, {
-      state: {
-        courseSlug:  slug,
-        priceNaira:  course?.price_naira,
-        priceKobo:   course?.price_kobo,
-        courseTitle: course?.title,
-        trainerName: course?.trainer?.name,
-      },
-    })
+  // Sends the learner to the overview page of the paid course resolved by
+  // category match — never to this intro video's own slug, and never
+  // straight to checkout. Falls back to the course catalogue if no linked
+  // course could be resolved (e.g. category has no paid course yet).
+  const goToCourseOverview = () => {
+    if (linkedCourseSlug) {
+      navigate(RouteBuilder.course(linkedCourseSlug))
+    } else {
+      navigate(ROUTES.COURSES)
+    }
   }
 
   const playlist = course ? buildPlaylist(course.modules) : []
@@ -513,9 +566,9 @@ export default function CoursePlayerPage() {
                         </svg>
                       </div>
                       <span>
-                        {activeLesson && !activeLesson.is_preview
-                          ? 'Enrol to watch this lesson'
-                          : 'Preview video not available yet'}
+                        {course?.is_free || (activeLesson && activeLesson.is_preview)
+                          ? 'Preview video not available yet'
+                          : 'Enrol to watch this lesson'}
                       </span>
                     </div>
                   )}
@@ -649,11 +702,19 @@ export default function CoursePlayerPage() {
                 {/* ── Enrol bar ── */}
                 <div className="enroll-bar">
                   <div>
-                    <p className="enroll-label">Ready to enrol?</p>
-                    <p className="enroll-price">{formatNaira(course.price_naira)}</p>
+                    <p className="enroll-label">
+                      {course.is_free ? 'Free course' : 'Ready to enrol?'}
+                    </p>
+                    <p className="enroll-price">
+                      {course.is_free ? 'Free' : formatNaira(course.price_naira)}
+                    </p>
                   </div>
-                  <button className="enroll-btn" onClick={goToCheckout}>
-                    Enrol now
+                  <button
+                    className="enroll-btn"
+                    onClick={goToCourseOverview}
+                    disabled={resolvingLink}
+                  >
+                    {resolvingLink ? 'Loading…' : 'Enrol now'}
                   </button>
                 </div>
               </>

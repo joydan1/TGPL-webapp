@@ -389,25 +389,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Banner: Start first module (0% progress) */}
-          {showCourseDependentSections && firstCourse && firstCourse.completion_percentage === 0 && (
-            <div className="resume-banner-empty">
-              <div className="resume-empty-left">
-                <div className="resume-you-badge">⭐ You're all set to begin!</div>
-                <div className="resume-empty-title">Start your first module</div>
-                <div className="resume-empty-sub">You haven't started your course yet. Begin Module 1 to kick off your learning journey.</div>
-                <div className="resume-empty-bar-wrap">
-                  <div className="resume-empty-bar"><div className="resume-empty-fill" /></div>
-                  <div className="resume-empty-sub2">0% complete · 4h 50m remaining</div>
-                </div>
-              </div>
-              <div className="resume-empty-right">
-                <button className="start-course-btn" onClick={() => goToCourse(firstCourse.course_slug)}>
-                  <Play size={14} fill="#2563EB" /> Start Course
-                </button>
-              </div>
-            </div>
-          )}
+         
 
           {/* Assignments — real data only; backend scaffolds this as [] until M2 ships */}
           <div>
