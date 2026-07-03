@@ -663,9 +663,13 @@ export const coursesAPI = {
 
   saveLessonNotes: async (courseSlug: string, lessonId: string, notes: string) => {
     try {
-      const response = await apiClient.patch<LessonDetailResponse>(
-        `/v1/courses/${courseSlug}/lessons/${lessonId}/`,
-        { notes },
+      const response = await apiClient.put<{
+        lesson_id: string
+        content: string
+        updated_at: string
+      }>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/note/`,
+        { content: notes },
       )
       return { success: true as const, data: response.data }
     } catch (error) {

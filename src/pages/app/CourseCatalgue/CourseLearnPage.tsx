@@ -312,11 +312,21 @@ export default function CourseLearnPage() {
     setError(null)
     notesLoadedRef.current = false
 
+    const noteStorageKey = `lesson-note:${slug}:${lessonId}`
+    const persistedNote = localStorage.getItem(noteStorageKey)
+
     coursesAPI.getLesson(slug, lessonId).then((res) => {
       if (cancelled) return
       if (res.success) {
         setLesson(res.data)
-        setNotes(res.data.notes ?? '')
+        const serverNotes = res.data.notes
+        const noteValue = serverNotes !== null && serverNotes !== undefined
+          ? serverNotes
+          : persistedNote ?? ''
+        setNotes(noteValue)
+        if (noteValue) {
+          localStorage.setItem(noteStorageKey, noteValue)
+        }
         notesLoadedRef.current = true
       } else {
         setError(res.statusCode === 404 ? 'Lesson not found.' : res.error)
@@ -396,6 +406,13 @@ export default function CourseLearnPage() {
     setJustSaved(false)
     notesTimer.current = setTimeout(async () => {
       setSavingNotes(true)
+      const noteStorageKey = `lesson-note:${slug}:${lessonId}`
+      if (notes) {
+        localStorage.setItem(noteStorageKey, notes)
+      } else {
+        localStorage.removeItem(noteStorageKey)
+      }
+
       const res = await coursesAPI.saveLessonNotes(slug, lessonId, notes)
       setSavingNotes(false)
       if (res.success) {
