@@ -30,6 +30,10 @@ import NotificationsPage from './pages/NotificationsPage'
 import LiveSessionsPage from './pages/app/LiveSessionsPage'
 import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
+import ProfilePage from './pages/app/ProfilePage.tsx'
+import SettingsPage from './pages/app/SettingsPage.tsx'
+import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
+import HelpSupportPage from './pages/app/HelpSupportPage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -58,7 +62,9 @@ function DashboardPageWrapper() {
 }
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, user } = useAuthStore()
+  const getAuthenticatedHome = () =>
+    user?.role === 'trainer' ? ROUTES.TRAINER_DASHBOARD : ROUTES.DASHBOARD
 
   return (
     <Router>
@@ -69,7 +75,7 @@ function App() {
             path="/"
             element={
               isAuthenticated ? (
-                <Navigate to={ROUTES.DASHBOARD} replace />
+                <Navigate to={getAuthenticatedHome()} replace />
               ) : (
                 <LandingPage />
               )
@@ -81,13 +87,13 @@ function App() {
         <Route
           path={ROUTES.LOGIN}
           element={
-            isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} replace /> : <LoginPage />
+            isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <LoginPage />
           }
         />
         <Route
           path={ROUTES.SIGNUP}
           element={
-            isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} replace /> : <SignupPage />
+            isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <SignupPage />
           }
         />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
@@ -100,8 +106,40 @@ function App() {
         <Route
           path={ROUTES.ONBOARDING}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="learner">
               <OnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.PROFILE}
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.SETTINGS}
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.SETTINGS_SECURITY}
+          element={
+            <ProtectedRoute>
+              <SettingsSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_SUPPORT}
+          element={
+            <ProtectedRoute>
+              <HelpSupportPage />
             </ProtectedRoute>
           }
         />

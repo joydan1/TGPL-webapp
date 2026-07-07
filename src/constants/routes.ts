@@ -43,6 +43,8 @@ LIVE_SESSION_JOIN: '/live-sessions/:id/join',
   PROFILE: '/profile',
   PROFILE_EDIT: '/profile/edit',
   SETTINGS: '/settings',
+  SETTINGS_SECURITY: '/settings/security',
+  HELP_SUPPORT: '/settings/help',
   NOTIFICATIONS: '/notifications',
   PROGRESS: '/progress',
   CERTIFICATES: '/certificates',
@@ -202,7 +204,7 @@ export const ROUTE_METADATA: Record<
     title: 'Profile',
     description: 'Your profile settings',
     requiresAuth: true,
-    requiredRole: 'learner',
+    // Accessible to all authenticated users (learners and trainers)
     showInNav: true,
   },
   [ROUTES.NOTIFICATIONS]: {

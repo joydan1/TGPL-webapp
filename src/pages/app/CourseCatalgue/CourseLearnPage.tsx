@@ -162,6 +162,16 @@ const PAGE_CSS = `
   .download-all-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .download-all-btn:hover { opacity: 0.9; }
   .download-all-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .assignments-section { margin-bottom: 1.5rem; }
+  .assignments-heading { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: #111; }
+  .assignments-grid { display: grid; gap: 1rem; }
+  .assignment-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid #E5E7EB; border-radius: 0.875rem; background: #fff; }
+  .assignment-info { min-width: 0; }
+  .assignment-title { font-size: 0.95rem; font-weight: 700; color: #111; margin-bottom: 0.25rem; }
+  .assignment-meta { font-size: 0.84rem; color: #4B5563; margin-bottom: 0.25rem; }
+  .assignment-meta-light { font-size: 0.78rem; color: #9CA3AF; }
+  .assignment-link { display: inline-flex; align-items: center; justify-content: center; padding: 0.7rem 1rem; border-radius: 999px; border: none; background: #2563EB; color: #fff; font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .assignment-link:hover { opacity: 0.92; }
   .error-banner { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
   .resources-empty { padding: 2.5rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9375rem; }
 
@@ -319,13 +329,15 @@ export default function CourseLearnPage() {
       if (cancelled) return
       if (res.success) {
         setLesson(res.data)
-        const serverNotes = res.data.notes
-        const noteValue = serverNotes !== null && serverNotes !== undefined
-          ? serverNotes
-          : persistedNote ?? ''
+        const serverNotes = res.data.notes ?? ''
+        const noteValue = persistedNote !== null && persistedNote !== ''
+          ? persistedNote
+          : serverNotes
         setNotes(noteValue)
         if (noteValue) {
           localStorage.setItem(noteStorageKey, noteValue)
+        } else {
+          localStorage.removeItem(noteStorageKey)
         }
         notesLoadedRef.current = true
       } else {
@@ -535,6 +547,28 @@ export default function CourseLearnPage() {
     setResourceError(null)
     setDownloadingResourceIds((prev) => new Set(prev).add(r.id))
 
+    const downloadWindow = window.open('', '_blank')
+    if (!downloadWindow) {
+      setResourceError('Unable to open download tab. Please allow popups.')
+      setDownloadingResourceIds((prev) => {
+        const next = new Set(prev)
+        next.delete(r.id)
+        return next
+      })
+      return
+    }
+
+    const url = r.download_url
+    if (url) {
+      downloadWindow.location.href = url
+      setDownloadingResourceIds((prev) => {
+        const next = new Set(prev)
+        next.delete(r.id)
+        return next
+      })
+      return
+    }
+
     const res = await coursesAPI.getResourceDownloadUrl(slug, lessonId, r.id)
     setDownloadingResourceIds((prev) => {
       const next = new Set(prev)
@@ -543,10 +577,11 @@ export default function CourseLearnPage() {
     })
 
     if (res.success) {
-      window.open(res.data.download_url, '_blank')
+      downloadWindow.location.href = res.data.download_url
       return
     }
 
+    downloadWindow.close()
     setResourceError(res.error || 'Failed to get resource download link.')
   }
 
@@ -794,11 +829,36 @@ export default function CourseLearnPage() {
 
                   {activeTab === 'resources' && (
                     <div className="tab-panel">
-                      {!lesson.resources || lesson.resources.length === 0 ? (
-                        <div className="resources-empty">No resources attached to this lesson yet.</div>
-                      ) : (
+                      {resourceError && <div className="error-banner">{resourceError}</div>}
+
+                      {lesson.assignments && lesson.assignments.length > 0 && (
+                        <div className="assignments-section">
+                          <h3 className="assignments-heading">Assignments</h3>
+                          <div className="assignments-grid">
+                            {lesson.assignments.map((assignment) => (
+                              <div className="assignment-card" key={assignment.id}>
+                                <div className="assignment-info">
+                                  <div className="assignment-title">{assignment.title}</div>
+                                  {assignment.module_title && (
+                                    <div className="assignment-meta">{assignment.module_title}</div>
+                                  )}
+                                  {assignment.due_at && (
+                                    <div className="assignment-meta-light">Due {new Date(assignment.due_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                  )}
+                                </div>
+                                <button className="assignment-link" onClick={() => navigate(RouteBuilder.assignmentDetail(assignment.id))}>
+                                  View assignment
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(!lesson.resources || lesson.resources.length === 0) && (!lesson.assignments || lesson.assignments.length === 0) ? (
+                        <div className="resources-empty">No resources or assignments attached to this lesson yet.</div>
+                      ) : lesson.resources && lesson.resources.length > 0 ? (
                         <>
-                          {resourceError && <div className="error-banner">{resourceError}</div>}
                           <label className="resources-select-all">
                             <input
                               type="checkbox"
@@ -845,7 +905,7 @@ export default function CourseLearnPage() {
                             </button>
                           </div>
                         </>
-                      )}
+                      ) : null}
                     </div>
                   )}
 

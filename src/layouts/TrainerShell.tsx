@@ -1,156 +1,317 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home,
-  BookOpen,
-  Star,
-  CalendarDays,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  type LucideProps,
+  Home, BookOpen, Star, Radio, Settings,
+  Search, Bell, ChevronDown,
+  PanelLeftClose, PanelLeftOpen,
+  LogOut, User as UserIcon, Shield, CreditCard, HelpCircle,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
+import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationPanel'
 
-type NavItem = {
-  key: string
-  label: string
-  route: string
-  Icon: React.ComponentType<LucideProps>
-}
+// TODO: hardcoded pending-reviews count for the sidebar badge. Wire this up
+// to real data (e.g. the same source as the "Pending reviews" stat card)
+// once there's a shared trainer-stats hook/context.
+const PENDING_REVIEWS_COUNT = 4
 
-const NAV_ITEMS: NavItem[] = [
-  { key: 'home', label: 'Home', route: ROUTES.TRAINER_DASHBOARD, Icon: Home },
-  { key: 'courses', label: 'My Courses', route: ROUTES.TRAINER_COURSES, Icon: BookOpen },
-  { key: 'reviews', label: 'Reviews', route: ROUTES.TRAINER_SUBMISSIONS, Icon: Star },
-  { key: 'live', label: 'Live Classes', route: ROUTES.TRAINER_LIVE_SESSIONS, Icon: CalendarDays },
-  { key: 'settings', label: 'Settings', route: ROUTES.SETTINGS, Icon: Settings },
+export const NAV_ITEMS = [
+  { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
+  { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
+  { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_SUBMISSIONS,  Icon: Star,   badge: PENDING_REVIEWS_COUNT },
+  { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_SESSIONS, Icon: Radio  },
+  { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
 ]
 
-const SHELL_CSS = `
-  *, *::before, *::after { box-sizing: border-box; }
-  .trainer-shell { display: flex; min-height: 100vh; background: #F4F7FB; font-family: Inter, system-ui, sans-serif; }
-  .trainer-sidebar { width: 260px; min-width: 260px; background: #fff; border-right: 1px solid #E5E7EB; display: flex; flex-direction: column; }
-  .trainer-sidebar-top { padding: 1.5rem 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
-  .trainer-sidebar-brand { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em; color: #1F2937; }
-  .trainer-nav { padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
-  .trainer-nav-item { display: flex; align-items: center; gap: 0.9rem; padding: 0.95rem 1.1rem; border-radius: 16px; cursor: pointer; color: #54618C; font-weight: 600; font-size: 0.95rem; transition: background 0.18s ease, color 0.18s ease; }
-  .trainer-nav-item:hover { background: #F8FAFF; color: #1D4ED8; }
-  .trainer-nav-item.active { background: #EEF2FF; color: #1D4ED8; }
-  .trainer-sidebar-spacer { flex: 1; }
-  .trainer-sidebar-footer { padding: 1.25rem; border-top: 1px solid #E5E7EB; }
-  .trainer-sidebar-footer p { margin: 0; color: #6B7280; font-size: 0.82rem; line-height: 1.5; }
-  .trainer-content { flex: 1; display: flex; flex-direction: column; }
-  .trainer-header { padding: 1.5rem 2rem 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-  .trainer-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #0F172A; }
-  .trainer-subtitle { margin: 0.5rem 0 0; color: #475569; font-size: 0.95rem; }
-  .trainer-search { min-width: 320px; max-width: 420px; width: 100%; display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem; border-radius: 14px; background: #fff; border: 1px solid #E5E7EB; }
-  .trainer-search input { border: none; outline: none; width: 100%; font-size: 0.95rem; color: #111827; background: transparent; }
-  .trainer-main { flex: 1; padding: 0 2rem 2rem 2rem; overflow-y: auto; }
-  .trainer-panels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
-  .trainer-card { background: #fff; border-radius: 1rem; padding: 1.25rem 1.25rem 1.5rem; box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); }
-  .trainer-card-title { margin: 0 0 0.75rem; font-size: 0.9rem; color: #6B7280; letter-spacing: 0.01em; }
-  .trainer-card-value { margin: 0; font-size: 2rem; font-weight: 800; color: #111827; }
-  .trainer-section { margin-top: 1.75rem; }
-  .trainer-section-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-  .trainer-section-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: #111827; }
-  .trainer-section-link { color: #2563EB; font-size: 0.9rem; font-weight: 600; background: none; border: none; cursor: pointer; }
-  .trainer-live-panel { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1.5rem; border-radius: 1rem; background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%); color: #fff; }
-  .trainer-live-meta { max-width: 64%; }
-  .trainer-live-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.5rem; color: rgba(255,255,255,0.8); }
-  .trainer-live-title { margin: 0; font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
-  .trainer-live-detail { margin: 0.5rem 0 0; color: rgba(255,255,255,0.85); font-size: 0.95rem; line-height: 1.5; }
-  .trainer-live-button { border: none; background: #fff; color: #1D4ED8; padding: 0.85rem 1.15rem; border-radius: 999px; font-weight: 700; cursor: pointer; box-shadow: 0 12px 30px rgba(37, 99, 235, 0.18); }
-  .trainer-review-list { display: grid; gap: 0.85rem; }
-  .trainer-review-card { background: #fff; border-radius: 1rem; padding: 1rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 1px solid #E5E7EB; }
-  .trainer-review-detail { display: grid; gap: 0.2rem; }
-  .trainer-review-name { margin: 0; font-size: 0.98rem; font-weight: 700; color: #111827; }
-  .trainer-review-course { margin: 0; font-size: 0.85rem; color: #64748B; }
-  .trainer-review-action { border: none; background: #2563EB; color: #fff; padding: 0.65rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-weight: 700; }
-  .trainer-active-course { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 1rem; padding: 1.25rem; background: #fff; border-radius: 1rem; border: 1px solid #E5E7EB; }
-  .trainer-active-course-img { width: 100%; height: 176px; border-radius: 0.9rem; object-fit: cover; }
-  .trainer-active-course-info { display: flex; flex-direction: column; justify-content: space-between; }
-  .trainer-active-course-meta { color: #64748B; font-size: 0.82rem; letter-spacing: 0.01em; text-transform: uppercase; margin-bottom: 0.75rem; }
-  .trainer-course-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: #0F172A; }
-  .trainer-course-subtitle { margin: 0.85rem 0 0; color: #475569; line-height: 1.6; }
-  .trainer-course-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-size: 0.9rem; color: #475569; }
+// Sub-items shown when the Settings row is expanded. `route` is used for
+// navigation; `danger` is a red destructive-style row (Log out).
+export const SETTINGS_SUBITEMS = [
+  { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
+  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS }, // TODO: no dedicated /security route yet
+  { key: 'notifications', label: 'Notifications',   Icon: Bell,        route: ROUTES.NOTIFICATIONS },
+  { key: 'billing',       label: 'Billing',         Icon: CreditCard,  route: ROUTES.SETTINGS }, // TODO: no dedicated /billing route yet
+  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle,  route: ROUTES.SETTINGS }, // TODO: no dedicated /help route yet
+  { key: 'logout',        label: 'Log out',         Icon: LogOut,      route: null, danger: true },
+]
 
-  @media (max-width: 1120px) {
-    .trainer-sidebar { width: 220px; min-width: 220px; }
-    .trainer-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .trainer-active-course { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 880px) {
-    .trainer-shell { flex-direction: column; }
-    .trainer-sidebar { width: 100%; min-width: 100%; position: relative; border-right: none; border-bottom: 1px solid #E5E7EB; }
-    .trainer-content { width: 100%; }
-    .trainer-main { padding: 0 1.25rem 1.5rem 1.25rem; }
-    .trainer-sidebar-top { padding: 1rem; }
-    .trainer-sidebar-footer { padding: 1rem; }
+export const SHELL_CSS = `
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .db-root { display: flex; flex-direction: column; min-height: 100vh; background: #F5F5F5; font-family: inherit; }
+
+  /* ── Navbar ── */
+  .navbar { height: 64px; background: #fff; border-bottom: 1px solid #F3F4F6; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; gap: 1rem; position: sticky; top: 0; z-index: 200; width: 100%; }
+  .navbar-logo img { height: 2.25rem; display: block; }
+  .navbar-right { display: flex; align-items: center; gap: 1rem; }
+  .search-wrap { display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 2rem; padding: 0.45rem 1.1rem; width: 240px; }
+  .search-wrap input { background: none; border: none; outline: none; font-size: 0.875rem; color: #111; width: 100%; }
+  .search-wrap input::placeholder { color: #9CA3AF; }
+  .topbar-bell { width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative; transition: background 0.15s; }
+  .topbar-bell:hover { background: #F3F4F6; }
+  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
+  .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
+
+  /* ── Profile dropdown ── */
+  .profile-menu-wrap { position: relative; }
+  .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
+  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
+  .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
+  .profile-chevron.open { transform: rotate(180deg); }
+  .profile-dropdown { position: absolute; top: calc(100% + 0.625rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 220px; padding: 0.5rem; z-index: 300; }
+  .profile-dropdown-header { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.625rem 0.75rem; border-bottom: 1px solid #F3F4F6; margin-bottom: 0.375rem; }
+  .profile-dropdown-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-dropdown-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-dropdown-item { display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.625rem; border-radius: 0.6rem; border: none; background: none; font-size: 0.8125rem; font-weight: 500; color: #374151; cursor: pointer; text-align: left; transition: background 0.15s; }
+  .profile-dropdown-item:hover { background: #F9FAFB; }
+  .profile-dropdown-item.danger { color: #EF4444; }
+  .profile-dropdown-item.danger:hover { background: #FEF2F2; }
+
+  /* ── Layout ── */
+  .db-body { display: flex; flex: 1; }
+  .sidebar { width: 220px; min-width: 220px; background: #fff; border-right: 1px solid #F3F4F6; display: flex; flex-direction: column; position: sticky; top: 64px; height: calc(100vh - 64px); flex-shrink: 0; transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s; overflow: hidden; }
+  .sidebar.collapsed { width: 64px; min-width: 64px; }
+  .sidebar-top { display: flex; justify-content: flex-end; padding: 0.75rem 0.75rem 0.25rem; }
+  .collapse-btn { width: 32px; height: 32px; border-radius: 0.5rem; background: #fff; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; box-shadow: 0 1px 3px rgba(0,0,0,0.07); transition: background 0.15s; flex-shrink: 0; }
+  .collapse-btn:hover { background: #F3F4F6; }
+  .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; }
+  .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
+  .nav-item:hover { background: #F9FAFB; color: #111; }
+  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+  .nav-item .nav-label { flex: 1; }
+  .nav-item .nav-badge { background: #F59E0B; color: #fff; font-size: 0.68rem; font-weight: 700; border-radius: 999px; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0; }
+  .nav-item .nav-chevron { transition: transform 0.18s ease; flex-shrink: 0; }
+  .nav-item .nav-chevron.open { transform: rotate(180deg); }
+  .sidebar.collapsed .nav-label { display: none; }
+  .sidebar.collapsed .nav-badge { display: none; }
+  .sidebar.collapsed .nav-chevron { display: none; }
+  .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
+
+  /* ── Settings accordion sub-items ── */
+  .nav-subitems { display: flex; flex-direction: column; gap: 2px; background: #F9FAFB; border-radius: 0.6rem; padding: 0.25rem; margin: 2px 0 0.25rem; overflow: hidden; }
+  .sidebar.collapsed .nav-subitems { display: none; }
+  .nav-subitem { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem 0.625rem 1.875rem; border-radius: 0.5rem; cursor: pointer; color: #4B5563; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; background: none; border: none; width: 100%; text-align: left; transition: background 0.15s; }
+  .nav-subitem:hover { background: #F1F3F5; color: #111; }
+  .nav-subitem.danger { color: #EF4444; }
+  .nav-subitem.danger:hover { background: #FEF2F2; }
+
+  .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
+  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
+  .user-text { overflow: hidden; }
+  .user-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar.collapsed .user-text { display: none; }
+
+  /* ── Main slot ── */
+  .main { flex: 1; min-width: 0; overflow-y: auto; }
+
+  /* ── Mobile tab bar ── */
+  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
+  .mobile-tabbar-inner { display: flex; height: 100%; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; position: relative; }
+  .tab-item.active { color: #2563EB; }
+  .tab-item .tab-badge { position: absolute; top: 2px; right: calc(50% - 18px); background: #F59E0B; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 999px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+
+  @media (max-width: 640px) {
+    .sidebar { display: none; }
+    .search-wrap { display: none; }
+    .navbar { padding: 0 1rem; }
+    .navbar-logo img { height: 1.75rem; }
+    .mobile-tabbar { display: block; }
   }
 `
 
 export default function TrainerShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
-  const [collapsed, setCollapsed] = useState(false)
+  const { user, logout } = useAuth()
+
+  const [collapsed,    setCollapsed]    = useState(false)
+  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [notifOpen,    setNotifOpen]    = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   if (!user) return null
 
-  const activeRoute = NAV_ITEMS.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
+  const activeRoute = NAV_ITEMS.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
+
+  function handleNav(key: string, route: string) {
+    if (key === 'settings') {
+      setSettingsOpen((o) => !o)
+      return
+    }
+    navigate(route)
+  }
+
+  function handleSubitemClick(sub: typeof SETTINGS_SUBITEMS[number]) {
+    if (sub.key === 'logout') {
+      handleLogout()
+      return
+    }
+    if (sub.route) navigate(sub.route)
+  }
+
+  async function handleLogout() {
+    setProfileOpen(false)
+    await logout()
+    navigate(ROUTES.LOGIN)
+  }
+
+  function toggleNotif() {
+    setNotifOpen(o => !o)
+    setProfileOpen(false)   // close profile if open
+  }
+
+  function toggleProfile() {
+    setProfileOpen(o => !o)
+    setNotifOpen(false)     // close notif if open
+  }
 
   return (
     <>
-      <style>{SHELL_CSS}</style>
-      <div className="trainer-shell">
-        <aside className="trainer-sidebar">
-          <div className="trainer-sidebar-top">
-            <div className="trainer-sidebar-brand">TGPL Trainer</div>
-            <button
-              type="button"
-              onClick={() => setCollapsed((value) => !value)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: '#4B5563',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </button>
+      <style>{SHELL_CSS + NOTIF_CSS}</style>
+      <div className="db-root">
+
+        {/* ── Navbar ── */}
+        <nav className="navbar">
+          <div className="navbar-logo">
+            <img src="/Logo.png" alt="The Global Project Leaders" />
           </div>
-          <nav className="trainer-nav" style={{ paddingLeft: collapsed ? 0 : undefined }}>
-            {NAV_ITEMS.map((item) => {
-              const active = activeRoute === item.route
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => navigate(item.route)}
-                  className={`trainer-nav-item${active ? ' active' : ''}`}
-                  style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}
-                >
-                  <item.Icon size={18} />
-                  {!collapsed && <span>{item.label}</span>}
-                </button>
-              )
-            })}
-          </nav>
-          <div className="trainer-sidebar-spacer" />
-          <div className="trainer-sidebar-footer">
-            <p>{initials} · {user.name || user.email}</p>
+
+          <div className="navbar-right">
+            <div className="search-wrap">
+              <Search size={16} color="#9CA3AF" />
+              <input type="text" placeholder="Search anything" />
+            </div>
+
+            {/* Bell + notification panel */}
+            <div style={{ position: 'relative' }}>
+              <div
+                className={`topbar-bell${notifOpen ? ' active' : ''}`}
+                onClick={toggleNotif}
+                role="button"
+                aria-label="Open notifications"
+                aria-expanded={notifOpen}
+              >
+                <Bell size={20} />
+                <div className="bell-dot" />
+              </div>
+              {notifOpen && (
+                <NotificationPanel onClose={() => setNotifOpen(false)} />
+              )}
+            </div>
+
+            {/* Profile dropdown */}
+            <div className="profile-menu-wrap">
+              <button
+                className="profile-trigger"
+                onClick={toggleProfile}
+                aria-haspopup="true"
+                aria-expanded={profileOpen}
+                aria-label="Open profile menu"
+              >
+                <div className="topbar-avatar">{initials}</div>
+                <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
+              </button>
+              {profileOpen && (
+                <div className="profile-dropdown" role="menu">
+                  <div className="profile-dropdown-header">
+                    <div className="user-avatar">{initials}</div>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div className="profile-dropdown-name">{user.name || user.email}</div>
+                      <div className="profile-dropdown-email">{user.email}</div>
+                    </div>
+                  </div>
+                  <button
+                    className="profile-dropdown-item"
+                    onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
+                  >
+                    <UserIcon size={16} /> Profile
+                  </button>
+                  <button className="profile-dropdown-item danger" onClick={handleLogout}>
+                    <LogOut size={16} /> Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </aside>
-        <div className="trainer-content">
-          {children}
+        </nav>
+
+        <div className="db-body">
+
+          {/* ── Sidebar ── */}
+          <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+            <div className="sidebar-top">
+              <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
+                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              </button>
+            </div>
+            <nav className="sidebar-nav">
+              {NAV_ITEMS.map(({ key, label, route, Icon, badge }) => {
+                const active = activeRoute === route
+                return (
+                  <div key={key}>
+                    <div
+                      className={`nav-item${active ? ' active' : ''}`}
+                      onClick={() => handleNav(key, route)}
+                    >
+                      <Icon size={18} />
+                      <span className="nav-label">{label}</span>
+                      {!!badge && <span className="nav-badge">{badge}</span>}
+                      {key === 'settings' && (
+                        <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
+                      )}
+                    </div>
+                    {key === 'settings' && settingsOpen && (
+                      <div className="nav-subitems">
+                        {SETTINGS_SUBITEMS.map((sub) => (
+                          <button
+                            key={sub.key}
+                            className={`nav-subitem${sub.danger ? ' danger' : ''}`}
+                            onClick={() => handleSubitemClick(sub)}
+                          >
+                            <sub.Icon size={15} />
+                            {sub.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </nav>
+            <div className="sidebar-user">
+              <div className="user-avatar">{initials}</div>
+              <div className="user-text">
+                <div className="user-name">{user.name || user.email}</div>
+                <div className="user-email">{user.email}</div>
+              </div>
+            </div>
+          </aside>
+
+          {/* ── Page content ── */}
+          <main className="main">
+            {children}
+          </main>
         </div>
+
+        {/* ── Mobile tab bar ── */}
+        <div className="mobile-tabbar">
+          <div className="mobile-tabbar-inner">
+            {NAV_ITEMS.map(({ key, label, route, Icon, badge }) => (
+              <button
+                key={key}
+                className={`tab-item${activeRoute === route ? ' active' : ''}`}
+                onClick={() => key === 'settings' ? navigate(ROUTES.SETTINGS) : navigate(route)}
+              >
+                {!!badge && <span className="tab-badge">{badge}</span>}
+                <Icon size={20} />
+                <span>{label === 'Live Classes' ? 'Live' : label === 'My Courses' ? 'Courses' : label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </>
   )

@@ -327,13 +327,13 @@ export default function OnboardingPage() {
       <div
         style={{
           display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center',
-          padding: isMobile ? '1rem 1.25rem' : '1.5rem 2.5rem', gap: '0.75rem',
+          padding: isMobile ? '0.9rem 1rem' : '1.5rem 2.5rem', gap: '0.75rem',
         }}
       >
         <img
           src="/Logo.png"
           alt="TGPL"
-          style={{ height: isMobile ? '1.75rem' : '2.5rem', flexShrink: 0 }}
+          style={{ height: isMobile ? '1.5rem' : '2.5rem', flexShrink: 0 }}
         />
         {showSkip && (
           <button

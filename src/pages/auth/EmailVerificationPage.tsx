@@ -19,9 +19,10 @@ export default function EmailVerificationPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
-  // Store profile completion status in local state so handleContinue
-  // never reads stale Zustand state — the value is captured at verify time
+  // Store profile completion status and role in local state so handleContinue
+  // never reads stale Zustand state — the values are captured at verify time
   const [profileStatus, setProfileStatus] = useState<string | null>(null)
+  const [role] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) {
@@ -75,7 +76,12 @@ export default function EmailVerificationPage() {
 
   // Reads from local state — no stale Zustand access risk
   const handleContinue = () => {
-    navigate(profileStatus === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+    const destination = role === 'trainer'
+      ? RouteBuilder.trainerDashboard()
+      : profileStatus === 'complete'
+        ? RouteBuilder.dashboard()
+        : RouteBuilder.onboarding()
+    navigate(destination)
   }
 
   return (

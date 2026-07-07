@@ -69,8 +69,12 @@ export default function LoginPage() {
         localStorage.removeItem('rememberEmail')
       }
       const user = useAuthStore.getState().user
-      const status = user?.learner_profile?.completion_status
-      navigate(status === 'complete' ? RouteBuilder.dashboard() : RouteBuilder.onboarding())
+      const destination = user?.role === 'trainer'
+        ? RouteBuilder.trainerDashboard()
+        : user?.learner_profile?.completion_status === 'complete'
+          ? RouteBuilder.dashboard()
+          : RouteBuilder.onboarding()
+      navigate(destination)
     } else {
      if (!result.success && (result as {success:false;statusCode?:number;code?:string}).statusCode === 403 && (result as {success:false;statusCode?:number;code?:string}).code === 'email_not_verified') {
         setUnverifiedEmail(formData.email)
@@ -151,7 +155,7 @@ export default function LoginPage() {
         .login-trust-badge { font-size: 0.875rem; color: #999; margin-top: 1.25rem; margin-bottom: 0; text-align: center; }
 
         @media (max-width: 1024px) { .login-hero { display: none; } .login-form-panel { width: 100%; } }
-        @media (max-width: 640px) { .login-form-panel { padding: 1.5rem 1rem; } .login-card { max-width: 100%; } .login-hero-content h1 { font-size: 1.5rem; } .login-hero-content p { font-size: 1rem; } }
+        @media (max-width: 640px) { .login-form-panel { padding: 1.5rem 1rem; } .login-card { max-width: 100%; } .login-logo img { height: 2rem; } .login-hero-content h1 { font-size: 1.5rem; } .login-hero-content p { font-size: 1rem; } }
       `}</style>
 
       <div className="login-page">

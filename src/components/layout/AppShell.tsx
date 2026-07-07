@@ -106,6 +106,7 @@ export const SHELL_CSS = `
     .sidebar { display: none; }
     .search-wrap { display: none; }
     .navbar { padding: 0 1rem; }
+    .navbar-logo img { height: 1.75rem; }
     .mobile-tabbar { display: block; }
   }
 `
@@ -226,9 +227,9 @@ export default function AppShell({ children, activeNav = 'home', onNavChange }: 
                   </div>
                   <button
                     className="profile-dropdown-item"
-                    onClick={() => { setProfileOpen(false); navigate(ROUTES.SETTINGS) }}
+                    onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
                   >
-                    <UserIcon size={16} /> Profile settings
+                    <UserIcon size={16} /> Profile
                   </button>
                   <button className="profile-dropdown-item danger" onClick={handleLogout}>
                     <LogOut size={16} /> Log out

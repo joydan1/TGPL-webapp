@@ -266,6 +266,10 @@ export default function SignupPage() {
         .signup-logo { margin-bottom: 1.75rem; text-align: center; }
         .signup-logo img { height: 2.75rem; }
 
+        @media (max-width: 640px) {
+          .signup-logo img { height: 2rem; }
+        }
+
         .signup-error-alert { width: 100%; max-width: 440px; margin-bottom: 1rem; }
 
         .signup-title { font-size: 1.5rem; font-weight: 700; text-align: center; color: var(--black); margin: 0 0 1.5rem 0; line-height: 1.2; }

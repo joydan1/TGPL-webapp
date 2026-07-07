@@ -246,11 +246,11 @@ class ApiClient {
     }
   }
 
-  public async get<T>(url: string) { return this.axiosInstance.get<T>(url) }
-  public async post<T>(url: string, data?: unknown) { return this.axiosInstance.post<T>(url, data) }
-  public async put<T>(url: string, data?: unknown) { return this.axiosInstance.put<T>(url, data) }
-  public async patch<T>(url: string, data?: unknown) { return this.axiosInstance.patch<T>(url, data) }
-  public async delete<T>(url: string) { return this.axiosInstance.delete<T>(url) }
+  public async get<T>(url: string, config?: any) { return this.axiosInstance.get<T>(url, config) }
+  public async post<T>(url: string, data?: unknown, config?: any) { return this.axiosInstance.post<T>(url, data, config) }
+  public async put<T>(url: string, data?: unknown, config?: any) { return this.axiosInstance.put<T>(url, data, config) }
+  public async patch<T>(url: string, data?: unknown, config?: any) { return this.axiosInstance.patch<T>(url, data, config) }
+  public async delete<T>(url: string, config?: any) { return this.axiosInstance.delete<T>(url, config) }
 }
 
 export const apiClient = new ApiClient()
@@ -397,6 +397,16 @@ export const authAPI = {
     }
   },
 
+  changePassword: async (current_password: string, new_password: string) => {
+    try {
+      await apiClient.post('/v1/auth/me/password/', { current_password, new_password })
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to change password')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
   ...(import.meta.env.DEV && {
     testLearnerOnly: async () => {
       try {
@@ -539,12 +549,21 @@ export interface LessonResource {
   file_format: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'zip' | 'image' | 'other' | null
   file_size: number
   created_at: string
+  download_url?: string
 }
 
 export interface AdjacentLesson {
   id: string
   title: string
   duration_display: string
+}
+
+export interface LessonAssignmentSummary {
+  id: string
+  title: string
+  module_title?: string
+  due_at?: string | null
+  status?: 'not_started' | 'in_progress' | 'graded' | string
 }
 
 export interface LessonDetailResponse {
@@ -556,8 +575,9 @@ export interface LessonDetailResponse {
   duration_seconds: number
   duration_display: string
   status: LessonStatus
-  notes: string | null
+  notes?: string | null
   resources: LessonResource[]
+  assignments?: LessonAssignmentSummary[]
   previous_lesson: AdjacentLesson | null
   next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
   resume_position_seconds: number | null
@@ -622,12 +642,23 @@ export const coursesAPI = {
   },
 
   getLesson: async (courseSlug: string, lessonId: string) => {
-    try {
-      const response = await apiClient.get<LessonDetailResponse>(
-        `/v1/courses/${courseSlug}/lessons/${lessonId}/`,
-      )
+    const requestLearn = async (path: string) => {
+      const response = await apiClient.get<LessonDetailResponse>(path)
       return { success: true as const, data: response.data }
+    }
+
+    try {
+      return await requestLearn(`/v1/courses/${courseSlug}/learn/${lessonId}/`)
     } catch (error) {
+      const axiosError = error as AxiosError<ApiErrorResponse>
+      if (axiosError.response?.status === 404) {
+        try {
+          return await requestLearn(`/v1/courses/${courseSlug}/lessons/${lessonId}/`)
+        } catch {
+          // fall through to error handling below
+        }
+      }
+
       const { message, statusCode } = parseApiError(error, 'Failed to load lesson')
       return { success: false as const, error: message, statusCode }
     }
