@@ -7,8 +7,9 @@ import {
   X, Coffee, ChevronRight,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
-import { coursesAPI } from '../../../services/api'
-import type { LessonDetailResponse, LessonResource } from '../../../services/api'
+import { coursesAPI, assignmentsAPI } from '../../../services/api'
+import type { LessonDetailResponse, LessonResource, LearnModule, LearnModuleAssignmentSummary, AssignmentResource } from '../../../services/api'
+// (types imported above)
 import { useAuth } from '../../../hooks/useAuth'
 import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 
@@ -280,6 +281,16 @@ export default function CourseLearnPage() {
   const [error, setError]     = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState('courses')
 
+  // ── Module-scoped assignments ──
+  // Assignments are NOT part of the lesson-detail response — the backend only
+  // returns them per-module from GET /courses/{slug}/learn/. We fetch that
+  // once per course (keyed on slug) and look up the current lesson's module
+  // assignments from it whenever the lesson changes.
+  const [moduleAssignments, setModuleAssignments] = useState<LearnModuleAssignmentSummary[]>([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false)
+  const [assignmentResources, setAssignmentResources] = useState<Record<string, AssignmentResource[]>>({})
+  const [downloadingAssignmentResourceIds, setDownloadingAssignmentResourceIds] = useState<Set<string>>(new Set())
+
   // ── Video ──
   const videoRef                              = useRef<HTMLVideoElement | null>(null)
   const [isPlaying, setIsPlaying]             = useState(false)
@@ -328,8 +339,17 @@ export default function CourseLearnPage() {
     coursesAPI.getLesson(slug, lessonId).then((res) => {
       if (cancelled) return
       if (res.success) {
-        setLesson(res.data)
-        const serverNotes = res.data.notes ?? ''
+        console.debug('coursesAPI.getLesson response', res.data)
+        // Backend currently returns `downloadable_resources` in some cases
+        // while frontend expects `resources`. Normalize here so the UI
+        // reliably reads `lesson.resources`.
+        const normalized = {
+          ...res.data,
+          resources: (res.data as any).resources ?? (res.data as any).downloadable_resources ?? [],
+          notes: (res.data as any).notes ?? (res.data as any).note ?? null,
+        }
+        setLesson(normalized as LessonDetailResponse)
+        const serverNotes = (normalized as any).notes ?? ''
         const noteValue = persistedNote !== null && persistedNote !== ''
           ? persistedNote
           : serverNotes
@@ -347,6 +367,58 @@ export default function CourseLearnPage() {
     })
     return () => { cancelled = true }
   }, [slug, lessonId])
+
+  // Full module list from the learn view, kept around so we can re-derive the
+  // current lesson's module assignments below whenever `lesson` changes.
+  const [allModules, setAllModules] = useState<LearnModule[]>([])
+
+  // ── Load course-wide learn view once per course, to get module → assignment
+  // mapping (assignments live here, not on the lesson-detail response). ──
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    setAssignmentsLoading(true)
+
+    coursesAPI.getCourseLearnView(slug).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        console.debug('coursesAPI.getCourseLearnView response', res.data)
+        setAllModules(res.data.modules)
+      }
+      setAssignmentsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [slug])
+
+  // When module-scoped assignments are present, fetch full assignment
+  // details (which include assignment resources) so we can surface them
+  // directly on the lesson resources tab for convenience.
+  useEffect(() => {
+    if (!moduleAssignments || moduleAssignments.length === 0) return
+    let cancelled = false
+    moduleAssignments.forEach((a) => {
+      // Skip if already fetched
+      if (assignmentResources[a.id]) return
+      assignmentsAPI.getAssignment(a.id).then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setAssignmentResources((prev) => ({ ...prev, [a.id]: res.data.resources ?? [] }))
+        }
+      }).catch(() => {})
+    })
+    return () => { cancelled = true }
+  }, [moduleAssignments])
+
+  // ── Whenever the lesson (and therefore its module) changes, look up that
+  // module's assignments from the learn-view data we already fetched. ──
+  useEffect(() => {
+    if (!lessonId || allModules.length === 0) {
+      setModuleAssignments([])
+      return
+    }
+    const match = allModules.find((m) => m.lessons.some((l) => l.id === lessonId))
+    setModuleAssignments(match?.assignments ?? [])
+  }, [lessonId, allModules])
 
   // ── Reset on lesson change ──
   useEffect(() => {
@@ -583,6 +655,38 @@ export default function CourseLearnPage() {
 
     downloadWindow.close()
     setResourceError(res.error || 'Failed to get resource download link.')
+  }
+
+  async function downloadAssignmentResource(assignmentId: string, r: AssignmentResource) {
+    if (!assignmentId || !r) return
+    setResourceError(null)
+    setDownloadingAssignmentResourceIds((prev) => new Set(prev).add(r.id))
+
+    const downloadWindow = window.open('', '_blank')
+    if (!downloadWindow) {
+      setResourceError('Unable to open download tab. Please allow popups.')
+      setDownloadingAssignmentResourceIds((prev) => {
+        const next = new Set(prev)
+        next.delete(r.id)
+        return next
+      })
+      return
+    }
+
+    const res = await assignmentsAPI.getResourceDownloadUrl(assignmentId, r.id)
+    setDownloadingAssignmentResourceIds((prev) => {
+      const next = new Set(prev)
+      next.delete(r.id)
+      return next
+    })
+
+    if (res.success) {
+      downloadWindow.location.href = res.data.download_url
+      return
+    }
+
+    downloadWindow.close()
+    setResourceError(res.error || 'Failed to get assignment resource download link.')
   }
 
   async function downloadAll(resources: LessonResource[]) {
@@ -831,44 +935,69 @@ export default function CourseLearnPage() {
                     <div className="tab-panel">
                       {resourceError && <div className="error-banner">{resourceError}</div>}
 
-                      {lesson.assignments && lesson.assignments.length > 0 && (
+                      {/* Assignments — module-scoped, fetched separately from /courses/{slug}/learn/ */}
+                      {!assignmentsLoading && moduleAssignments.length > 0 && (
                         <div className="assignments-section">
                           <h3 className="assignments-heading">Assignments</h3>
                           <div className="assignments-grid">
-                            {lesson.assignments.map((assignment) => (
+                            {moduleAssignments.map((assignment) => (
                               <div className="assignment-card" key={assignment.id}>
                                 <div className="assignment-info">
                                   <div className="assignment-title">{assignment.title}</div>
-                                  {assignment.module_title && (
-                                    <div className="assignment-meta">{assignment.module_title}</div>
-                                  )}
-                                  {assignment.due_at && (
-                                    <div className="assignment-meta-light">Due {new Date(assignment.due_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                  {assignment.deadline && (
+                                    <div className="assignment-meta-light">Due {new Date(assignment.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                                   )}
                                 </div>
-                                <button className="assignment-link" onClick={() => navigate(RouteBuilder.assignmentDetail(assignment.id))}>
-                                  View assignment
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button
+  className="assignment-link"
+  onClick={() =>
+    navigate(RouteBuilder.assignmentDetail(assignment.id), {
+      state: { courseSlug: slug, courseTitle, moduleTitle },
+    })
+  }
+>
+  View assignment
+</button>
+                                    {assignmentResources[assignment.id] && assignmentResources[assignment.id].length > 0 && (
+                                      <div style={{ alignSelf: 'center', color: '#6B7280', fontSize: '0.85rem' }}>{assignmentResources[assignment.id].length} resource{assignmentResources[assignment.id].length !== 1 ? 's' : ''}</div>
+                                    )}
+                                  </div>
+                                  {/* Inline list of assignment resources (if fetched) */}
+                                  {assignmentResources[assignment.id] && assignmentResources[assignment.id].length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                                      {assignmentResources[assignment.id].map((ar) => (
+                                        <div key={ar.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                          <div style={{ color: '#374151', fontWeight: 600 }}>{ar.title}</div>
+                                          <button className="resource-download" onClick={() => downloadAssignmentResource(assignment.id, ar)} disabled={downloadingAssignmentResourceIds.has(ar.id)}>
+                                            {downloadingAssignmentResourceIds.has(ar.id) ? 'Waiting…' : <Download size={14} />}
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {(!lesson.resources || lesson.resources.length === 0) && (!lesson.assignments || lesson.assignments.length === 0) ? (
+                      {(!lesson.resources || lesson.resources.length === 0) && moduleAssignments.length === 0 && !assignmentsLoading ? (
                         <div className="resources-empty">No resources or assignments attached to this lesson yet.</div>
                       ) : lesson.resources && lesson.resources.length > 0 ? (
                         <>
                           <label className="resources-select-all">
                             <input
                               type="checkbox"
-                              checked={selectedResources.size === lesson.resources.length}
-                              onChange={() => toggleSelectAll(lesson.resources)}
+                              checked={selectedResources.size === (lesson.resources?.length ?? 0)}
+                              onChange={() => toggleSelectAll(lesson.resources ?? [])}
                             />
                             Select all
                           </label>
                           <div className="resources-grid">
-                            {lesson.resources.map((r) => {
+                            {(lesson.resources ?? []).map((r) => {
                               const fileType = getFileTypeLabel(r)
                               const downloading = downloadingResourceIds.has(r.id)
                               return (
@@ -898,9 +1027,9 @@ export default function CourseLearnPage() {
                               )
                             })}
                           </div>
-                          <div className="resources-footer">
-                            <div className="resources-footer-text">{lesson.resources.length} file{lesson.resources.length !== 1 ? 's' : ''}</div>
-                            <button className="download-all-btn" onClick={() => downloadAll(lesson.resources)} disabled={isDownloadingResource}>
+                            <div className="resources-footer">
+                            <div className="resources-footer-text">{(lesson.resources ?? []).length} file{(lesson.resources ?? []).length !== 1 ? 's' : ''}</div>
+                            <button className="download-all-btn" onClick={() => downloadAll(lesson.resources ?? [])} disabled={isDownloadingResource}>
                               <Download size={16} />{isDownloadingResource ? 'Downloading…' : 'Download all'}
                             </button>
                           </div>

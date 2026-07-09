@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Check } from 'lucide-react'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
 import { authAPI } from '../../services/api'
+import { ROUTES } from '../../constants/routes'
 
 type StrengthLevel = { score: number; label: string; color: string }
 
@@ -52,6 +54,7 @@ const PAGE_CSS = `
 `
 
 export default function SettingsSecurityPage() {
+  const navigate = useNavigate()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -79,8 +82,12 @@ export default function SettingsSecurityPage() {
       setLoading(true)
       const res = await authAPI.changePassword(currentPassword, newPassword)
       if (res.success) {
-        setSuccess('Password updated successfully')
+        setSuccess('Password updated. Redirecting you to log in again…')
         setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
+        // Backend invalidates all refresh tokens on password change (authAPI
+        // already clears local auth state) — give the user a moment to read
+        // the confirmation, then send them to log back in.
+        setTimeout(() => navigate(ROUTES.LOGIN), 2000)
       } else {
         setError(res.error || 'Failed to update password')
       }
@@ -131,8 +138,8 @@ export default function SettingsSecurityPage() {
               {success && <div style={{ color: '#059669', fontWeight: 700, marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Check size={16} /> {success}</div>}
 
               <div className="actions">
-                <button className="btn primary" type="button" onClick={handleSubmit} disabled={loading}>{loading ? 'Updating…' : 'Update Password'}</button>
-                <button type="button" className="btn secondary" onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setError(null); setSuccess(null) }} disabled={loading}>Cancel</button>
+                <button className="btn primary" type="button" onClick={handleSubmit} disabled={loading || !!success}>{loading ? 'Updating…' : 'Update Password'}</button>
+                <button type="button" className="btn secondary" onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setError(null); setSuccess(null) }} disabled={loading || !!success}>Cancel</button>
               </div>
             </form>
           </div>

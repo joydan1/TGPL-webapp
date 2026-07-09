@@ -106,7 +106,7 @@ export const SHELL_CSS = `
     .sidebar { display: none; }
     .search-wrap { display: none; }
     .navbar { padding: 0 1rem; }
-    .navbar-logo img { height: 1.75rem; }
+    .navbar-logo img { height: 1.35rem; width: auto; }
     .mobile-tabbar { display: block; }
   }
 `

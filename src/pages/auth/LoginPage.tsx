@@ -129,7 +129,7 @@ export default function LoginPage() {
 
         .login-form-panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 1.5rem; background: var(--grey); overflow: hidden; }
         .login-logo { margin-bottom: 1.75rem; text-align: center; }
-        .login-logo img { height: 2.75rem; }
+        .login-logo img { height: 2.75rem; width: auto; }
 
         .login-card { width: 100%; max-width: 440px; background: var(--white); border: 1px solid #E8E8E8; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm); }
         .login-title { text-align: center; margin-bottom: 1.75rem; }
@@ -155,7 +155,7 @@ export default function LoginPage() {
         .login-trust-badge { font-size: 0.875rem; color: #999; margin-top: 1.25rem; margin-bottom: 0; text-align: center; }
 
         @media (max-width: 1024px) { .login-hero { display: none; } .login-form-panel { width: 100%; } }
-        @media (max-width: 640px) { .login-form-panel { padding: 1.5rem 1rem; } .login-card { max-width: 100%; } .login-logo img { height: 2rem; } .login-hero-content h1 { font-size: 1.5rem; } .login-hero-content p { font-size: 1rem; } }
+        @media (max-width: 640px) { .login-form-panel { padding: 1.5rem 1rem; } .login-card { max-width: 100%; } .login-logo img { height: 1.5rem; width: auto; } .login-hero-content h1 { font-size: 1.5rem; } .login-hero-content p { font-size: 1rem; } }
       `}</style>
 
       <div className="login-page">

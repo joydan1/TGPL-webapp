@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   BookOpen, Calendar,
   CheckCircle2, AlertTriangle, Upload, X, Plus,
@@ -12,12 +12,182 @@ import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 import {
   assignmentsAPI,
   type AssignmentDetail,
+  type AssignmentStatus,
   type AssignmentRequirement,
   type SubmittedFile,
 } from '../../../services/api'
 
+
+interface RawSubmissionFile {
+  id: string
+  requirement_id: string
+  file_name: string
+  file_size: number
+  content_type: string
+  download_url: string
+  created_at: string
+}
+
+interface RawSubmissionAttempt {
+  id: string
+  assignment_id: string
+  attempt_number: number
+  state: string // TODO: confirm full enum — seen so far: "not_started". Assumed others: in_progress/submitted/graded/revision_requested
+  submitted_at: string | null
+  is_late: boolean
+  files: RawSubmissionFile[]
+  grade: Record<string, unknown> | null // TODO: confirm real shape once a graded example is available
+  created_at: string
+}
+
+interface RawAssignmentResource {
+  id: string
+  title: string
+  resource_type: string
+  file_format: string | null
+  file_size: number
+  created_at: string
+}
+
+interface RawAssignmentDetail {
+  id: string
+  module_id: string
+  title: string
+  instructions: string
+  deadline: string | null
+  max_attempts: number
+  accept_late: boolean
+  grading_criteria: unknown
+  order: number
+  requirements: AssignmentRequirement[]
+  resources: RawAssignmentResource[]
+  my_submissions: RawSubmissionAttempt[]
+}
+
+interface AssignmentNavContext {
+  courseSlug?: string
+  courseTitle?: string
+  moduleTitle?: string
+}
+
+// Picks the attempt that should drive the page's status/feedback/submitted
+// files. Assumes `my_submissions` is ordered oldest → newest; if the backend
+// actually returns newest-first, swap to `[0]` instead.
+function latestAttempt(raw: RawAssignmentDetail): RawSubmissionAttempt | null {
+  if (!raw.my_submissions || raw.my_submissions.length === 0) return null
+  return raw.my_submissions[raw.my_submissions.length - 1]
+}
+
+function deriveStatus(attempt: RawSubmissionAttempt | null): AssignmentStatus {
+  if (!attempt || attempt.state === 'not_started') return 'not_started'
+  if (attempt.state === 'graded') return 'graded'
+  return 'in_progress' // covers in_progress / submitted / revision_requested / anything else
+}
+
+function deriveFeedback(attempt: RawSubmissionAttempt | null): AssignmentDetail['feedback'] {
+  if (!attempt) return null
+  if (attempt.state !== 'graded' && attempt.state !== 'revision_requested') return null
+
+  const grade = (attempt.grade ?? {}) as Record<string, unknown>
+  return {
+    type: attempt.state === 'graded' ? 'graded' : 'revision_requested',
+    grader_name: typeof grade.grader_name === 'string' ? grade.grader_name : 'Your trainer',
+    comment: typeof grade.comment === 'string' ? grade.comment : '',
+    date: (typeof grade.date === 'string' && grade.date) || attempt.submitted_at || attempt.created_at,
+    score: typeof grade.score === 'number' ? grade.score : undefined,
+  }
+}
+
+function normalizeGradingCriteria(
+  raw: unknown,
+): { id: string; label: string; points: number }[] {
+  // Observed shape: [{ label, max_points }, ...]
+  if (Array.isArray(raw)) {
+    return raw.map((c, i) => {
+      if (c && typeof c === 'object' && 'label' in c) {
+        const item = c as { label: string; max_points?: number; points?: number }
+        return {
+          id: String(i),
+          label: item.label,
+          points: item.max_points ?? item.points ?? 0,
+        }
+      }
+      console.warn('Unexpected grading_criteria array item shape:', c)
+      return { id: String(i), label: String(c), points: 0 }
+    })
+  }
+
+  // Fallback: plain { label: points } map
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw as Record<string, number>).map(([label, points], i) => ({
+      id: String(i),
+      label,
+      points: typeof points === 'number' ? points : 0,
+    }))
+  }
+
+  // Truly a string, null, or undefined — nothing renderable
+  if (raw != null) {
+    console.warn('Unrecognized grading_criteria shape, ignoring:', raw)
+  }
+  return []
+}
+
+function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext): AssignmentDetail {
+  const attempt = latestAttempt(raw)
+
+  return {
+    id: raw.id,
+    title: raw.title,
+    course_slug: ctx.courseSlug ?? '',
+    course_title: ctx.courseTitle ?? '',
+    module_title: ctx.moduleTitle ?? '',
+    due_at: raw.deadline ?? '',
+    // TODO: backend does not return points or grade weighting anywhere on
+    // this endpoint. Left at 0 and hidden in the UI below until there's a
+    // real source (course structure endpoint?).
+    points: 0,
+    grade_weight_percent: 0,
+    status: deriveStatus(attempt),
+    instructions: {
+      intro: raw.instructions,
+      example_image_url: null,
+      example_image_caption: null,
+      what_youll_do: [],
+      scenarios: [],
+      deliverables: [],
+      grading_criteria: normalizeGradingCriteria(raw.grading_criteria),
+    },
+    resources: (raw.resources ?? []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      file_type: r.file_format ?? r.resource_type,
+      file_url: '', // never provided directly — always goes through getResourceDownloadUrl
+      size_display: r.file_size ? `${(r.file_size / 1024).toFixed(0)} KB` : '',
+      size_tag: undefined,
+    })),
+    requirements: raw.requirements ?? [],
+    submitted_files: (attempt?.files ?? []).map((f) => ({
+      id: f.id,
+      filename: f.file_name,
+      file_url: f.download_url,
+      uploaded_at: f.created_at,
+    })),
+    feedback: deriveFeedback(attempt),
+    submission_requirements: {
+      accepted_file_types: (raw.requirements ?? []).map((r) => r.allowed_file_types).join(', '),
+      max_file_size: (raw.requirements ?? []).length
+        ? `${Math.round(Math.max(...raw.requirements.map((r) => r.max_bytes)) / (1024 * 1024))} MB`
+        : '',
+      word_count: null,
+      max_files: (raw.requirements ?? []).length,
+    },
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDueDate(iso: string): string {
+  if (!iso) return 'No due date'
   const d = new Date(iso)
   const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
   const timePart = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -25,18 +195,19 @@ function fmtDueDate(iso: string): string {
 }
 
 function fmtShortDate(iso: string): string {
+  if (!iso) return ''
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function resourceIcon(fileType: string) {
-  const t = fileType.toLowerCase()
+  const t = (fileType || '').toLowerCase()
   if (t.includes('xls') || t.includes('sheet')) return <FileSpreadsheet size={20} color="#16A34A" />
   if (t.includes('ppt') || t.includes('slide')) return <Presentation size={20} color="#EA580C" />
   return <FileText size={20} color="#7C3AED" />
 }
 
 function resourceIconBg(fileType: string) {
-  const t = fileType.toLowerCase()
+  const t = (fileType || '').toLowerCase()
   if (t.includes('xls') || t.includes('sheet')) return '#ECFDF3'
   if (t.includes('ppt') || t.includes('slide')) return '#FFF4ED'
   return '#F5F0FF'
@@ -105,7 +276,7 @@ const PAGE_CSS = `
   /* Instructions card */
   .instructions-card { background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.5rem; }
   .section-label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; color: #6B7280; text-transform: uppercase; }
-  .intro-text { font-size: 0.9375rem; line-height: 1.7; color: #374151; }
+  .intro-text { font-size: 0.9375rem; line-height: 1.7; color: #374151; white-space: pre-wrap; }
   .intro-text b { color: #111; }
   .example-fig { display: flex; flex-direction: column; gap: 0.5rem; }
   .example-img { width: 100%; border-radius: 0.875rem; aspect-ratio: 1025.333251953125/329; object-fit: cover; display: block; background: linear-gradient(135deg,#c8c8c8,#a0a0a0); }
@@ -211,133 +382,139 @@ const PAGE_CSS = `
 
 // ─── Submission modal ───────────────────────────────────────────────────────
 function SubmissionModal({
-  assignment,
-  onClose,
-  onSubmitted,
+assignment,
+onClose,
+onSubmitted,
 }: {
-  assignment: AssignmentDetail
-  onClose: () => void
-  onSubmitted: (files: SubmittedFile[]) => void
+assignment: AssignmentDetail
+onClose: () => void
+onSubmitted: (files: SubmittedFile[]) => void
 }) {
-  const [files, setFiles] = useState<File[]>([])
-  const [dragOver, setDragOver] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [uploadStep, setUploadStep] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+const [files, setFiles] = useState<File[]>([])
+const [dragOver, setDragOver] = useState(false)
+const [submitting, setSubmitting] = useState(false)
+const [uploadStep, setUploadStep] = useState<string | null>(null)
+const [error, setError] = useState<string | null>(null)
+const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Requirements define both how many files we can accept and which
-  // requirement_id each uploaded file must be tagged with. Files are
-  // auto-mapped to requirements in the order they're added.
-  const requirements = sortedRequirements(assignment.requirements)
-  const maxFiles = requirements.length
+const requirements = sortedRequirements(assignment.requirements)
 
-  function addFiles(list: FileList | null) {
-    if (!list) return
-    setFiles((prev) => [...prev, ...Array.from(list)].slice(0, maxFiles))
-  }
+const minFiles = 1
+const maxFiles = 3
 
-  function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+function addFiles(list: FileList | null) {
+if (!list) return
+setFiles((prev) => [...prev, ...Array.from(list)].slice(0, maxFiles))
+}
 
-  async function handleSubmit() {
-    if (files.length === 0) return
-    setSubmitting(true)
-    setError(null)
-    setUploadStep(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}…`)
+function removeFile(index: number) {
+setFiles((prev) => prev.filter((_, i) => i !== index))
+}
 
-    const res = await assignmentsAPI.submitAssignment(assignment.id, files, requirements)
+async function handleSubmit() {
+if (files.length < minFiles) {
+setError(`Upload at least ${minFiles} file`)
+return
+}
 
-    setSubmitting(false)
-    setUploadStep(null)
+setSubmitting(true)
+setError(null)
+setUploadStep(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`)
 
-    if (res.success) {
-      onSubmitted(res.data.submitted_files)
-    } else {
-      setError(res.error)
-    }
-  }
+const res = await assignmentsAPI.submitAssignment(assignment.id, files, requirements)
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="submit-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="submit-modal-head">
-          <span className="submit-modal-title">{assignment.title}</span>
-          <button className="submit-modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
-        </div>
+setSubmitting(false)
+setUploadStep(null)
 
-        <div className="asgn-modal-progress-row">
-          <span className="asgn-modal-progress-label">Submission progress</span>
-          <span className="asgn-modal-progress-count">{files.length} of {maxFiles} files uploaded</span>
-        </div>
+if (res.success) {
+  onSubmitted(res.data.submitted_files)
+} else {
+  setError(res.error)
+}
 
-        <div className="modal-body-row">
-          <div
-            className={`dropzone${dragOver ? ' dragover' : ''}${files.length >= maxFiles ? ' disabled' : ''}`}
-            onClick={() => files.length < maxFiles && fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); if (files.length < maxFiles) setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragOver(false)
-              if (files.length < maxFiles) addFiles(e.dataTransfer.files)
-            }}
-          >
-            <div className="dropzone-icon"><Plus size={20} /></div>
-            <span className="dropzone-text">
-              {files.length >= maxFiles ? 'All slots filled' : 'Click to add file(s)'}
+
+}
+
+return ( <div className="modal-backdrop" onClick={onClose}>
+<div className="submit-modal" onClick={(e) => e.stopPropagation()}> <div className="submit-modal-head"> <span className="submit-modal-title">{assignment.title}</span> <button className="submit-modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button> </div>
+
+    <div className="asgn-modal-progress-row">
+      <span className="asgn-modal-progress-label">Submission progress</span>
+      <span className="asgn-modal-progress-count">{files.length} of {maxFiles} files uploaded</span>
+    </div>
+
+    <div className="modal-body-row">
+      <div
+        className={`dropzone${dragOver ? ' dragover' : ''}${files.length >= maxFiles ? ' disabled' : ''}`}
+        onClick={() => files.length < maxFiles && fileInputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); if (files.length < maxFiles) setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          if (files.length < maxFiles) addFiles(e.dataTransfer.files)
+        }}
+      >
+        <div className="dropzone-icon"><Plus size={20} /></div>
+        <span className="dropzone-text">
+          {files.length >= maxFiles ? 'All slots filled' : 'Click to add file(s)'}
+        </span>
+        <span className="dropzone-sub">{assignment.submission_requirements.accepted_file_types}</span>
+        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+      </div>
+
+      {/*  UPDATED: no more strict per-requirement enforcement */}
+      <div className="criteria-list">
+        {requirements.map((req) => (
+          <div className="criteria-row" key={req.id}>
+            <div className="criteria-label-wrap">
+              <span>{req.label}{req.required ? '' : ' (optional)'}</span>
+              <span className="criteria-hint">{req.allowed_file_types}</span>
+            </div>
+            <span className="criteria-status">
+              {files.length >= minFiles
+                ? <CheckCircle2 size={18} color="#16A34A" />
+                : <X size={16} color="#DC2626" strokeWidth={3} />}
             </span>
-            <span className="dropzone-sub">{assignment.submission_requirements.accepted_file_types}</span>
-            <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
           </div>
-
-          <div className="criteria-list">
-            {requirements.map((req, i) => (
-              <div className="criteria-row" key={req.id}>
-                <div className="criteria-label-wrap">
-                  <span>{req.label}{req.required ? '' : ' (optional)'}</span>
-                  <span className="criteria-hint">{req.allowed_file_types}</span>
-                </div>
-                <span className="criteria-status">
-                  {files.length > i
-                    ? <CheckCircle2 size={18} color="#16A34A" />
-                    : <X size={16} color="#DC2626" strokeWidth={3} />}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {files.length > 0 && (
-          <div className="file-list">
-            {files.map((f, i) => (
-              <div className="file-list-item" key={`${f.name}-${i}`}>
-                <FileText size={16} color="#6B7280" />
-                <span className="file-list-name">{f.name}</span>
-                <span className="file-list-req">→ {requirements[i]?.label}</span>
-                <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
-                <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {uploadStep && <div className="upload-progress">{uploadStep}</div>}
-        {error && <div className="submit-error">{error}</div>}
-
-        <button
-          className="action-btn start"
-          disabled={files.length === 0 || submitting}
-          style={{ opacity: files.length === 0 || submitting ? 0.6 : 1, cursor: files.length === 0 || submitting ? 'default' : 'pointer' }}
-          onClick={handleSubmit}
-        >
-          {submitting ? 'Submitting…' : 'Submit Assignment'}
-        </button>
+        ))}
       </div>
     </div>
+
+    {files.length > 0 && (
+      <div className="file-list">
+        {files.map((f, i) => (
+          <div className="file-list-item" key={`${f.name}-${i}`}>
+            <FileText size={16} color="#6B7280" />
+            <span className="file-list-name">{f.name}</span>
+            {/* ❌ removed requirement index mapping */}
+            <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
+            <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {uploadStep && <div className="upload-progress">{uploadStep}</div>}
+    {error && <div className="submit-error">{error}</div>}
+
+    <button
+      className="action-btn start"
+      disabled={files.length < minFiles || submitting}
+      style={{
+        opacity: files.length < minFiles || submitting ? 0.6 : 1,
+        cursor: files.length < minFiles || submitting ? 'default' : 'pointer'
+      }}
+      onClick={handleSubmit}
+    >
+      {submitting ? 'Submitting…' : 'Submit Assignment'}
+    </button>
+  </div>
+</div>
+
+
   )
 }
 
@@ -345,7 +522,14 @@ function SubmissionModal({
 export default function AssignmentDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const { user } = useAuth()
+
+  // Course/module context isn't returned by GET /assignments/{id}/ at all —
+  // it has to be forwarded via navigation state from wherever the "View
+  // assignment" link originates (see CourseLearnPage). Falls back to blank
+  // if the page was reached directly (e.g. a bookmarked/shared URL).
+  const navCtx = (location.state as AssignmentNavContext) ?? {}
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null)
   const [loading, setLoading]       = useState(true)
@@ -357,10 +541,14 @@ export default function AssignmentDetailPage() {
     setLoading(true)
     setError(null)
     const res = await assignmentsAPI.getAssignment(assignmentId)
-    if (res.success) setAssignment(res.data)
-    else setError(res.error)
+    if (res.success) {
+      setAssignment(normalizeAssignment(res.data as unknown as RawAssignmentDetail, navCtx))
+    } else {
+      setError(res.error)
+    }
     setLoading(false)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navCtx.courseSlug, navCtx.courseTitle, navCtx.moduleTitle])
 
   useEffect(() => {
     if (id) load(id)
@@ -390,6 +578,11 @@ export default function AssignmentDetailPage() {
   const showStartSubmission  = assignment?.status === 'not_started' || showRevisionResubmit
   const showAwaitingBanner   = assignment?.status === 'in_progress' && !assignment.feedback
 
+  // Points / grade-weight aren't returned by the backend yet (see
+  // normalizeAssignment TODOs) — hide those meta chips rather than show "0".
+  const hasPoints = Boolean(assignment?.points)
+  const hasWeight = Boolean(assignment?.grade_weight_percent)
+
   return (
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
@@ -403,15 +596,28 @@ export default function AssignmentDetailPage() {
               {/* Header */}
               <div className="header-card">
                 <div className="crumb-row">
-                  <button className="crumb-back" onClick={() => navigate(RouteBuilder.course(assignment.course_slug))} aria-label="Back">
+                  <button className="crumb-back" onClick={() => navigate(-1)} aria-label="Back">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6" /></svg>
                   </button>
                   <div className="crumb">
                     <BookOpen size={14} />
-                    <span className="crumb-link" onClick={() => navigate(RouteBuilder.course(assignment.course_slug))}>{assignment.course_title}</span>
-                    <span>›</span>
-                    <span className="crumb-link">{assignment.module_title.split('—')[0].trim()}</span>
-                    <span>›</span>
+                    {assignment.course_title && (
+                      <>
+                        <span
+                          className="crumb-link"
+                          onClick={() => assignment.course_slug && navigate(RouteBuilder.course(assignment.course_slug))}
+                        >
+                          {assignment.course_title}
+                        </span>
+                        <span>›</span>
+                      </>
+                    )}
+                    {assignment.module_title && (
+                      <>
+                        <span className="crumb-link">{assignment.module_title.split('—')[0].trim()}</span>
+                        <span>›</span>
+                      </>
+                    )}
                     <span className="crumb-current">Assignment</span>
                   </div>
                 </div>
@@ -419,7 +625,7 @@ export default function AssignmentDetailPage() {
                 <div className="header-title-row">
                   <div>
                     <div className="header-title">{assignment.title}</div>
-                    <div className="header-sub">{assignment.module_title}</div>
+                    {assignment.module_title && <div className="header-sub">{assignment.module_title}</div>}
                   </div>
                   <div className={`status-pill ${assignment.status}`}>
                     {assignment.status === 'not_started' && <><span style={{ width: 7, height: 7, borderRadius: '50%', border: '1.5px solid #9CA3AF', display: 'inline-block' }} />Not started</>}
@@ -430,8 +636,8 @@ export default function AssignmentDetailPage() {
 
                 <div className="meta-row">
                   <span className="meta-item"><Calendar size={14} />{fmtDueDate(assignment.due_at)}</span>
-                  <span className="meta-item meta-pts">{assignment.points} pts</span>
-                  <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>
+                  {hasPoints && <span className="meta-item meta-pts">{assignment.points} pts</span>}
+                  {hasWeight && <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>}
                 </div>
               </div>
 
@@ -446,13 +652,19 @@ export default function AssignmentDetailPage() {
                         <div className="feedback-title">Well done, {(user.name || '').split(' ')[0] || 'there'}!</div>
                       </div>
                     </div>
-                    <div className="feedback-score">
-                      <div className="feedback-score-num">{assignment.feedback.score}</div>
-                      <div className="feedback-score-denom">/ {assignment.points} pts</div>
-                    </div>
+                    {typeof assignment.feedback.score === 'number' && (
+                      <div className="feedback-score">
+                        <div className="feedback-score-num">{assignment.feedback.score}</div>
+                        {hasPoints && <div className="feedback-score-denom">/ {assignment.points} pts</div>}
+                      </div>
+                    )}
                   </div>
-                  <div className="feedback-divider" />
-                  <div className="feedback-comment graded">&ldquo;{assignment.feedback.comment}&rdquo;</div>
+                  {assignment.feedback.comment && (
+                    <>
+                      <div className="feedback-divider" />
+                      <div className="feedback-comment graded">&ldquo;{assignment.feedback.comment}&rdquo;</div>
+                    </>
+                  )}
                   <div className="feedback-byline graded">Graded by {assignment.feedback.grader_name} · {fmtShortDate(assignment.feedback.date)}</div>
                 </div>
               )}
@@ -464,7 +676,9 @@ export default function AssignmentDetailPage() {
                     <div className="feedback-icon revision"><AlertTriangle size={18} color="#B45309" /></div>
                     <div className="feedback-title revision">Revision requested by {assignment.feedback.grader_name}</div>
                   </div>
-                  <div className="feedback-comment revision">&ldquo;{assignment.feedback.comment}&rdquo;</div>
+                  {assignment.feedback.comment && (
+                    <div className="feedback-comment revision">&ldquo;{assignment.feedback.comment}&rdquo;</div>
+                  )}
                   <div className="feedback-byline revision">Feedback received · {fmtShortDate(assignment.feedback.date)}</div>
                 </div>
               )}
@@ -493,14 +707,16 @@ export default function AssignmentDetailPage() {
                   </div>
                 )}
 
-                <div className="subsection">
-                  <h3>What you&apos;ll do</h3>
-                  <div className="bullet-list">
-                    {assignment.instructions.what_youll_do.map((item, i) => (
-                      <div className="bullet-row" key={i}><span className="bullet-dot" />{item}</div>
-                    ))}
+                {assignment.instructions.what_youll_do.length > 0 && (
+                  <div className="subsection">
+                    <h3>What you&apos;ll do</h3>
+                    <div className="bullet-list">
+                      {assignment.instructions.what_youll_do.map((item, i) => (
+                        <div className="bullet-row" key={i}><span className="bullet-dot" />{item}</div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {assignment.instructions.scenarios.length > 0 && (
                   <div className="scenario-box">
@@ -513,28 +729,32 @@ export default function AssignmentDetailPage() {
                   </div>
                 )}
 
-                <div className="subsection">
-                  <h3>Deliverables</h3>
-                  <div className="numbered-list">
-                    {assignment.instructions.deliverables.map((d) => (
-                      <div className="numbered-row" key={d.id}>
-                        <span className="num-badge">{d.order}</span>{d.text}
-                      </div>
-                    ))}
+                {assignment.instructions.deliverables.length > 0 && (
+                  <div className="subsection">
+                    <h3>Deliverables</h3>
+                    <div className="numbered-list">
+                      {assignment.instructions.deliverables.map((d) => (
+                        <div className="numbered-row" key={d.id}>
+                          <span className="num-badge">{d.order}</span>{d.text}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#111', marginBottom: '0.75rem' }}>Grading criteria</h3>
-                  <div className="grading-table">
-                    {assignment.instructions.grading_criteria.map((g) => (
-                      <div className="grading-row" key={g.id}>
-                        <span>{g.label}</span>
-                        <span>{g.points} pts</span>
-                      </div>
-                    ))}
+                {assignment.instructions.grading_criteria.length > 0 && (
+                  <div>
+                    <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#111', marginBottom: '0.75rem' }}>Grading criteria</h3>
+                    <div className="grading-table">
+                      {assignment.instructions.grading_criteria.map((g) => (
+                        <div className="grading-row" key={g.id}>
+                          <span>{g.label}</span>
+                          <span>{g.points} pts</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Resources */}
@@ -550,7 +770,7 @@ export default function AssignmentDetailPage() {
                         <div className="resource-info">
                           <div className="resource-title">{r.title}</div>
                           <div className="resource-meta">
-                            {r.file_type} · {r.size_display}
+                            {r.file_type}{r.size_display && ` · ${r.size_display}`}
                             {r.size_tag && <span className="size-tag"> · {r.size_tag}</span>}
                           </div>
                         </div>
@@ -576,9 +796,9 @@ export default function AssignmentDetailPage() {
                       <div className="req-icon-wrap"><FileCheck2 size={16} color="#7C3AED" /></div>
                       <div className="req-info">
                         <div className="req-label">Accepted file types</div>
-                        <div className="req-sub">All three deliverables in one upload or separate files</div>
+                        <div className="req-sub">All deliverables in one upload or separate files</div>
                       </div>
-                      <div className="req-value">{assignment.submission_requirements.accepted_file_types}</div>
+                      <div className="req-value">{assignment.submission_requirements.accepted_file_types || '—'}</div>
                     </div>
                     <div className="req-row">
                       <div className="req-icon-wrap"><Info size={16} color="#7C3AED" /></div>
@@ -586,7 +806,7 @@ export default function AssignmentDetailPage() {
                         <div className="req-label">Max file size</div>
                         <div className="req-sub">Compress images before uploading if needed</div>
                       </div>
-                      <div className="req-value">{assignment.submission_requirements.max_file_size}</div>
+                      <div className="req-value">{assignment.submission_requirements.max_file_size || '—'}</div>
                     </div>
                     {assignment.submission_requirements.word_count && (
                       <div className="req-row">

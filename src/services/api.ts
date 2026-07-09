@@ -136,11 +136,6 @@ const SKIP_REFRESH_ROUTES = [
   API_ENDPOINTS.PASSWORD_RESET_CONFIRM,
 ]
 
-// ─── Routes where a 403 is an EXPECTED, recoverable response that the calling
-// page already handles gracefully (e.g. "this lesson isn't the free preview,
-// please enrol", "this course isn't available to you yet") — the global
-// hard-redirect must not hijack these. Covers the whole courses namespace:
-// course detail, lessons, enrollment-status, progress, etc.
 const SKIP_FORBIDDEN_REDIRECT_PATTERNS = [
   /\/v1\/courses\//,
 ]
@@ -397,15 +392,21 @@ export const authAPI = {
     }
   },
 
-  changePassword: async (current_password: string, new_password: string) => {
-    try {
-      await apiClient.post('/v1/auth/me/password/', { current_password, new_password })
-      return { success: true as const }
-    } catch (error) {
-      const { message, statusCode } = parseApiError(error, 'Failed to change password')
-      return { success: false as const, error: message, statusCode }
-    }
-  },
+ changePassword: async (current_password: string, new_password: string) => {
+  try {
+    await apiClient.post('/v1/auth/password-change/', {
+      old_password: current_password,
+      new_password,
+    })
+    // Backend invalidates all refresh tokens on success — the caller must
+    // log in again, so clear local auth state right away.
+    useAuthStore.getState().logout()
+    return { success: true as const }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Failed to change password')
+    return { success: false as const, error: message, statusCode }
+  }
+},
 
   ...(import.meta.env.DEV && {
     testLearnerOnly: async () => {
@@ -576,7 +577,11 @@ export interface LessonDetailResponse {
   duration_display: string
   status: LessonStatus
   notes?: string | null
-  resources: LessonResource[]
+  // NOTE: backend currently returns `downloadable_resources` in some
+  // responses while the frontend expects `resources`. Make both fields
+  // optional here to reflect reality until the API is stabilized.
+  resources?: LessonResource[]
+  downloadable_resources?: LessonResource[]
   assignments?: LessonAssignmentSummary[]
   previous_lesson: AdjacentLesson | null
   next_lesson: (AdjacentLesson & { thumbnail?: string | null }) | null
@@ -600,6 +605,74 @@ export interface SavePositionResponse {
   lesson_id: string
   position_seconds: number
   updated_at: string
+}
+
+// ─── Course "learn" view types ─────────────────────────────────────────────────
+// GET /v1/courses/{course_slug}/learn/
+// This is the ONLY place assignments show up before you have a specific
+// assignment_id — they're returned per-module (sibling to that module's
+// `lessons` array), NOT nested inside individual lesson-detail responses.
+// Lesson content itself (video/resources) still comes from the lesson-detail
+// endpoint; this view is metadata + the module → assignment mapping.
+
+export interface LearnCourseHeader {
+  id: string
+  slug: string
+  title: string
+  category: string
+  status: string
+}
+
+export interface LearnCourseProgress {
+  percent: number
+  lessons_completed: number
+  lessons_total: number
+  total_duration_seconds: number
+  estimated_seconds_remaining: number
+  next_incomplete_lesson: {
+    id: string
+    module_id: string
+    title: string
+  } | null
+}
+
+export interface LearnModuleLessonSummary {
+  id: string
+  title: string
+  order: number
+  duration_seconds: number
+  is_completed: boolean
+  is_next: boolean
+  is_preview: boolean
+}
+
+// The assignment summary as it appears nested under a module in the
+// learn-view response. Use `assignmentsAPI.getAssignment(id)` to fetch the
+// full detail (instructions, requirements, resources, submissions) once you
+// have the id from here.
+export interface LearnModuleAssignmentSummary {
+  id: string
+  title: string
+  deadline: string | null
+  order: number
+  my_submission_status: string
+}
+
+export interface LearnModule {
+  id: string
+  title: string
+  order: number
+  lessons_completed: number
+  lessons_total: number
+  is_current: boolean
+  lessons: LearnModuleLessonSummary[]
+  assignments: LearnModuleAssignmentSummary[]
+}
+
+export interface CourseLearnViewResponse {
+  course: LearnCourseHeader
+  progress: LearnCourseProgress
+  modules: LearnModule[]
 }
 
 // ─── Courses API ──────────────────────────────────────────────────────────────
@@ -641,24 +714,29 @@ export const coursesAPI = {
     }
   },
 
-  getLesson: async (courseSlug: string, lessonId: string) => {
-    const requestLearn = async (path: string) => {
-      const response = await apiClient.get<LessonDetailResponse>(path)
-      return { success: true as const, data: response.data }
-    }
-
+  // GET /v1/courses/{course_slug}/learn/
+  // Course header + progress + ordered module → lesson tree, with each
+  // module's assignments array. This is where assignment metadata actually
+  // lives — see CourseLearnViewResponse above for why it's not on the lesson.
+  getCourseLearnView: async (courseSlug: string) => {
     try {
-      return await requestLearn(`/v1/courses/${courseSlug}/learn/${lessonId}/`)
+      const response = await apiClient.get<CourseLearnViewResponse>(
+        `/v1/courses/${courseSlug}/learn/`,
+      )
+      return { success: true as const, data: response.data }
     } catch (error) {
-      const axiosError = error as AxiosError<ApiErrorResponse>
-      if (axiosError.response?.status === 404) {
-        try {
-          return await requestLearn(`/v1/courses/${courseSlug}/lessons/${lessonId}/`)
-        } catch {
-          // fall through to error handling below
-        }
-      }
+      const { message, statusCode } = parseApiError(error, 'Failed to load course learning view')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
 
+  getLesson: async (courseSlug: string, lessonId: string) => {
+    try {
+      const response = await apiClient.get<LessonDetailResponse>(
+        `/v1/courses/${courseSlug}/lessons/${lessonId}/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to load lesson')
       return { success: false as const, error: message, statusCode }
     }
@@ -890,20 +968,6 @@ export const assignmentsAPI = {
     }
   },
 
-  /**
-   * Full presigned-upload flow:
-   *   1. POST /assignments/{id}/submissions/                            → submission_id
-   *   2. For each file (matched to a requirement, in order):
-   *      a. POST /assignments/submissions/{sid}/files/presign/          → { upload_url, method, headers, object_key, expires_in }
-   *      b. Upload  →  upload_url, using the `method` and `headers` the backend gave us
-   *      c. POST /assignments/submissions/{sid}/files/confirm/          → records the file server-side
-   *   3. POST /assignments/submissions/{sid}/submit/                    → finalises, returns the submission
-   *      with its authoritative `files` array (id, download_url, etc.) — this is what we
-   *      use to build the SubmittedFile[] we hand back to the UI.
-   *
-   * `requirements` should be `assignment.requirements` sorted by `order`. Files are
-   * auto-mapped to requirements in the order they were added (files[0] → requirements[0], etc).
-   */
   submitAssignment: async (
     assignmentId: string,
     files: File[],

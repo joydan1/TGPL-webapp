@@ -56,6 +56,39 @@ interface LiveSessionSummary {
   trainer_name: string
 }
 
+// Raw shape of an assignment item inside dashboard.assignments.active/upcoming.
+// Swagger only documents this as a generic object (additionalProp1/2/3
+// placeholders — untyped JSONField), so we can't fully trust field names
+// until confirmed against a real populated response. Normalize defensively
+// (same pattern as AssignmentDetailPage's normalizeGradingCriteria) instead
+// of assuming a fixed contract.
+interface RawDashboardAssignment {
+  id: string
+  title?: string
+  deadline?: string | null
+  due_at?: string | null
+  course_id?: string
+  course_title?: string
+  module_id?: string
+  [key: string]: unknown
+}
+
+interface AssignmentItem {
+  id: string
+  title: string
+  course_title: string
+  due_at: string
+}
+
+function normalizeAssignmentItem(raw: RawDashboardAssignment): AssignmentItem {
+  return {
+    id: raw.id,
+    title: raw.title ?? 'Untitled assignment',
+    course_title: raw.course_title ?? '',
+    due_at: raw.deadline ?? raw.due_at ?? '',
+  }
+}
+
 interface DashboardResponse {
   user: {
     id: string
@@ -66,7 +99,7 @@ interface DashboardResponse {
     profile_completion_status: string
   }
   continue_learning: string | null
-  assignments: { active: unknown[]; upcoming: unknown[] }
+  assignments: { active: RawDashboardAssignment[]; upcoming: RawDashboardAssignment[] }
   live_sessions: { live_now: unknown[]; upcoming: unknown[] }
   enrolled_courses: EnrolledCourse[]
   certification_progress: CertificationProgress[]
@@ -102,6 +135,13 @@ function fmtSessionTime(iso: string): string {
   const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   const timePart = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
   return `${datePart} · ${timePart} WAT`
+}
+
+function fmtDueDate(iso: string): string {
+  if (!iso) return 'No due date'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return 'No due date'
+  return `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 }
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
@@ -140,17 +180,17 @@ const PAGE_CSS = `
   .resume-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.65rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .resume-btn:hover { opacity: 0.9; }
 
-  .resume-banner-empty { background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%); border-radius: 1rem; padding: 1.75rem 2rem 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; color: #fff; min-height: 160px; overflow: hidden; position: relative; }
-  .resume-empty-left { flex: 1; min-width: 0; padding-bottom: 1.75rem; }
-  .resume-you-badge { display: inline-flex; align-items: center; gap: 0.375rem; background: rgba(255,255,255,0.18); border-radius: 2rem; padding: 0.2rem 0.75rem; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
-  .resume-empty-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.375rem; }
-  .resume-empty-sub { font-size: 0.8125rem; opacity: 0.85; max-width: 420px; line-height: 1.5; }
-  .resume-empty-bar-wrap { margin-top: 1.25rem; }
-  .resume-empty-bar { height: 6px; background: rgba(255,255,255,0.25); border-radius: 99px; }
-  .resume-empty-fill { height: 100%; background: rgba(255,255,255,0.55); border-radius: 99px; width: 2%; }
-  .resume-empty-sub2 { font-size: 0.72rem; opacity: 0.7; margin-top: 0.375rem; }
-  .resume-empty-right { flex-shrink: 0; display: flex; align-items: flex-end; justify-content: flex-end; padding-bottom: 1.75rem; }
-  .start-course-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .resume-banner-empty { background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%); border-radius: 1rem; padding: 1.5rem 1.75rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; color: #fff; min-height: 110px; overflow: hidden; position: relative; }
+  .resume-empty-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+  .resume-you-badge { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.9; }
+  .resume-empty-title { font-size: 1.0625rem; font-weight: 700; }
+  .resume-empty-sub { font-size: 0.8125rem; opacity: 0.85; max-width: 460px; line-height: 1.5; }
+  .resume-empty-bar-wrap { display: flex; flex-direction: column; width: 100%; }
+  .resume-empty-bar { height: 12px; background: rgba(255,255,255,0.25); border-radius: 99px; width: 100%; }
+  .resume-empty-fill { height: 100%; background: #fff; border-radius: 99px; width: 2%; }
+  .resume-empty-sub2 { font-size: 0.75rem; opacity: 0.75; margin-top: 0.4rem; }
+  .resume-empty-right { flex-shrink: 0; }
+  .start-course-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.65rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .start-course-btn:hover { opacity: 0.9; }
 
   .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.875rem; }
@@ -254,10 +294,8 @@ export default function DashboardPage() {
   const [activeNav, setActiveNav] = useState('home')
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
-  // `assignments` is scaffolded by the backend (always []) until Sprint 5 ships.
-  // We still read it into state so the UI is ready the moment real items
-  const [assignmentsActive, setAssignmentsActive] = useState<unknown[]>([])
-  const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<unknown[]>([])
+  const [assignmentsActive, setAssignmentsActive] = useState<AssignmentItem[]>([])
+  const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<AssignmentItem[]>([])
   const [liveSessions, setLiveSessions] = useState<LiveSessionSummary[]>([])
   const [liveSessionsLoaded, setLiveSessionsLoaded] = useState(false)
   const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set())
@@ -277,8 +315,8 @@ export default function DashboardPage() {
         const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
         setCertProgress(response.data.certification_progress || [])
         setEnrolledCourses(response.data.enrolled_courses || [])
-        setAssignmentsActive(response.data.assignments?.active || [])
-        setAssignmentsUpcoming(response.data.assignments?.upcoming || [])
+        setAssignmentsActive((response.data.assignments?.active || []).map(normalizeAssignmentItem))
+        setAssignmentsUpcoming((response.data.assignments?.upcoming || []).map(normalizeAssignmentItem))
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
         setError('Failed to load courses')
@@ -313,8 +351,6 @@ export default function DashboardPage() {
   const showEmptyState              = !loading && !error && !hasCourses
   const showCourseDependentSections = !loading && !error && hasCourses
 
-  // Always true today (Sprint 5 hasn't shipped), but written so this
-  // naturally starts working once the backend fills in real assignment items.
   const hasAssignments = assignmentsActive.length > 0 || assignmentsUpcoming.length > 0
 
   const liveNowSessions = liveSessions
@@ -343,12 +379,15 @@ export default function DashboardPage() {
       })[0]
     : null
 
-  const firstCourse = hasCourses ? enrolledCourses[0] : null
   const activeCert  = certProgress.length > 0 ? certProgress[0] : null
 
   function goToCourse(slug: string) {
     if (!slug) return
     navigate(RouteBuilder.course(slug))
+  }
+
+  function goToAssignment(a: AssignmentItem) {
+    navigate(RouteBuilder.assignmentDetail(a.id), { state: { courseTitle: a.course_title } })
   }
 
   return (
@@ -366,7 +405,6 @@ export default function DashboardPage() {
           {/* Resume banner (has progress) */}
           {showCourseDependentSections && resumeCourse && resumeCourse.completion_percentage > 0 && (
             <div className="resume-banner">
-              {/* Left: label + title on top, progress bar on bottom */}
               <div className="resume-banner-left">
                 <div className="resume-banner-top">
                   <div className="resume-label">Continue where you left off</div>
@@ -379,7 +417,6 @@ export default function DashboardPage() {
                   <div className="resume-sub">{resumeCourse.completion_percentage}% complete</div>
                 </div>
               </div>
-              {/* Right: Resume button pinned to top-right */}
               <button className="resume-btn" onClick={() => {
                 if (resumeCourse.resume_url) navigate(resumeCourse.resume_url)
                 else goToCourse(resumeCourse.course_slug)
@@ -389,9 +426,32 @@ export default function DashboardPage() {
             </div>
           )}
 
-         
+          {/* Resume banner (enrolled, but hasn't started anything yet) */}
+          {showCourseDependentSections && resumeCourse && resumeCourse.completion_percentage === 0 && (
+            <div className="resume-banner-empty">
+              <div className="resume-empty-left">
+                <div className="resume-you-badge">✨ You're all set to begin!</div>
+                <div className="resume-empty-title">Start your first module</div>
+                <div className="resume-empty-sub">
+                  You haven't started your course yet. Begin Module 1 to kick off your learning journey.
+                </div>
+                <div className="resume-empty-bar-wrap">
+                  <div className="resume-empty-bar"><div className="resume-empty-fill" /></div>
+                  <div className="resume-empty-sub2">0% complete</div>
+                </div>
+              </div>
+              <div className="resume-empty-right">
+                <button className="start-course-btn" onClick={() => {
+                  if (resumeCourse.resume_url) navigate(resumeCourse.resume_url)
+                  else goToCourse(resumeCourse.course_slug)
+                }}>
+                  <Play size={14} fill="#2563EB" /> Start Course
+                </button>
+              </div>
+            </div>
+          )}
 
-          {/* Assignments — real data only; backend scaffolds this as [] until Sprint 5 ships */}
+          {/* Assignments */}
           <div>
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
@@ -409,12 +469,33 @@ export default function DashboardPage() {
                 <div className="empty-inline-sub">Assignments will appear here once you start progressing through your course.</div>
               </div>
             )}
-            {/* TODO: AssignmentsSection is documented as scaffolded — "both buckets
-                empty until Sprint 5" per Swagger. Once Sprint 5 ships and the item
-                shape is defined, render real cards here using assignmentsActive/
-                assignmentsUpcoming and RouteBuilder.assignmentDetail(<real uuid>).
-                Do not reintroduce mock/hardcoded ids — the assignment-detail API
-                requires a real UUID. */}
+
+            {!loading && !error && hasAssignments && (
+              <div className="assignments-wrap">
+                <div className="assignments-scroll">
+                  {[...assignmentsActive, ...assignmentsUpcoming].map((a) => {
+                    const isActive = assignmentsActive.some((x) => x.id === a.id)
+                    return (
+                      <div
+                        key={a.id}
+                        className={`asgn-card${isActive ? ' active' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => goToAssignment(a)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToAssignment(a) }}
+                      >
+                        <div className={`asgn-badge ${isActive ? 'active' : 'upcoming'}`}>
+                          {isActive ? 'Active' : 'Upcoming'}
+                        </div>
+                        <div className="asgn-title">{a.title}</div>
+                        {a.course_title && <div className="asgn-course">{a.course_title}</div>}
+                        <div className="asgn-due-note"><Clock size={12} /> {fmtDueDate(a.due_at)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sessions — real data from GET /v1/live/sessions/ */}
@@ -593,7 +674,7 @@ export default function DashboardPage() {
               </div>
               <div className="cert-empty-bar"><div className="cert-empty-fill" /></div>
               <div className="cert-empty-hint">Complete all 8 modules, quizzes, and submit your project to earn your certificate.</div>
-              <button className="cert-empty-cta" onClick={() => firstCourse && goToCourse(firstCourse.course_slug)}>
+              <button className="cert-empty-cta" onClick={() => navigate(RouteBuilder.courseCatalogPage())}>
                 Let's get started <ChevronRight size={16} />
               </button>
             </div>

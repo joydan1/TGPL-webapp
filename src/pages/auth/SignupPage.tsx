@@ -264,10 +264,10 @@ export default function SignupPage() {
         .signup-card { width: 100%; max-width: 440px; background: var(--white); border: 1px solid #E8E8E8; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm); }
 
         .signup-logo { margin-bottom: 1.75rem; text-align: center; }
-        .signup-logo img { height: 2.75rem; }
+        .signup-logo img { height: 2.75rem; width: auto; }
 
         @media (max-width: 640px) {
-          .signup-logo img { height: 2rem; }
+          .signup-logo img { height: 1.5rem; width: auto; }
         }
 
         .signup-error-alert { width: 100%; max-width: 440px; margin-bottom: 1rem; }
