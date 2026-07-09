@@ -1,16 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Camera, CheckCircle2, Mail, Phone, Globe, FileText, User, Check, X } from 'lucide-react'
+import { Camera, CheckCircle2, Mail, Phone, Globe, FileText, User, Check, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import { apiClient } from '../../services/api'
-import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
+import SettingsLayout from '../../components/layout/SettingsLayout'
 
-// ── Types ──────────────────────────────────────────────────────────────────
-// NOTE: field names below follow Dan's message about GET/PATCH
-// /api/v1/auth/me/ (full_name, phone, country, bio, avatar_url, email).
-// Confirm the exact keys against Swagger once it's published — this is
-// built from the endpoint description, not a verified schema.
 interface UserProfile {
   full_name: string
   email: string
@@ -57,15 +52,7 @@ const COUNTRIES = [
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
 const PAGE_CSS = `
-  .profile-content { padding: 2rem 2.5rem 8rem; max-width: 1200px; width: 100%; margin: 0 auto; }
-
-  .profile-header { display: flex; align-items: center; gap: 1rem; }
-  .profile-back-btn { border: none; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #374151; flex-shrink: 0; }
-  .profile-back-btn:hover { background: #F9FAFB; }
-  .profile-heading { font-size: 1.5rem; font-weight: 800; color: #111; }
-  .profile-sub { font-size: 0.9375rem; color: #6B7280; margin-top: 0.25rem; }
-
-  .profile-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; margin-top: 1.5rem; padding: 1.5rem; grid-column: 1 / -1; }
+  .profile-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; margin-top: 0.25rem; padding: 1.5rem; grid-column: 1 / -1; }
 
   .avatar-row { display: flex; align-items: center; gap: 1.25rem; }
   .avatar-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
@@ -106,7 +93,7 @@ const PAGE_CSS = `
   .field-textarea:focus { outline: none; border-color: #93C5FD; background: #fff; }
   .char-count { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.4rem; text-align: right; }
 
-  .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 1rem 2.5rem; display: flex; justify-content: center; gap: 0.75rem; z-index: 20; }
+  .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 1rem 2.5rem; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.75rem; z-index: 20; }
   .save-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; border-radius: 0.75rem; padding: 0.9rem 1.5rem; font-weight: 700; font-size: 0.9375rem; cursor: pointer; width: 100%; max-width: 340px; }
   .save-btn.primary { background: #2563EB; color: #fff; }
   .save-btn.primary:disabled { background: #E5E7EB; color: #9CA3AF; cursor: default; }
@@ -114,8 +101,7 @@ const PAGE_CSS = `
   .save-btn.secondary:disabled { color: #C4C9D1; cursor: default; }
 
   @media (max-width: 640px) {
-    .profile-content { padding: 1.25rem 1rem 8rem; }
-    .save-bar { flex-direction: column; padding: 0.85rem 1rem; }
+    .save-bar { padding: 0.85rem 1rem; }
     .field-card { grid-template-columns: 1fr; padding: 0; }
     .field-block { padding: 1rem; }
   }
@@ -209,13 +195,12 @@ export default function SettingsProfilePage() {
   }
 
   function handleAvatarClick() {
-    // open the bottom-sheet modal with options
     setSheetOpen(true)
   }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    e.target.value = '' // allow re-selecting the same file later
+    e.target.value = ''
     setSheetOpen(false)
     if (!file) return
 
@@ -269,7 +254,6 @@ export default function SettingsProfilePage() {
 
   function openCameraInput() {
     setSheetOpen(false)
-    // close sheet first, then trigger camera input so overlay doesn't block the dialog
     setTimeout(() => cameraInputRef.current?.click(), 80)
   }
 
@@ -282,182 +266,170 @@ export default function SettingsProfilePage() {
 
   return (
     <>
-      <style>{SHELL_CSS + PAGE_CSS}</style>
-      <AppShell activeNav="settings" onNavChange={() => {}}>
-        <div className="profile-content">
-          <div className="profile-header">
-            <button className="profile-back-btn" onClick={() => navigate(ROUTES.SETTINGS)} aria-label="Back to settings">
-              <ChevronLeft size={20} />
-            </button>
-            <div>
-              <div className="profile-heading">Profile</div>
-              <div className="profile-sub">Manage your personal information.</div>
-            </div>
-          </div>
-
-          {loading ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#9CA3AF' }}>Loading profile…</div>
-          ) : error && !profile ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#EF4444' }}>{error}</div>
-          ) : profile && (
-            <>
-              {/* Avatar */}
-              <div className="profile-card">
-                <div className="avatar-row">
-                  <div className="avatar-wrap">
-                    <img
-                      src={profile.avatar_url || '/image1.png'}
-                      alt={profile.full_name}
-                      className="avatar-img"
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
-                    />
-                    <button className="avatar-camera-btn" onClick={handleAvatarClick} disabled={avatarUploading} aria-label="Change photo">
-                      <Camera size={14} />
+      <style>{PAGE_CSS}</style>
+      <SettingsLayout title="Profile" subtitle="Manage your personal information." backTo={ROUTES.SETTINGS}>
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#9CA3AF' }}>Loading profile…</div>
+        ) : error && !profile ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#EF4444' }}>{error}</div>
+        ) : profile && (
+          <>
+            {/* Avatar */}
+            <div className="profile-card">
+              <div className="avatar-row">
+                <div className="avatar-wrap">
+                  <img
+                    src={profile.avatar_url || '/image1.png'}
+                    alt={profile.full_name}
+                    className="avatar-img"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
+                  />
+                  <button className="avatar-camera-btn" onClick={handleAvatarClick} disabled={avatarUploading} aria-label="Change photo">
+                    <Camera size={14} />
+                  </button>
+                </div>
+                <div>
+                  <div className="avatar-info-name">{profile.full_name}</div>
+                  <div className="avatar-info-hint">JPG or PNG · max 2 MB</div>
+                  <div className="avatar-actions">
+                    <button className="avatar-upload-link" onClick={handleAvatarClick} disabled={avatarUploading}>
+                      <Camera size={15} /> {avatarUploading ? 'Uploading…' : 'Upload new photo'}
+                    </button>
+                    <button className="avatar-remove-link" onClick={handleAvatarRemove} disabled={avatarUploading || !profile.avatar_url}>
+                      Remove
                     </button>
                   </div>
-                  <div>
-                    <div className="avatar-info-name">{profile.full_name}</div>
-                    <div className="avatar-info-hint">JPG or PNG · max 2 MB</div>
-                    <div className="avatar-actions">
-                      <button className="avatar-upload-link" onClick={handleAvatarClick} disabled={avatarUploading}>
-                        <Camera size={15} /> {avatarUploading ? 'Uploading…' : 'Upload new photo'}
-                      </button>
-                      <button className="avatar-remove-link" onClick={handleAvatarRemove} disabled={avatarUploading || !profile.avatar_url}>
-                        Remove
-                      </button>
-                    </div>
-                    {avatarError && <div style={{ color: '#EF4444', fontSize: '0.8125rem', marginTop: '0.5rem' }}>{avatarError}</div>}
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    style={{ display: 'none' }}
-                    onChange={handleAvatarChange}
-                  />
-                  {/* Camera capture input: using capture attribute to open camera on mobile */}
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    {...{ capture: 'environment' }}
-                    style={{ display: 'none' }}
-                    onChange={handleAvatarChange}
-                  />
+                  {avatarError && <div style={{ color: '#EF4444', fontSize: '0.8125rem', marginTop: '0.5rem' }}>{avatarError}</div>}
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarChange}
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  {...{ capture: 'environment' }}
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarChange}
+                />
+              </div>
+            </div>
+
+            {/* Fields */}
+            <div className="field-card">
+              <div className="field-block">
+                <div className="field-label-row">
+                  <User size={16} />
+                  <span className="field-label">Full name <span className="field-required">*</span></span>
+                </div>
+                <input
+                  className="field-input"
+                  type="text"
+                  value={profile.full_name ?? ''}
+                  onChange={(e) => updateField('full_name', e.target.value)}
+                />
               </div>
 
-              {/* Fields */}
-              <div className="field-card">
-                <div className="field-block">
-                  <div className="field-label-row">
-                    <User size={16} />
-                    <span className="field-label">Full name <span className="field-required">*</span></span>
-                  </div>
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={profile.full_name ?? ''}
-                    onChange={(e) => updateField('full_name', e.target.value)}
-                  />
+              <div className="field-block">
+                <div className="field-label-row">
+                  <Mail size={16} />
+                  <span className="field-label">Email address</span>
                 </div>
-
-                <div className="field-block">
-                  <div className="field-label-row">
-                    <Mail size={16} />
-                    <span className="field-label">Email address</span>
-                  </div>
-                  <div className="email-row">
-                    <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled />
-                    {profile.email_verified && (
-                      <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
-                    )}
-                  </div>
-                  <div className="field-hint">To change your email, contact support.</div>
+                <div className="email-row">
+                  <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled />
+                  {profile.email_verified && (
+                    <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
+                  )}
                 </div>
-
-                <div className="field-block">
-                  <div className="field-label-row">
-                    <Phone size={16} />
-                    <span className="field-label">Phone number</span>
-                    <span className="field-optional">optional</span>
-                  </div>
-                  <input
-                    className="field-input"
-                    type="tel"
-                    placeholder="+234 801 234 5678"
-                    value={profile.phone ?? ''}
-                    onChange={(e) => updateField('phone', e.target.value)}
-                  />
-                </div>
-
-                <div className="field-block">
-                  <div className="field-label-row">
-                    <Globe size={16} />
-                    <span className="field-label">Country / region</span>
-                  </div>
-                  <select
-                    className="field-select"
-                    value={profile.country ?? ''}
-                    onChange={(e) => updateField('country', e.target.value || null)}
-                  >
-                    <option value="">Select a country</option>
-                    {COUNTRIES.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="field-block fullwidth">
-                  <div className="field-label-row">
-                    <FileText size={16} />
-                    <span className="field-label">Bio</span>
-                    <span className="field-optional">optional</span>
-                  </div>
-                  <textarea
-                    className="field-textarea"
-                    placeholder="Tell your trainer a little about yourself…"
-                    maxLength={BIO_MAX_LEN}
-                    value={profile.bio ?? ''}
-                    onChange={(e) => updateField('bio', e.target.value)}
-                  />
-                  <div className="char-count">{bioLength}/{BIO_MAX_LEN}</div>
-                </div>
+                <div className="field-hint">To change your email, contact support.</div>
               </div>
 
-              {error && <div style={{ color: '#EF4444', fontSize: '0.875rem', marginTop: '0.85rem' }}>{error}</div>}
-            </>
-          )}
-          {/* Bottom-sheet modal for photo options */}
-          {sheetOpen && (
-            <>
-              <div className="sheet-overlay" onClick={() => setSheetOpen(false)} />
-              <div className="sheet" role="dialog" aria-label="Change profile photo">
-                <div className="sheet-handle" />
-                <div className="sheet-title">Change profile photo</div>
-                <button className="sheet-option" onClick={openCameraInput}>
-                  <span className="sheet-option-icon icon-blue"><Camera size={18} /></span>
-                  <div>
-                    <div className="label">Take photo</div>
-                    <div className="sub">Use your camera to take a new photo</div>
-                  </div>
-                </button>
-                <button className="sheet-option" onClick={openFileInput}>
-                  <span className="sheet-option-icon icon-purple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M16 3H8L6 7H18L16 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 11.5C13.3807 11.5 14.5 10.3807 14.5 9C14.5 7.61929 13.3807 6.5 12 6.5C10.6193 6.5 9.5 7.61929 9.5 9C9.5 10.3807 10.6193 11.5 12 11.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg></span>
-                  <div>
-                    <div className="label">Upload from photos</div>
-                    <div className="sub">Choose from your photo library</div>
-                  </div>
-                </button>
-                <button className="sheet-cancel" onClick={() => setSheetOpen(false)}>Cancel</button>
+              <div className="field-block">
+                <div className="field-label-row">
+                  <Phone size={16} />
+                  <span className="field-label">Phone number</span>
+                  <span className="field-optional">optional</span>
+                </div>
+                <input
+                  className="field-input"
+                  type="tel"
+                  placeholder="+234 801 234 5678"
+                  value={profile.phone ?? ''}
+                  onChange={(e) => updateField('phone', e.target.value)}
+                />
               </div>
-            </>
-          )}
-        </div>
+
+              <div className="field-block">
+                <div className="field-label-row">
+                  <Globe size={16} />
+                  <span className="field-label">Country / region</span>
+                </div>
+                <select
+                  className="field-select"
+                  value={profile.country ?? ''}
+                  onChange={(e) => updateField('country', e.target.value || null)}
+                >
+                  <option value="">Select a country</option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field-block fullwidth">
+                <div className="field-label-row">
+                  <FileText size={16} />
+                  <span className="field-label">Bio</span>
+                  <span className="field-optional">optional</span>
+                </div>
+                <textarea
+                  className="field-textarea"
+                  placeholder="Tell your trainer a little about yourself…"
+                  maxLength={BIO_MAX_LEN}
+                  value={profile.bio ?? ''}
+                  onChange={(e) => updateField('bio', e.target.value)}
+                />
+                <div className="char-count">{bioLength}/{BIO_MAX_LEN}</div>
+              </div>
+            </div>
+
+            {error && <div style={{ color: '#EF4444', fontSize: '0.875rem', marginTop: '0.85rem' }}>{error}</div>}
+          </>
+        )}
+
+        {/* Bottom-sheet modal for photo options */}
+        {sheetOpen && (
+          <>
+            <div className="sheet-overlay" onClick={() => setSheetOpen(false)} />
+            <div className="sheet" role="dialog" aria-label="Change profile photo">
+              <div className="sheet-handle" />
+              <div className="sheet-title">Change profile photo</div>
+              <button className="sheet-option" onClick={openCameraInput}>
+                <span className="sheet-option-icon icon-blue"><Camera size={18} /></span>
+                <div>
+                  <div className="label">Take photo</div>
+                  <div className="sub">Use your camera to take a new photo</div>
+                </div>
+              </button>
+              <button className="sheet-option" onClick={openFileInput}>
+                <span className="sheet-option-icon icon-purple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M16 3H8L6 7H18L16 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12 11.5C13.3807 11.5 14.5 10.3807 14.5 9C14.5 7.61929 13.3807 6.5 12 6.5C10.6193 6.5 9.5 7.61929 9.5 9C9.5 10.3807 10.6193 11.5 12 11.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg></span>
+                <div>
+                  <div className="label">Upload from photos</div>
+                  <div className="sub">Choose from your photo library</div>
+                </div>
+              </button>
+              <button className="sheet-cancel" onClick={() => setSheetOpen(false)}>Cancel</button>
+            </div>
+          </>
+        )}
 
         {profile && (
           <div className="save-bar">
@@ -469,7 +441,7 @@ export default function SettingsProfilePage() {
             </button>
           </div>
         )}
-      </AppShell>
+      </SettingsLayout>
     </>
   )
 }

@@ -12,6 +12,24 @@ export const NOTIF_CSS = `
   /* ── Bell wrapper ── */
   .bell-wrap { position: relative; }
 
+  /* ── Backdrop (mobile only) ── */
+  .notif-backdrop {
+    display: none;
+  }
+  @media (max-width: 640px) {
+    .notif-backdrop {
+      display: block;
+      position: fixed; inset: 0;
+      background: rgba(17,24,39,0.45);
+      z-index: 490;
+      animation: notifBackdropIn 0.18s ease-out;
+    }
+  }
+  @keyframes notifBackdropIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
   /* ── Dropdown (desktop) / Bottom sheet (mobile) ── */
   .notif-dropdown {
     position: absolute; top: calc(100% + 0.75rem); right: 0;
@@ -24,8 +42,27 @@ export const NOTIF_CSS = `
   @media (max-width: 640px) {
     .notif-dropdown {
       position: fixed; top: auto; bottom: 0; left: 0; right: 0;
-      width: 100%; border-radius: 1.25rem 1.25rem 0 0;
-      max-height: 85vh;
+      width: 100%; border: none; border-radius: 1.25rem 1.25rem 0 0;
+      max-height: min(85vh, 85dvh);
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.18);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      animation: notifSheetIn 0.22s cubic-bezier(.32,.72,0,1);
+    }
+  }
+  @keyframes notifSheetIn {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  /* ── Drag handle (mobile only) ── */
+  .notif-drag-handle { display: none; }
+  @media (max-width: 640px) {
+    .notif-drag-handle {
+      display: flex; justify-content: center;
+      padding: 0.625rem 0 0.25rem; flex-shrink: 0;
+    }
+    .notif-drag-handle span {
+      width: 36px; height: 4px; border-radius: 2px; background: #E5E7EB;
     }
   }
 
@@ -35,6 +72,7 @@ export const NOTIF_CSS = `
     justify-content: space-between;
     padding: 1.25rem 1.25rem 0.75rem;
     border-bottom: 1px solid #F3F4F6;
+    flex-shrink: 0;
   }
   .notif-title { font-size: 1.125rem; font-weight: 700; color: #111; }
   .notif-new-badge {
@@ -72,12 +110,16 @@ export const NOTIF_CSS = `
     text-align: center; padding: 0.625rem 0;
     font-size: 0.875rem; font-weight: 600; color: #2563EB;
     cursor: pointer; background: none; border: none; width: 100%;
-    border-bottom: 1px solid #F3F4F6;
+    border-bottom: 1px solid #F3F4F6; flex-shrink: 0;
   }
   .notif-mark-read:hover { opacity: 0.8; }
 
   /* ── Scrollable list ── */
-  .notif-body { overflow-y: auto; flex: 1; }
+  .notif-body {
+    overflow-y: auto; flex: 1; min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
 
   .notif-section-label {
     font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.1em;
@@ -128,6 +170,10 @@ export const NOTIF_CSS = `
     cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;
   }
   .notif-see-all:hover { opacity: 0.8; }
+
+  @media (max-width: 640px) {
+    .notif-item { padding: 1rem 1.25rem; } /* slightly bigger tap targets on touch */
+  }
 `
 
 // ── Icon map (same icons used in full page) ────────────────────────────────
@@ -192,14 +238,28 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>(NOTIFICATIONS)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
+  // Close on outside click/tap
   useEffect(() => {
-    function onDown(e: MouseEvent) {
+    function onOutside(e: MouseEvent | TouchEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose()
     }
-    const t = setTimeout(() => document.addEventListener('mousedown', onDown), 0)
-    return () => { clearTimeout(t); document.removeEventListener('mousedown', onDown) }
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', onOutside)
+      document.addEventListener('touchstart', onOutside)
+    }, 0)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('mousedown', onOutside)
+      document.removeEventListener('touchstart', onOutside)
+    }
   }, [onClose])
+
+  // Lock background scroll while the panel is open
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [])
 
   const filtered = activeTab === 'all'
     ? notifications
@@ -222,66 +282,72 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   }
 
   return (
-    <div className="notif-dropdown" ref={panelRef}>
-      {/* Header */}
-      <div className="notif-header">
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span className="notif-title">Notifications</span>
-          {counts.all > 0 && <span className="notif-new-badge">{counts.all}</span>}
-        </div>
-        <button className="notif-close" onClick={onClose} aria-label="Close notifications">
-          <X size={16} />
-        </button>
-      </div>
+    <>
+      <div className="notif-backdrop" onClick={onClose} />
+      <div className="notif-dropdown" ref={panelRef}>
+        {/* Drag handle — mobile bottom-sheet affordance only */}
+        <div className="notif-drag-handle"><span /></div>
 
-      {/* Tabs */}
-      <div className="notif-tabs">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            className={`notif-tab${activeTab === t.key ? ' active' : ''}`}
-            onClick={() => setActiveTab(t.key)}
-          >
-            {t.label}
-            {counts[t.key] > 0 && (
-              <span className="notif-tab-count">{counts[t.key]}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Mark all read */}
-      <button className="notif-mark-read" onClick={markAllRead}>
-        Mark all read
-      </button>
-
-      {/* List */}
-      <div className="notif-body">
-        {newItems.length > 0 && (
-          <>
-            <div className="notif-section-label">New</div>
-            {newItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
-          </>
-        )}
-        {oldItems.length > 0 && (
-          <>
-            <div className="notif-section-label">Earlier</div>
-            {oldItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
-          </>
-        )}
-        {filtered.length === 0 && (
-          <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem' }}>
-            No notifications here
+        {/* Header */}
+        <div className="notif-header">
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span className="notif-title">Notifications</span>
+            {counts.all > 0 && <span className="notif-new-badge">{counts.all}</span>}
           </div>
-        )}
-      </div>
+          <button className="notif-close" onClick={onClose} aria-label="Close notifications">
+            <X size={16} />
+          </button>
+        </div>
 
-      {/* Footer */}
-      <div className="notif-footer">
-        <button className="notif-see-all" onClick={goToAll}>
-          See all notifications <ChevronRight size={14} />
+        {/* Tabs */}
+        <div className="notif-tabs">
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              className={`notif-tab${activeTab === t.key ? ' active' : ''}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label}
+              {counts[t.key] > 0 && (
+                <span className="notif-tab-count">{counts[t.key]}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Mark all read */}
+        <button className="notif-mark-read" onClick={markAllRead}>
+          Mark all read
         </button>
+
+        {/* List */}
+        <div className="notif-body">
+          {newItems.length > 0 && (
+            <>
+              <div className="notif-section-label">New</div>
+              {newItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
+            </>
+          )}
+          {oldItems.length > 0 && (
+            <>
+              <div className="notif-section-label">Earlier</div>
+              {oldItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
+            </>
+          )}
+          {filtered.length === 0 && (
+            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem' }}>
+              No notifications here
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="notif-footer">
+          <button className="notif-see-all" onClick={goToAll}>
+            See all notifications <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

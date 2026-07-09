@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
-import { apiClient } from '../../services/api'
+import { apiClient, coursesAPI } from '../../services/api'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -56,53 +56,21 @@ interface LiveSessionSummary {
   trainer_name: string
 }
 
-// Raw shape of an assignment item inside dashboard.assignments.active/upcoming.
-// Swagger only documents this as a generic object (additionalProp1/2/3
-// placeholders — untyped JSONField), so we can't fully trust field names
-// until confirmed against a real populated response. Normalize defensively
-// (same pattern as AssignmentDetailPage's normalizeGradingCriteria) instead
-// of assuming a fixed contract.
-interface RawDashboardAssignment {
-  id: string
-  title?: string
-  deadline?: string | null
-  due_at?: string | null
-  course_id?: string
-  course_title?: string
-  module_id?: string
-  [key: string]: unknown
-}
-
+// Assignments shown on the dashboard. NOTE: the dashboard endpoint's own
+// `assignments.active` / `assignments.upcoming` fields are still scaffolded
+// as [] on the backend (same situation `live_sessions` was in before it
+// shipped). The only endpoint that reliably returns assignment data today is
+// GET /courses/{slug}/learn/, where assignments are nested per-module — same
+// discovery that fixed CourseLearnPage. So we fetch each enrolled course's
+// learn view and aggregate their module assignments client-side instead of
+// trusting the dashboard's assignments field.
 interface AssignmentItem {
   id: string
   title: string
   course_title: string
+  course_slug: string
   due_at: string
-}
-
-function normalizeAssignmentItem(raw: RawDashboardAssignment): AssignmentItem {
-  return {
-    id: raw.id,
-    title: raw.title ?? 'Untitled assignment',
-    course_title: raw.course_title ?? '',
-    due_at: raw.deadline ?? raw.due_at ?? '',
-  }
-}
-
-interface DashboardResponse {
-  user: {
-    id: string
-    first_name: string
-    last_name: string
-    email: string
-    role: string
-    profile_completion_status: string
-  }
-  continue_learning: string | null
-  assignments: { active: RawDashboardAssignment[]; upcoming: RawDashboardAssignment[] }
-  live_sessions: { live_now: unknown[]; upcoming: unknown[] }
-  enrolled_courses: EnrolledCourse[]
-  certification_progress: CertificationProgress[]
+  my_submission_status: string
 }
 
 // ── Progress ring ──────────────────────────────────────────────────────────
@@ -288,6 +256,26 @@ const PAGE_CSS = `
   }
 `
 
+// Backend interface for the raw dashboard response. `assignments` is kept
+// here only for typing purposes — it is currently always { active: [],
+// upcoming: [] } and is intentionally NOT used to populate assignment state
+// (see the getCourseLearnView aggregation effect below instead).
+interface DashboardResponse {
+  user: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string
+    role: string
+    profile_completion_status: string
+  }
+  continue_learning: string | null
+  assignments: { active: unknown[]; upcoming: unknown[] }
+  live_sessions: { live_now: unknown[]; upcoming: unknown[] }
+  enrolled_courses: EnrolledCourse[]
+  certification_progress: CertificationProgress[]
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
@@ -296,6 +284,7 @@ export default function DashboardPage() {
   const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
   const [assignmentsActive, setAssignmentsActive] = useState<AssignmentItem[]>([])
   const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<AssignmentItem[]>([])
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
   const [liveSessions, setLiveSessions] = useState<LiveSessionSummary[]>([])
   const [liveSessionsLoaded, setLiveSessionsLoaded] = useState(false)
   const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set())
@@ -315,8 +304,9 @@ export default function DashboardPage() {
         const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
         setCertProgress(response.data.certification_progress || [])
         setEnrolledCourses(response.data.enrolled_courses || [])
-        setAssignmentsActive((response.data.assignments?.active || []).map(normalizeAssignmentItem))
-        setAssignmentsUpcoming((response.data.assignments?.upcoming || []).map(normalizeAssignmentItem))
+        // NOTE: response.data.assignments is intentionally ignored — it's a
+        // backend stub that's always empty. Real assignment data is fetched
+        // below via getCourseLearnView() once enrolledCourses is populated.
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
         setError('Failed to load courses')
@@ -326,6 +316,64 @@ export default function DashboardPage() {
     }
     if (user) fetchDashboardData()
   }, [user])
+
+  // Aggregate assignments across all enrolled courses via the learn-view
+  // endpoint (same one CourseLearnPage uses), since the dashboard's own
+  // assignments field is still scaffolded as [] on the backend.
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (enrolledCourses.length === 0) {
+        setAssignmentsLoaded(true)
+        return
+      }
+      try {
+        const results = await Promise.all(
+          enrolledCourses.map((c) => coursesAPI.getCourseLearnView(c.course_slug)),
+        )
+
+        const all: AssignmentItem[] = []
+        results.forEach((res, i) => {
+          if (!res.success) return
+          const course = enrolledCourses[i]
+          res.data.modules.forEach((m) => {
+            m.assignments.forEach((a) => {
+              all.push({
+                id: a.id,
+                title: a.title,
+                course_title: course.title,
+                course_slug: course.course_slug,
+                due_at: a.deadline ?? '',
+                my_submission_status: a.my_submission_status,
+              })
+            })
+          })
+        })
+
+        // Exclude anything already graded — nothing actionable left to show.
+        // Active = you've started it (in_progress). Upcoming = not started yet.
+        const byDueDate = (a: AssignmentItem, b: AssignmentItem) => {
+          if (!a.due_at) return 1
+          if (!b.due_at) return -1
+          return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+        }
+
+        const active = all
+          .filter((a) => a.my_submission_status === 'in_progress')
+          .sort(byDueDate)
+        const upcoming = all
+          .filter((a) => a.my_submission_status === 'not_started')
+          .sort(byDueDate)
+
+        setAssignmentsActive(active)
+        setAssignmentsUpcoming(upcoming)
+      } catch (err) {
+        console.error('Failed to fetch assignments:', err)
+      } finally {
+        setAssignmentsLoaded(true)
+      }
+    }
+    if (user && !loading) fetchAssignments()
+  }, [user, loading, enrolledCourses])
 
   useEffect(() => {
     const fetchLiveSessions = async () => {
@@ -387,7 +435,9 @@ export default function DashboardPage() {
   }
 
   function goToAssignment(a: AssignmentItem) {
-    navigate(RouteBuilder.assignmentDetail(a.id), { state: { courseTitle: a.course_title } })
+    navigate(RouteBuilder.assignmentDetail(a.id), {
+      state: { courseSlug: a.course_slug, courseTitle: a.course_title },
+    })
   }
 
   return (
@@ -456,7 +506,7 @@ export default function DashboardPage() {
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
             </div>
-            {!loading && !error && !hasAssignments && (
+            {assignmentsLoaded && !hasAssignments && (
               <div className="empty-inline">
                 <div className="empty-inline-icon" style={{ background: '#EFF6FF' }}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.8">
@@ -470,7 +520,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {!loading && !error && hasAssignments && (
+            {assignmentsLoaded && hasAssignments && (
               <div className="assignments-wrap">
                 <div className="assignments-scroll">
                   {[...assignmentsActive, ...assignmentsUpcoming].map((a) => {

@@ -34,6 +34,7 @@ import ProfilePage from './pages/app/ProfilePage.tsx'
 import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
 import HelpSupportPage from './pages/app/HelpSupportPage'
+import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -128,21 +129,30 @@ function App() {
           }
         />
         <Route
-          path={ROUTES.SETTINGS_SECURITY}
-          element={
-            <ProtectedRoute>
-              <SettingsSecurityPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_SUPPORT}
-          element={
-            <ProtectedRoute>
-              <HelpSupportPage />
-            </ProtectedRoute>
-          }
-        />
+  path={ROUTES.SETTINGS_SECURITY}
+  element={
+    <ProtectedRoute>
+      <SettingsSecurityPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.SETTINGS_NOTIFICATIONS}
+  element={
+    <ProtectedRoute>
+      <SettingsNotificationPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.HELP_SUPPORT}
+  element={
+    <ProtectedRoute>
+      <HelpSupportPage />
+    </ProtectedRoute>
+  }
+/>
+        
         <Route
           path={ROUTES.CHECKOUT}
           element={

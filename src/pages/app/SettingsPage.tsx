@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Shield, Bell, HelpCircle, LogOut, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
+import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../../components/layout/LogoutConfirmModal'
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
 const PAGE_CSS = `
@@ -29,17 +31,17 @@ const PAGE_CSS = `
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
-  const handleLogout = async () => {
-    const confirmed = window.confirm('Are you sure you want to log out?')
-    if (!confirmed) return
+  const handleConfirmLogout = async () => {
+    setLogoutConfirmOpen(false)
     await logout()
     navigate(ROUTES.LOGIN)
   }
 
   return (
     <>
-      <style>{SHELL_CSS + PAGE_CSS}</style>
+      <style>{SHELL_CSS + PAGE_CSS + LOGOUT_MODAL_CSS}</style>
       <AppShell activeNav="settings" onNavChange={() => {}}>
         <div className="settings-content">
           <div className="settings-heading">Settings</div>
@@ -58,7 +60,7 @@ export default function SettingsPage() {
               <ChevronRight size={18} className="settings-row-chevron" />
             </button>
 
-            <button className="settings-row" onClick={() => navigate(ROUTES.NOTIFICATIONS)}>
+            <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_NOTIFICATIONS)}>
               <div className="settings-row-icon"><Bell size={19} /></div>
               <span className="settings-row-label">Notifications</span>
               <ChevronRight size={18} className="settings-row-chevron" />
@@ -70,13 +72,20 @@ export default function SettingsPage() {
               <ChevronRight size={18} className="settings-row-chevron" />
             </button>
 
-            <button className="settings-row danger" onClick={handleLogout}>
+            <button className="settings-row danger" onClick={() => setLogoutConfirmOpen(true)}>
               <div className="settings-row-icon"><LogOut size={19} /></div>
               <span className="settings-row-label">Log out</span>
             </button>
           </div>
         </div>
       </AppShell>
+
+      {logoutConfirmOpen && (
+        <LogoutConfirmModal
+          onCancel={() => setLogoutConfirmOpen(false)}
+          onConfirm={handleConfirmLogout}
+        />
+      )}
     </>
   )
 }

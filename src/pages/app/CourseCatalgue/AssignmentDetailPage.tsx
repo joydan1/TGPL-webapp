@@ -71,17 +71,35 @@ interface AssignmentNavContext {
 }
 
 // Picks the attempt that should drive the page's status/feedback/submitted
-// files. Assumes `my_submissions` is ordered oldest → newest; if the backend
-// actually returns newest-first, swap to `[0]` instead.
+// files. Prefers the most recent attempt that actually has content (files
+// uploaded, or a submitted_at timestamp) over a later, still-empty attempt —
+// e.g. if the submission modal was opened again after a real submission,
+// which can append a fresh empty "in_progress" attempt to the array. Falls
+// back to the last entry if nothing has content yet (genuinely brand new).
 function latestAttempt(raw: RawAssignmentDetail): RawSubmissionAttempt | null {
   if (!raw.my_submissions || raw.my_submissions.length === 0) return null
+
+  for (let i = raw.my_submissions.length - 1; i >= 0; i--) {
+    const attempt = raw.my_submissions[i]
+    if (attempt.files.length > 0 || attempt.submitted_at) return attempt
+  }
+
   return raw.my_submissions[raw.my_submissions.length - 1]
 }
 
 function deriveStatus(attempt: RawSubmissionAttempt | null): AssignmentStatus {
   if (!attempt || attempt.state === 'not_started') return 'not_started'
   if (attempt.state === 'graded') return 'graded'
-  return 'in_progress' // covers in_progress / submitted / revision_requested / anything else
+  // A dangling attempt can sit in "in_progress" forever with no files and
+  // no submitted_at — e.g. the modal creates/resumes an attempt as soon as
+  // it's opened, but submit was never completed (presign/upload/confirm
+  // failed partway through, or the modal was closed early). submitted_at
+  // is the only reliable signal that something was actually turned in;
+  // without it, treat the attempt as not_started so the learner still
+  // sees "Start submission" instead of getting stuck on the
+  // awaiting-grading banner with no way to try again.
+  if (!attempt.submitted_at) return 'not_started'
+  return 'in_progress' // covers submitted / revision_requested / anything else with a real submission
 }
 
 function deriveFeedback(attempt: RawSubmissionAttempt | null): AssignmentDetail['feedback'] {
