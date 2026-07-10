@@ -1,5 +1,7 @@
+import { useNavigate } from 'react-router-dom'
 import TrainerShell from '../../../layouts/TrainerShell'
 import { Plus, Users, BookOpen, ClipboardList, Star } from 'lucide-react'
+import { ROUTES } from '../../../constants/routes'
 
 const stats = [
   {
@@ -55,6 +57,68 @@ const pendingReviews = [
   },
 ]
 
+const PAGE_CSS = `
+  .db-page { padding: 1rem; background: #F5F5F5; }
+
+  .db-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .db-greeting { margin: 0; color: #6B7280; font-size: 0.9rem; }
+  .db-name { margin: 0.3rem 0 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
+  .db-add-btn { appearance: none; border: none; border-radius: 999px; padding: 0.75rem 1.1rem; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; white-space: nowrap; }
+
+  .db-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1.25rem; }
+  .db-stat-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); min-width: 0; }
+  .db-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
+  .db-stat-title { margin: 0; color: #6B7280; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7rem; }
+  .db-stat-icon { width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .db-stat-value { margin: 0.65rem 0 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
+  .db-stat-label { margin: 0.5rem 0 0; font-size: 0.8rem; font-weight: 600; }
+
+  .db-section-title { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 700; color: #111827; }
+
+  .db-live-card { border-radius: 1rem; overflow: hidden; background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%); color: #fff; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+  .db-live-badge { margin: 0; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; display: flex; align-items: center; gap: 0.4rem; }
+  .db-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #4ADE80; display: inline-block; flex-shrink: 0; }
+  .db-live-title { margin: 0.65rem 0 0; font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+  .db-live-sub { margin: 0.65rem 0 0; color: rgba(255,255,255,0.85); font-size: 0.85rem; }
+  .db-live-btn { border: none; border-radius: 999px; padding: 0.85rem 1.1rem; background: #fff; color: #1D4ED8; font-weight: 700; cursor: pointer; white-space: nowrap; align-self: flex-start; }
+
+  .db-reviews-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); }
+  .db-reviews-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .db-view-all { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  .db-review-list { margin-top: 0.85rem; display: grid; gap: 0.75rem; }
+  .db-review-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem; border-radius: 1rem; background: #F8FAFF; border: 1px solid #E5E7EB; flex-wrap: wrap; }
+  .db-review-person { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+  .db-review-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; }
+  .db-review-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.9rem; }
+  .db-review-course { margin: 0.25rem 0 0; color: #64748B; font-size: 0.8rem; }
+  .db-review-meta { text-align: right; }
+  .db-review-time { margin: 0; color: #6B7280; font-size: 0.75rem; }
+  .db-review-btn { margin-top: 0.5rem; border: none; border-radius: 999px; background: #2563EB; color: #fff; padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+
+  .db-course-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); max-width: 340px; }
+  .db-course-img-wrap { position: relative; }
+  .db-course-img { width: 100%; height: 176px; object-fit: cover; border-radius: 1rem; background: #E2E8F0; display: block; }
+  .db-course-ring { position: absolute; bottom: 0.75rem; right: 0.75rem; }
+  .db-course-body { margin-top: 1rem; display: grid; gap: 0.5rem; }
+  .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
+  .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
+  .db-course-date { margin: 0; color: #6B7280; font-size: 0.8rem; }
+  .db-course-preview-btn { margin-top: 1rem; width: 100%; border: none; border-radius: 999px; padding: 0.8rem 1rem; background: #EFF6FF; color: #2563EB; font-weight: 700; cursor: pointer; }
+
+  @media (min-width: 640px) {
+    .db-page { padding: 1.5rem; }
+    .db-name { font-size: 1.85rem; }
+    .db-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+    .db-live-card { flex-direction: row; align-items: center; justify-content: space-between; padding: 1.5rem; }
+    .db-live-title { font-size: 1.25rem; }
+  }
+
+ @media (min-width: 1024px) {
+  .db-page { padding: 1.5rem 2rem 2rem; }
+  .db-name { font-size: 2.25rem; }
+}
+`
+
 function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }) {
   const stroke = 4
   const radius = (size - stroke) / 2
@@ -96,165 +160,76 @@ function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }
 }
 
 export default function TrainerDashboardPage() {
+  const navigate = useNavigate()
+
   return (
     <TrainerShell>
-      <div style={{ padding: '1.5rem 2rem 2rem', background: '#F5F5F5' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+      <style>{PAGE_CSS}</style>
+      <div className="db-page">
+        <div className="db-header">
           <div>
-            <p style={{ margin: 0, color: '#6B7280', fontSize: '0.95rem' }}>Good morning,</p>
-            <h1 style={{ margin: '0.35rem 0 0', fontSize: '2.25rem', fontWeight: 800, color: '#111827' }}>
-              Amara <span style={{ fontSize: '2.25rem' }}>👋</span>
-            </h1>
+            <p className="db-greeting">Good morning,</p>
+            <h1 className="db-name">Amara 👋</h1>
           </div>
-          <button
-            style={{
-              appearance: 'none',
-              border: 'none',
-              borderRadius: '999px',
-              padding: '0.95rem 1.2rem',
-              background: '#2563EB',
-              color: '#fff',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <Plus size={18} />
-            Add new course
-          </button>
+          <button className="db-add-btn" onClick={() => navigate(ROUTES.TRAINER_COURSE_ADD)}>
+  <Plus size={18} />
+  Add new course
+</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem', marginTop: '1.5rem' }}>
+        <div className="db-stats">
           {stats.map((stat) => {
             const Icon = stat.icon
             return (
-              <div
-                key={stat.title}
-                style={{
-                  background: '#fff',
-                  borderRadius: '1rem',
-                  padding: '1.35rem',
-                  boxShadow: '0 16px 48px rgba(15, 23, 42, 0.06)',
-                  border: '1px solid rgba(148, 163, 184, 0.12)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <p style={{ margin: 0, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.8rem' }}>
-                    {stat.title}
-                  </p>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '999px',
-                      background: stat.iconBg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon size={18} color={stat.iconColor} />
+              <div key={stat.title} className="db-stat-card">
+                <div className="db-stat-top">
+                  <p className="db-stat-title">{stat.title}</p>
+                  <div className="db-stat-icon" style={{ background: stat.iconBg }}>
+                    <Icon size={16} color={stat.iconColor} />
                   </div>
                 </div>
-                <p style={{ margin: '0.85rem 0 0', fontSize: '2rem', fontWeight: 800, color: '#111827' }}>{stat.value}</p>
-                <p style={{ margin: '0.75rem 0 0', color: stat.labelColor, fontSize: '0.9rem', fontWeight: 600 }}>{stat.label}</p>
+                <p className="db-stat-value">{stat.value}</p>
+                <p className="db-stat-label" style={{ color: stat.labelColor }}>{stat.label}</p>
               </div>
             )
           })}
         </div>
 
-        <section style={{ marginTop: '1.75rem', display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '1rem' }}>
+        <section className="db-sections">
           <div style={{ display: 'grid', gap: '1rem' }}>
             <div>
-              <h3 style={{ margin: '0 0 0.85rem', fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Upcoming Live Session(s)</h3>
-              <div
-                style={{
-                  borderRadius: '1rem',
-                  overflow: 'hidden',
-                  background: 'linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%)',
-                  color: '#fff',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '1rem',
-                }}
-              >
+              <h3 className="db-section-title">Upcoming Live Session(s)</h3>
+              <div className="db-live-card">
                 <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: '0.75rem',
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      opacity: 0.9,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                    }}
-                  >
-                    <span style={{ width: 8, height: 8, borderRadius: '999px', background: '#4ADE80', display: 'inline-block' }} />
+                  <p className="db-live-badge">
+                    <span className="db-live-dot" />
                     Starting in 2h
                   </p>
-                  <h2 style={{ margin: '0.75rem 0 0', fontSize: '1.35rem', fontWeight: 700 }}>Q&A: Stakeholder Communication in Practice</h2>
-                  <p style={{ margin: '0.75rem 0 0', color: 'rgba(255,255,255,0.85)', fontSize: '0.95rem' }}>Today · 3:00 PM WAT · 47 registered</p>
+                  <h2 className="db-live-title">Q&A: Stakeholder Communication in Practice</h2>
+                  <p className="db-live-sub">Today · 3:00 PM WAT · 47 registered</p>
                 </div>
-                <button
-                  style={{
-                    border: 'none',
-                    borderRadius: '999px',
-                    padding: '0.95rem 1.2rem',
-                    background: '#fff',
-                    color: '#1D4ED8',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Begin Session
-                </button>
+                <button className="db-live-btn">Begin Session</button>
               </div>
             </div>
 
-            <div style={{ background: '#fff', borderRadius: '1rem', padding: '1.4rem', boxShadow: '0 16px 46px rgba(15, 23, 42, 0.06)', border: '1px solid rgba(148, 163, 184, 0.12)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Pending reviews</h3>
-                <button style={{ border: 'none', background: 'none', color: '#2563EB', fontWeight: 700, cursor: 'pointer' }}>View all</button>
+            <div className="db-reviews-card">
+              <div className="db-reviews-header">
+                <h3 className="db-section-title" style={{ margin: 0 }}>Pending reviews</h3>
+                <button className="db-view-all">View all</button>
               </div>
-              <div style={{ marginTop: '1rem', display: 'grid', gap: '0.85rem' }}>
+              <div className="db-review-list">
                 {pendingReviews.map((review) => (
-                  <div
-                    key={review.name}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                      padding: '1rem',
-                      borderRadius: '1rem',
-                      background: '#F8FAFF',
-                      border: '1px solid #E5E7EB',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      <img
-                        src={review.avatar}
-                        alt={review.name}
-                        style={{ width: 40, height: 40, borderRadius: '999px', objectFit: 'cover', background: '#E2E8F0', flexShrink: 0 }}
-                      />
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 700, color: '#111827' }}>{review.name}</p>
-                        <p style={{ margin: '0.35rem 0 0', color: '#64748B', fontSize: '0.9rem' }}>{review.course}</p>
+                  <div key={review.name} className="db-review-row">
+                    <div className="db-review-person">
+                      <img src={review.avatar} alt={review.name} className="db-review-avatar" />
+                      <div style={{ minWidth: 0 }}>
+                        <p className="db-review-name">{review.name}</p>
+                        <p className="db-review-course">{review.course}</p>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: 0, color: '#6B7280', fontSize: '0.85rem' }}>{review.time}</p>
-                      <button style={{ marginTop: '0.65rem', border: 'none', borderRadius: '999px', background: '#2563EB', color: '#fff', padding: '0.7rem 1rem', fontWeight: 700, cursor: 'pointer' }}>
-                        Review
-                      </button>
+                    <div className="db-review-meta">
+                      <p className="db-review-time">{review.time}</p>
+                      <button className="db-review-btn">Review</button>
                     </div>
                   </div>
                 ))}
@@ -262,29 +237,21 @@ export default function TrainerDashboardPage() {
             </div>
           </div>
 
-          <div style={{ background: '#fff', borderRadius: '1rem', padding: '1.5rem', boxShadow: '0 16px 46px rgba(15, 23, 42, 0.06)', border: '1px solid rgba(148, 163, 184, 0.12)' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Active Course</h3>
-            <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
-              <div style={{ position: 'relative' }}>
-                <img
-                  src="/trainer-course-card.png"
-                  alt="Active course"
-                  style={{ width: '100%', minHeight: 176, objectFit: 'cover', borderRadius: '1rem', background: '#E2E8F0', display: 'block' }}
-                />
-                <div style={{ position: 'absolute', bottom: '0.75rem', right: '0.75rem' }}>
+          <div>
+            <h3 className="db-section-title">Active Course</h3>
+            <div className="db-course-card">
+              <div className="db-course-img-wrap">
+                <img src="/image1.png" alt="Active course" className="db-course-img" />
+                <div className="db-course-ring">
                   <ProgressRing percent={37} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                <p style={{ margin: 0, fontSize: '0.8rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#2563EB', fontWeight: 700 }}>
-                  Management
-                </p>
-                <h4 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#111827' }}>Project Management Course</h4>
-                <p style={{ margin: 0, color: '#6B7280', fontSize: '0.85rem' }}>Uploaded 2 months ago</p>
+              <div className="db-course-body">
+                <p className="db-course-cat">Management</p>
+                <h4 className="db-course-name">Project Management Course</h4>
+                <p className="db-course-date">Uploaded 2 months ago</p>
               </div>
-              <button style={{ border: 'none', borderRadius: '999px', padding: '0.9rem 1rem', background: '#EFF6FF', color: '#2563EB', fontWeight: 700, cursor: 'pointer' }}>
-                Preview
-              </button>
+              <button className="db-course-preview-btn">Preview</button>
             </div>
           </div>
         </section>

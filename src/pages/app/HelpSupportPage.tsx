@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { Search, Plus, Minus, Zap, CreditCard, ShieldCheck, BookOpen } from 'lucide-react'
+import { Search, Plus, Minus, Zap, CreditCard, ShieldCheck, BookOpen, Edit3, Users, Clock } from 'lucide-react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
+import { useAuth } from '../../hooks/useAuth' 
 
 type FaqItem = { id: string; question: string; answer: string; category: string }
+type CategoryItem = { id: string; label: string; icon: typeof Zap }
 
-const CATEGORIES = [
+// ---------- LEARNER CONTENT ----------
+const LEARNER_CATEGORIES: CategoryItem[] = [
   { id: 'gettingStarted', label: 'Getting started', icon: Zap },
   { id: 'payments', label: 'Payments & enrollment', icon: CreditCard },
   { id: 'account', label: 'Account & security', icon: ShieldCheck },
   { id: 'courses', label: 'Courses & certificates', icon: BookOpen },
 ]
 
-const FAQS: FaqItem[] = [
+const LEARNER_FAQS: FaqItem[] = [
   {
     id: 'reset-password',
     question: 'How to reset my password',
@@ -35,6 +38,41 @@ const FAQS: FaqItem[] = [
     question: 'How do I check my courses?',
     answer: 'Open the Courses tab from the sidebar to see everything you are enrolled in, along with your progress.',
     category: 'gettingStarted',
+  },
+]
+
+// ---------- TRAINER CONTENT ----------
+const TRAINER_CATEGORIES: CategoryItem[] = [
+  { id: 'creatingCourses', label: 'Creating courses', icon: Edit3 },
+  { id: 'managingStudents', label: 'Managing students', icon: Users },
+  { id: 'account', label: 'Account & security', icon: ShieldCheck },
+  { id: 'liveClassSetup', label: 'Live class setup', icon: Clock },
+]
+
+const TRAINER_FAQS: FaqItem[] = [
+  {
+    id: 'schedule-live-class',
+    question: 'How do I schedule a live class?',
+    answer: 'Go to Live Classes > New Session, pick a date and time, and invite the students or cohort you want to attend.',
+    category: 'liveClassSetup',
+  },
+  {
+    id: 'publish-course',
+    question: 'How do I publish a course?',
+    answer: 'From My Courses, finish adding your modules and lessons, then click Publish. Your course becomes visible to learners immediately.',
+    category: 'creatingCourses',
+  },
+  {
+    id: 'grades-visibility',
+    question: 'Do students see their grades immediately?',
+    answer: 'Yes. Students get to receive their grades immediately after the trainer marks it.',
+    category: 'managingStudents',
+  },
+  {
+    id: 'payment-timeline',
+    question: 'What is the payment timeline',
+    answer: 'Payouts are processed on a rolling basis after a course sale is confirmed. Check Settings > Payments for your specific schedule.',
+    category: 'account',
   },
 ]
 
@@ -67,9 +105,15 @@ const PAGE_CSS = `
 `
 
 export default function HelpSupportPage() {
+  const { user } = useAuth()
+const isTrainer = user?.role === 'trainer' 
+
+  const CATEGORIES = isTrainer ? TRAINER_CATEGORIES : LEARNER_CATEGORIES
+  const FAQS = isTrainer ? TRAINER_FAQS : LEARNER_FAQS
+
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [openId, setOpenId] = useState<string | null>('certificate')
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const filtered = FAQS.filter((f) => {
     const matchesCategory = !activeCategory || f.category === activeCategory

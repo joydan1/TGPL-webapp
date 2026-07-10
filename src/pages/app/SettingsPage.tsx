@@ -4,6 +4,7 @@ import { User, Shield, Bell, HelpCircle, LogOut, ChevronRight } from 'lucide-rea
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
+import TrainerShell from '../../layouts/TrainerShell'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../../components/layout/LogoutConfirmModal'
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ const PAGE_CSS = `
 
 export default function SettingsPage() {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   const handleConfirmLogout = async () => {
@@ -39,46 +40,53 @@ export default function SettingsPage() {
     navigate(ROUTES.LOGIN)
   }
 
+  const content = (
+    <div className="settings-content">
+      <div className="settings-heading">Settings</div>
+      <div className="settings-sub">Manage your account preferences</div>
+
+      <div className="settings-list">
+        <button className="settings-row" onClick={() => navigate(ROUTES.PROFILE)}>
+          <div className="settings-row-icon"><User size={19} /></div>
+          <span className="settings-row-label">Profile</span>
+          <ChevronRight size={18} className="settings-row-chevron" />
+        </button>
+
+        <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_SECURITY)}>
+          <div className="settings-row-icon"><Shield size={19} /></div>
+          <span className="settings-row-label">Security</span>
+          <ChevronRight size={18} className="settings-row-chevron" />
+        </button>
+
+        <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_NOTIFICATIONS)}>
+          <div className="settings-row-icon"><Bell size={19} /></div>
+          <span className="settings-row-label">Notifications</span>
+          <ChevronRight size={18} className="settings-row-chevron" />
+        </button>
+
+        <button className="settings-row" onClick={() => navigate(ROUTES.HELP_SUPPORT)}>
+          <div className="settings-row-icon"><HelpCircle size={19} /></div>
+          <span className="settings-row-label">Help &amp; Support</span>
+          <ChevronRight size={18} className="settings-row-chevron" />
+        </button>
+
+        <button className="settings-row danger" onClick={() => setLogoutConfirmOpen(true)}>
+          <div className="settings-row-icon"><LogOut size={19} /></div>
+          <span className="settings-row-label">Log out</span>
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <>
       <style>{SHELL_CSS + PAGE_CSS + LOGOUT_MODAL_CSS}</style>
-      <AppShell activeNav="settings" onNavChange={() => {}}>
-        <div className="settings-content">
-          <div className="settings-heading">Settings</div>
-          <div className="settings-sub">Manage your account preferences</div>
 
-          <div className="settings-list">
-            <button className="settings-row" onClick={() => navigate(ROUTES.PROFILE)}>
-              <div className="settings-row-icon"><User size={19} /></div>
-              <span className="settings-row-label">Profile</span>
-              <ChevronRight size={18} className="settings-row-chevron" />
-            </button>
-
-            <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_SECURITY)}>
-              <div className="settings-row-icon"><Shield size={19} /></div>
-              <span className="settings-row-label">Security</span>
-              <ChevronRight size={18} className="settings-row-chevron" />
-            </button>
-
-            <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_NOTIFICATIONS)}>
-              <div className="settings-row-icon"><Bell size={19} /></div>
-              <span className="settings-row-label">Notifications</span>
-              <ChevronRight size={18} className="settings-row-chevron" />
-            </button>
-
-            <button className="settings-row" onClick={() => navigate(ROUTES.HELP_SUPPORT)}>
-              <div className="settings-row-icon"><HelpCircle size={19} /></div>
-              <span className="settings-row-label">Help &amp; Support</span>
-              <ChevronRight size={18} className="settings-row-chevron" />
-            </button>
-
-            <button className="settings-row danger" onClick={() => setLogoutConfirmOpen(true)}>
-              <div className="settings-row-icon"><LogOut size={19} /></div>
-              <span className="settings-row-label">Log out</span>
-            </button>
-          </div>
-        </div>
-      </AppShell>
+      {user?.role === 'trainer' ? (
+        <TrainerShell>{content}</TrainerShell>
+      ) : (
+        <AppShell activeNav="settings" onNavChange={() => {}}>{content}</AppShell>
+      )}
 
       {logoutConfirmOpen && (
         <LogoutConfirmModal

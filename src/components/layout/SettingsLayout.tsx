@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import AppShell, { SHELL_CSS } from './AppShell'
+import TrainerShell from '../../layouts/TrainerShell'
+import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 
 export const SETTINGS_LAYOUT_CSS = `
@@ -18,17 +20,21 @@ interface SettingsLayoutProps {
 
 export default function SettingsLayout({ title, subtitle, children, backTo }: SettingsLayoutProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const pageHeader = { title, subtitle, onBack: () => navigate(backTo || ROUTES.SETTINGS) }
+  const content = <div className="settings-layout-content">{children}</div>
 
   return (
     <>
       <style>{SHELL_CSS + SETTINGS_LAYOUT_CSS}</style>
-      <AppShell
-        activeNav="settings"
-        onNavChange={() => {}}
-        pageHeader={{ title, subtitle, onBack: () => navigate(backTo || ROUTES.SETTINGS) }}
-      >
-        <div className="settings-layout-content">{children}</div>
-      </AppShell>
+      {user?.role === 'trainer' ? (
+        <TrainerShell pageHeader={pageHeader}>{content}</TrainerShell>
+      ) : (
+        <AppShell activeNav="settings" onNavChange={() => {}} pageHeader={pageHeader}>
+          {content}
+        </AppShell>
+      )}
     </>
   )
 }

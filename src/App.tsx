@@ -30,6 +30,9 @@ import NotificationsPage from './pages/NotificationsPage'
 import LiveSessionsPage from './pages/app/LiveSessionsPage'
 import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
+import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
+import AddCoursePage from './pages/app/trainer/courses/AddCoursePage'
+import TrainerReviewsPage from './pages/app/trainer/reviews/TrainerReviewsPage'
 import ProfilePage from './pages/app/ProfilePage.tsx'
 import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
@@ -177,6 +180,30 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+  path={ROUTES.TRAINER_COURSES}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <TrainerCoursesPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.TRAINER_COURSE_ADD}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <AddCoursePage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.TRAINER_SUBMISSIONS}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <TrainerReviewsPage />
+    </ProtectedRoute>
+  }
+/>
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route
           path={ROUTES.COURSES}

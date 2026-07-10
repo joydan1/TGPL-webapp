@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
+import { useAuth } from '../../hooks/useAuth' 
 
 type Channel = 'inApp' | 'email' | 'push'
 
@@ -11,10 +12,18 @@ type CategoryPrefs = {
   push: boolean
 }
 
-const DEFAULT_CATEGORIES: CategoryPrefs[] = [
+// ---------- LEARNER CONTENT ----------
+const LEARNER_CATEGORIES: CategoryPrefs[] = [
   { id: 'deadlines', label: 'Deadlines & assignments', inApp: false, email: false, push: true },
   { id: 'liveSessions', label: 'Live sessions', inApp: true, email: false, push: true },
   { id: 'feedback', label: 'Feedback & grades', inApp: false, email: true, push: true },
+]
+
+// ---------- TRAINER CONTENT ----------
+const TRAINER_CATEGORIES: CategoryPrefs[] = [
+  { id: 'assignmentSubmission', label: 'Assignments submission', inApp: false, email: false, push: true },
+  { id: 'studentQuestions', label: 'Students questions & feedback', inApp: true, email: false, push: true },
+  { id: 'liveClassReminder', label: 'Live class reminder', inApp: false, email: true, push: true },
 ]
 
 const PAGE_CSS = `
@@ -56,6 +65,11 @@ function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disa
 }
 
 export default function SettingsNotificationPage() {
+ const { user } = useAuth()
+const isTrainer = user?.role === 'trainer' 
+
+  const DEFAULT_CATEGORIES = isTrainer ? TRAINER_CATEGORIES : LEARNER_CATEGORIES
+
   const [pauseAll, setPauseAll] = useState(false)
   const [categories, setCategories] = useState<CategoryPrefs[]>(DEFAULT_CATEGORIES)
   const [saved, setSaved] = useState(false)

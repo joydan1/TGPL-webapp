@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, CheckCircle2, Mail, Phone, Globe, FileText, User, Check, X } from 'lucide-react'
+import { Camera, CheckCircle2, Mail, Phone, Globe, AlertCircle, FileText, User, Check, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import { apiClient } from '../../services/api'
 import SettingsLayout from '../../components/layout/SettingsLayout'
 
 interface UserProfile {
-  full_name: string
+  first_name: string
+  last_name: string
   email: string
-  email_verified: boolean
+  is_email_verified: boolean
   phone: string | null
   country: string | null
   bio: string | null
@@ -99,7 +100,15 @@ const PAGE_CSS = `
   .save-btn.primary:disabled { background: #E5E7EB; color: #9CA3AF; cursor: default; }
   .save-btn.secondary { background: #fff; color: #6B7280; border: 1px solid #E5E7EB; }
   .save-btn.secondary:disabled { color: #C4C9D1; cursor: default; }
-
+.toast { position: fixed; bottom: 6.5rem; left: 50%; transform: translateX(-50%); background: #1F2937; color: #fff; padding: 0.85rem 1.1rem; border-radius: 0.85rem; display: flex; align-items: center; gap: 0.7rem; font-size: 0.9rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 400; max-width: 90vw; }
+  .toast-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .toast-icon.success { background: #22C55E; }
+  .toast-icon.error { background: #EF4444; }
+  .toast-close { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0; display: flex; margin-left: 0.25rem; flex-shrink: 0; }
+  .toast-close:hover { color: #fff; }
+  @media (max-width: 640px) {
+    .toast { bottom: 5.5rem; padding: 0.75rem 0.9rem; font-size: 0.85rem; }
+  }
   @media (max-width: 640px) {
     .save-bar { padding: 0.85rem 1rem; }
     .field-card { grid-template-columns: 1fr; padding: 0; }
@@ -135,6 +144,13 @@ export default function SettingsProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+ const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    window.clearTimeout((showToast as any)._t)
+    ;(showToast as any)._t = window.setTimeout(() => setToast(null), 3200)
+  }
 
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
@@ -157,13 +173,13 @@ export default function SettingsProfilePage() {
     }
     if (user) fetchProfile()
   }, [user])
-
-  const isDirty = !!profile && !!original && (
-    profile.full_name !== original.full_name ||
-    profile.phone !== original.phone ||
-    profile.country !== original.country ||
-    profile.bio !== original.bio
-  )
+const isDirty = !!profile && !!original && (
+  profile.first_name !== original.first_name ||
+  profile.last_name !== original.last_name ||
+  profile.phone !== original.phone ||
+  profile.country !== original.country ||
+  profile.bio !== original.bio
+)
 
   function updateField<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
     setProfile((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -174,17 +190,20 @@ export default function SettingsProfilePage() {
     try {
       setSaving(true)
       setError(null)
-      const response = await apiClient.patch<UserProfile>('/v1/auth/me/', {
-        full_name: profile.full_name,
-        phone: profile.phone,
-        country: profile.country,
-        bio: profile.bio,
-      })
+     const response = await apiClient.patch<UserProfile>('/v1/auth/me/', {
+  first_name: profile.first_name,
+  last_name: profile.last_name,
+  phone: profile.phone,
+  country: profile.country,
+  bio: profile.bio,
+})
       setProfile(response.data)
       setOriginal(response.data)
+      showToast('Profile updated successfully', 'success')
     } catch (err) {
       console.error('Failed to save profile:', err)
       setError('Failed to save changes. Please try again.')
+      showToast('Failed to update profile. Please try again.', 'error')
     } finally {
       setSaving(false)
     }
@@ -218,8 +237,6 @@ export default function SettingsProfilePage() {
     try {
       setAvatarUploading(true)
       const formData = new FormData()
-      // NOTE: multipart field key ("avatar") is an assumption — confirm
-      // against Swagger for POST /v1/auth/me/avatar/.
       formData.append('avatar', file)
       const response = await apiClient.post<{ avatar_url: string }>('/v1/auth/me/avatar/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -280,7 +297,7 @@ export default function SettingsProfilePage() {
                 <div className="avatar-wrap">
                   <img
                     src={profile.avatar_url || '/image1.png'}
-                    alt={profile.full_name}
+                    alt={`${profile.first_name} ${profile.last_name}`}
                     className="avatar-img"
                     onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
                   />
@@ -289,7 +306,7 @@ export default function SettingsProfilePage() {
                   </button>
                 </div>
                 <div>
-                  <div className="avatar-info-name">{profile.full_name}</div>
+                  <div className="avatar-info-name">{profile.first_name} {profile.last_name}</div>
                   <div className="avatar-info-hint">JPG or PNG · max 2 MB</div>
                   <div className="avatar-actions">
                     <button className="avatar-upload-link" onClick={handleAvatarClick} disabled={avatarUploading}>
@@ -322,31 +339,47 @@ export default function SettingsProfilePage() {
             {/* Fields */}
             <div className="field-card">
               <div className="field-block">
-                <div className="field-label-row">
-                  <User size={16} />
-                  <span className="field-label">Full name <span className="field-required">*</span></span>
-                </div>
-                <input
-                  className="field-input"
-                  type="text"
-                  value={profile.full_name ?? ''}
-                  onChange={(e) => updateField('full_name', e.target.value)}
-                />
-              </div>
+  <div className="field-label-row">
+    <User size={16} />
+    <span className="field-label">First name <span className="field-required">*</span></span>
+  </div>
+  <input
+    className="field-input"
+    type="text"
+    value={profile.first_name ?? ''}
+    onChange={(e) => updateField('first_name', e.target.value)}
+  />
+</div>
 
-              <div className="field-block">
-                <div className="field-label-row">
-                  <Mail size={16} />
-                  <span className="field-label">Email address</span>
-                </div>
-                <div className="email-row">
-                  <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled />
-                  {profile.email_verified && (
-                    <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
-                  )}
-                </div>
-                <div className="field-hint">To change your email, contact support.</div>
-              </div>
+<div className="field-block">
+  <div className="field-label-row">
+    <User size={16} />
+    <span className="field-label">Last name <span className="field-required">*</span></span>
+  </div>
+  <input
+    className="field-input"
+    type="text"
+    value={profile.last_name ?? ''}
+    onChange={(e) => updateField('last_name', e.target.value)}
+  />
+</div>
+
+             <div className="field-block">
+  <div className="field-label-row">
+    <Mail size={16} />
+    <span className="field-label">Email address</span>
+  </div>
+  <div
+    className="email-row"
+    onClick={() => showToast('To change your email, contact support.', 'error')}
+    style={{ cursor: 'pointer' }}
+  >
+    <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled style={{ pointerEvents: 'none' }} />
+    {profile.is_email_verified && (
+  <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
+)}
+  </div>
+</div>
 
               <div className="field-block">
                 <div className="field-label-row">
@@ -430,7 +463,18 @@ export default function SettingsProfilePage() {
             </div>
           </>
         )}
-
+{/* Toast notification */}
+        {toast && (
+          <div className="toast" role="status">
+            <span className={`toast-icon ${toast.type}`}>
+              {toast.type === 'success' ? <Check size={13} color="#fff" /> : <AlertCircle size={13} color="#fff" />}
+            </span>
+            <span>{toast.message}</span>
+            <button className="toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+              <X size={16} />
+            </button>
+          </div>
+        )}
         {profile && (
           <div className="save-bar">
             <button className="save-btn primary" disabled={!isDirty || saving} onClick={handleSave}>

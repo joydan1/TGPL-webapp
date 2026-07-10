@@ -4,7 +4,7 @@ import {
   Home, BookOpen, Radio, Settings,
   Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon, Shield, CreditCard, HelpCircle,
+  LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,9 +22,8 @@ export const NAV_ITEMS = [
 // navigation; `danger` is a red destructive-style row (Log out).
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
-  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS_SECURITY }, // TODO: no dedicated /security route yet
+  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS_SECURITY }, 
   { key: 'notifications', label: 'Notifications',   Icon: Bell,        route: ROUTES.SETTINGS_NOTIFICATIONS },
-  { key: 'billing',       label: 'Billing',         Icon: CreditCard,  route: ROUTES.SETTINGS }, // TODO: no dedicated /billing route yet
   { key: 'help', label: 'Help & Support', Icon: HelpCircle, route: ROUTES.HELP_SUPPORT }, 
   { key: 'logout',        label: 'Log out',         Icon: LogOut,      route: null, danger: true },
 ]

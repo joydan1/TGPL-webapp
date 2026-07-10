@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Star, Radio, Settings,
-  Search, Bell, ChevronDown,
+  Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon, Shield, CreditCard, HelpCircle,
+  LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
 import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationPanel'
+import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
 
 // TODO: hardcoded pending-reviews count for the sidebar badge. Wire this up
 // to real data (e.g. the same source as the "Pending reviews" stat card)
@@ -26,12 +27,11 @@ export const NAV_ITEMS = [
 // Sub-items shown when the Settings row is expanded. `route` is used for
 // navigation; `danger` is a red destructive-style row (Log out).
 export const SETTINGS_SUBITEMS = [
-  { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
-  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS }, // TODO: no dedicated /security route yet
-  { key: 'notifications', label: 'Notifications',   Icon: Bell,        route: ROUTES.NOTIFICATIONS },
-  { key: 'billing',       label: 'Billing',         Icon: CreditCard,  route: ROUTES.SETTINGS }, // TODO: no dedicated /billing route yet
-  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle,  route: ROUTES.SETTINGS }, // TODO: no dedicated /help route yet
-  { key: 'logout',        label: 'Log out',         Icon: LogOut,      route: null, danger: true },
+  { key: 'profile',       label: 'Profile',         Icon: UserIcon,   route: ROUTES.PROFILE },
+  { key: 'security',      label: 'Security',        Icon: Shield,     route: ROUTES.SETTINGS_SECURITY },
+  { key: 'notifications', label: 'Notifications',   Icon: Bell,       route: ROUTES.SETTINGS_NOTIFICATIONS },
+  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle, route: ROUTES.HELP_SUPPORT },
+  { key: 'logout',        label: 'Log out',         Icon: LogOut,     route: null, danger: true },
 ]
 
 export const SHELL_CSS = `
@@ -50,6 +50,13 @@ export const SHELL_CSS = `
   .topbar-bell:hover { background: #F3F4F6; }
   .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
+
+  /* ── Page header (replaces navbar content on sub-pages like Settings) ── */
+  .navbar-page-header { display: flex; align-items: center; gap: 0.875rem; }
+  .navbar-page-back { background: none; border: none; cursor: pointer; color: #111; padding: 0.25rem; display: flex; align-items: center; flex-shrink: 0; }
+  .navbar-page-back:hover { color: #2563EB; }
+  .navbar-page-title { font-size: 1.0625rem; font-weight: 700; color: #111; line-height: 1.2; }
+  .navbar-page-subtitle { font-size: 0.75rem; color: #6B7280; line-height: 1.2; margin-top: 1px; }
 
   /* ── Profile dropdown ── */
   .profile-menu-wrap { position: relative; }
@@ -116,19 +123,27 @@ export const SHELL_CSS = `
     .search-wrap { display: none; }
     .navbar { padding: 0 1rem; }
     .navbar-logo img { height: 1.35rem; width: auto; }
+    .navbar-page-subtitle { display: none; }
     .mobile-tabbar { display: block; }
   }
 `
 
-export default function TrainerShell({ children }: { children: React.ReactNode }) {
+interface TrainerShellProps {
+  children: React.ReactNode
+  /** When set, replaces the logo/search/bell/profile row with a back button + title/subtitle. */
+  pageHeader?: { title: string; subtitle?: string; onBack: () => void }
+}
+
+export default function TrainerShell({ children, pageHeader }: TrainerShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
 
-  const [collapsed,    setCollapsed]    = useState(false)
-  const [profileOpen,  setProfileOpen]  = useState(false)
-  const [notifOpen,    setNotifOpen]    = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [collapsed,         setCollapsed]         = useState(false)
+  const [profileOpen,       setProfileOpen]       = useState(false)
+  const [notifOpen,         setNotifOpen]         = useState(false)
+  const [settingsOpen,      setSettingsOpen]      = useState(false)
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   if (!user) return null
 
@@ -145,14 +160,19 @@ export default function TrainerShell({ children }: { children: React.ReactNode }
 
   function handleSubitemClick(sub: typeof SETTINGS_SUBITEMS[number]) {
     if (sub.key === 'logout') {
-      handleLogout()
+      requestLogout()
       return
     }
     if (sub.route) navigate(sub.route)
   }
 
-  async function handleLogout() {
+  function requestLogout() {
     setProfileOpen(false)
+    setLogoutConfirmOpen(true)
+  }
+
+  async function handleLogout() {
+    setLogoutConfirmOpen(false)
     await logout()
     navigate(ROUTES.LOGIN)
   }
@@ -169,72 +189,88 @@ export default function TrainerShell({ children }: { children: React.ReactNode }
 
   return (
     <>
-      <style>{SHELL_CSS + NOTIF_CSS}</style>
+      <style>{SHELL_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
       <div className="db-root">
 
         {/* ── Navbar ── */}
         <nav className="navbar">
-          <div className="navbar-logo">
-            <img src="/Logo.png" alt="The Global Project Leaders" />
-          </div>
-
-          <div className="navbar-right">
-            <div className="search-wrap">
-              <Search size={16} color="#9CA3AF" />
-              <input type="text" placeholder="Search anything" />
-            </div>
-
-            {/* Bell + notification panel */}
-            <div style={{ position: 'relative' }}>
-              <div
-                className={`topbar-bell${notifOpen ? ' active' : ''}`}
-                onClick={toggleNotif}
-                role="button"
-                aria-label="Open notifications"
-                aria-expanded={notifOpen}
-              >
-                <Bell size={20} />
-                <div className="bell-dot" />
-              </div>
-              {notifOpen && (
-                <NotificationPanel onClose={() => setNotifOpen(false)} />
-              )}
-            </div>
-
-            {/* Profile dropdown */}
-            <div className="profile-menu-wrap">
-              <button
-                className="profile-trigger"
-                onClick={toggleProfile}
-                aria-haspopup="true"
-                aria-expanded={profileOpen}
-                aria-label="Open profile menu"
-              >
-                <div className="topbar-avatar">{initials}</div>
-                <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
+          {pageHeader ? (
+            <div className="navbar-page-header">
+              <button className="navbar-page-back" onClick={pageHeader.onBack} aria-label="Back">
+                <ChevronLeft size={22} />
               </button>
-              {profileOpen && (
-                <div className="profile-dropdown" role="menu">
-                  <div className="profile-dropdown-header">
-                    <div className="user-avatar">{initials}</div>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div className="profile-dropdown-name">{user.name || user.email}</div>
-                      <div className="profile-dropdown-email">{user.email}</div>
-                    </div>
-                  </div>
-                  <button
-                    className="profile-dropdown-item"
-                    onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
-                  >
-                    <UserIcon size={16} /> Profile
-                  </button>
-                  <button className="profile-dropdown-item danger" onClick={handleLogout}>
-                    <LogOut size={16} /> Log out
-                  </button>
-                </div>
-              )}
+              <div>
+                <div className="navbar-page-title">{pageHeader.title}</div>
+                {pageHeader.subtitle && (
+                  <div className="navbar-page-subtitle">{pageHeader.subtitle}</div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="navbar-logo">
+                <img src="/Logo.png" alt="The Global Project Leaders" />
+              </div>
+
+              <div className="navbar-right">
+                <div className="search-wrap">
+                  <Search size={16} color="#9CA3AF" />
+                  <input type="text" placeholder="Search anything" />
+                </div>
+
+                {/* Bell + notification panel */}
+                <div style={{ position: 'relative' }}>
+                  <div
+                    className={`topbar-bell${notifOpen ? ' active' : ''}`}
+                    onClick={toggleNotif}
+                    role="button"
+                    aria-label="Open notifications"
+                    aria-expanded={notifOpen}
+                  >
+                    <Bell size={20} />
+                    <div className="bell-dot" />
+                  </div>
+                  {notifOpen && (
+                    <NotificationPanel onClose={() => setNotifOpen(false)} />
+                  )}
+                </div>
+
+                {/* Profile dropdown */}
+                <div className="profile-menu-wrap">
+                  <button
+                    className="profile-trigger"
+                    onClick={toggleProfile}
+                    aria-haspopup="true"
+                    aria-expanded={profileOpen}
+                    aria-label="Open profile menu"
+                  >
+                    <div className="topbar-avatar">{initials}</div>
+                    <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
+                  </button>
+                  {profileOpen && (
+                    <div className="profile-dropdown" role="menu">
+                      <div className="profile-dropdown-header">
+                        <div className="user-avatar">{initials}</div>
+                        <div style={{ overflow: 'hidden' }}>
+                          <div className="profile-dropdown-name">{user.name || user.email}</div>
+                          <div className="profile-dropdown-email">{user.email}</div>
+                        </div>
+                      </div>
+                      <button
+                        className="profile-dropdown-item"
+                        onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
+                      >
+                        <UserIcon size={16} /> Profile
+                      </button>
+                      <button className="profile-dropdown-item danger" onClick={requestLogout}>
+                        <LogOut size={16} /> Log out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </nav>
 
         <div className="db-body">
@@ -311,6 +347,14 @@ export default function TrainerShell({ children }: { children: React.ReactNode }
             ))}
           </div>
         </div>
+
+        {/* ── Logout confirmation modal ── */}
+        {logoutConfirmOpen && (
+          <LogoutConfirmModal
+            onCancel={() => setLogoutConfirmOpen(false)}
+            onConfirm={handleLogout}
+          />
+        )}
 
       </div>
     </>

@@ -56,7 +56,7 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   // ===========================
   TRAINER_DASHBOARD: '/trainer/dashboard',
   TRAINER_COURSES: '/trainer/courses',
-  TRAINER_COURSE_CREATE: '/trainer/courses/create',
+  TRAINER_COURSE_ADD: '/trainer/courses/addcourse',
   TRAINER_COURSE_EDIT: '/trainer/courses/:id/edit',
   TRAINER_COURSE_MANAGE: '/trainer/courses/:id/manage',
   TRAINER_COURSE_MODULES: '/trainer/courses/:id/modules',
@@ -309,7 +309,7 @@ liveSessionJoin: (id: string | number) =>
   // Trainer routes
   trainerDashboard: () => ROUTES.TRAINER_DASHBOARD,
   trainerCourses: () => ROUTES.TRAINER_COURSES,
-  trainerCourseCreate: () => ROUTES.TRAINER_COURSE_CREATE,
+ trainerCourseCreate: () => ROUTES.TRAINER_COURSE_ADD,
   trainerCourseEdit: (id: string | number) =>
     getRoute(ROUTES.TRAINER_COURSE_EDIT, { id }),
   trainerCourseManage: (id: string | number) =>
