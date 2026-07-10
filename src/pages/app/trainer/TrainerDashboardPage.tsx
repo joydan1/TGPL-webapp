@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import TrainerShell from '../../../layouts/TrainerShell'
 import { Plus, Users, BookOpen, ClipboardList, Star } from 'lucide-react'
 import { ROUTES } from '../../../constants/routes'
+import { useAuth } from '../../../hooks/useAuth'
 
 const stats = [
   {
@@ -118,7 +119,12 @@ const PAGE_CSS = `
   .db-name { font-size: 2.25rem; }
 }
 `
-
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }) {
   const stroke = 4
   const radius = (size - stroke) / 2
@@ -161,6 +167,11 @@ function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }
 
 export default function TrainerDashboardPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  if (!user) return null
+
+  const firstName = (user.name || '').split(' ')[0] || 'there'
 
   return (
     <TrainerShell>
@@ -168,13 +179,13 @@ export default function TrainerDashboardPage() {
       <div className="db-page">
         <div className="db-header">
           <div>
-            <p className="db-greeting">Good morning,</p>
-            <h1 className="db-name">Amara 👋</h1>
+            <p className="db-greeting">{getGreeting()},</p>
+            <h1 className="db-name">{firstName} 👋</h1>
           </div>
           <button className="db-add-btn" onClick={() => navigate(ROUTES.TRAINER_COURSE_ADD)}>
-  <Plus size={18} />
-  Add new course
-</button>
+            <Plus size={18} />
+            Add new course
+          </button>
         </div>
 
         <div className="db-stats">
