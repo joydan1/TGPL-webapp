@@ -25,7 +25,6 @@ type PastReview = {
 }
 
 
-
 const pendingReviews: PendingReview[] = [
   {
     id: 'fatima-al-rashidi',

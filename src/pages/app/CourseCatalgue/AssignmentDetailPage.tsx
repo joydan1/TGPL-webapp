@@ -32,11 +32,11 @@ interface RawSubmissionAttempt {
   id: string
   assignment_id: string
   attempt_number: number
-  state: string // TODO: confirm full enum — seen so far: "not_started". Assumed others: in_progress/submitted/graded/revision_requested
+  state: string 
   submitted_at: string | null
   is_late: boolean
   files: RawSubmissionFile[]
-  grade: Record<string, unknown> | null // TODO: confirm real shape once a graded example is available
+  grade: Record<string, unknown> | null 
   created_at: string
 }
 
@@ -235,6 +235,51 @@ function sortedRequirements(reqs: AssignmentRequirement[]): AssignmentRequiremen
   return [...reqs].sort((a, b) => a.order - b.order)
 }
 
+function getExtensionFromResource(fileType: string, url: string): string {
+  try {
+    const path = new URL(url).pathname
+    const match = path.match(/\.([a-zA-Z0-9]+)(?:$|\?)/)
+    if (match) return match[1].toLowerCase()
+  } catch {
+    // ignore, fall through
+  }
+  const t = (fileType || '').toLowerCase()
+  const map: Record<string, string> = {
+    pdf: 'pdf', doc: 'doc', docx: 'docx', xls: 'xls', xlsx: 'xlsx',
+    sheet: 'xlsx', ppt: 'ppt', pptx: 'pptx', slide: 'pptx', zip: 'zip',
+  }
+  for (const key in map) {
+    if (t.includes(key)) return map[key]
+  }
+  return ''
+}
+
+async function triggerDownload(url: string, filename?: string, fileType?: string) {
+  try {
+    const response = await fetch(url, { mode: 'cors' })
+    if (!response.ok) throw new Error('Download request failed')
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const ext = getExtensionFromResource(fileType || '', url)
+    const safeName = (filename || 'download').replace(/[/\\?%*:|"<>]/g, '-')
+    const alreadyHasExt = /\.[a-zA-Z0-9]+$/.test(safeName)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = alreadyHasExt || !ext ? safeName : `${safeName}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (err) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || ''
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+}
+
 // ─── Page CSS (page-specific only — shell handled by AppShell) ────────────────
 const PAGE_CSS = `
   .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.5rem; }
@@ -247,12 +292,12 @@ const PAGE_CSS = `
   .crumb-row { display: flex; align-items: center; gap: 0.625rem; }
   .crumb-back { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: none; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .crumb-back:hover { background: #F3F4F6; }
-  .crumb { font-size: 0.875rem; color: #9CA3AF; display: flex; align-items: center; gap: 0.4rem; }
+  .crumb { font-size: 0.875rem; color: #9CA3AF; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; row-gap: 0.25rem; min-width: 0; }
   .crumb .crumb-link { color: #9CA3AF; cursor: pointer; }
   .crumb .crumb-link:hover { color: #2563EB; }
   .crumb .crumb-current { color: #2563EB; font-weight: 600; }
   .header-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .header-title { font-size: 1.5rem; font-weight: 700; color: #111; }
+  .header-title { font-size: 1.5rem; font-weight: 700; color: #111; word-break: break-word; }
   .header-sub { font-size: 0.9375rem; color: #6B7280; margin-top: 0.125rem; }
   .status-pill { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 0.8125rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
   .status-pill.not_started { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
@@ -266,15 +311,15 @@ const PAGE_CSS = `
   .feedback-card { border-radius: 1rem; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.625rem; }
   .feedback-card.graded { background: #ECFDF3; }
   .feedback-card.revision { background: #FFFBEB; }
-  .feedback-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-  .feedback-head { display: flex; align-items: center; gap: 0.75rem; }
+  .feedback-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .feedback-head { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
   .feedback-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .feedback-icon.graded { background: #D1FAE5; }
   .feedback-icon.revision { background: #FDE68A; }
   .feedback-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
   .feedback-label.graded { color: #16A34A; }
   .feedback-label.revision { color: #B45309; }
-  .feedback-title { font-size: 1.0625rem; font-weight: 700; color: #111; margin-top: 0.125rem; }
+  .feedback-title { font-size: 1.0625rem; font-weight: 700; color: #111; margin-top: 0.125rem; word-break: break-word; }
   .feedback-title.revision { color: #B45309; }
   .feedback-score { text-align: right; flex-shrink: 0; }
   .feedback-score-num { font-size: 1.625rem; font-weight: 800; color: #16A34A; line-height: 1; }
@@ -313,9 +358,9 @@ const PAGE_CSS = `
   .scenario-box h3 { font-size: 0.9375rem; font-weight: 700; color: #111; }
 
   .grading-table { display: flex; flex-direction: column; gap: 0.625rem; border-top: 1px solid #F3F4F6; padding-top: 1rem; }
-  .grading-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9375rem; }
+  .grading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; }
   .grading-row span:first-child { color: #374151; }
-  .grading-row span:last-child { font-weight: 700; color: #111; }
+  .grading-row span:last-child { font-weight: 700; color: #111; white-space: nowrap; }
 
   /* Resources */
   .resources-section { display: flex; flex-direction: column; gap: 0.875rem; }
@@ -323,7 +368,7 @@ const PAGE_CSS = `
   .resource-row { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; }
   .resource-icon-wrap { width: 2.5rem; height: 2.5rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .resource-info { flex: 1; min-width: 0; }
-  .resource-title { font-size: 0.9375rem; font-weight: 700; color: #111; }
+  .resource-title { font-size: 0.9375rem; font-weight: 700; color: #111; word-break: break-word; }
   .resource-meta { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.125rem; }
   .resource-meta .size-tag { color: #16A34A; font-weight: 700; }
   .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
@@ -331,12 +376,12 @@ const PAGE_CSS = `
 
   /* Submission requirements */
   .req-list { display: flex; flex-direction: column; gap: 0.625rem; }
-  .req-row { display: flex; align-items: flex-start; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; }
+  .req-row { display: flex; align-items: flex-start; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; flex-wrap: wrap; }
   .req-icon-wrap { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #F5F0FF; }
-  .req-info { flex: 1; min-width: 0; }
+  .req-info { flex: 1; min-width: 140px; }
   .req-label { font-size: 0.9375rem; font-weight: 700; color: #111; }
   .req-sub { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.125rem; }
-  .req-value { font-size: 0.9375rem; font-weight: 700; color: #111; text-align: right; flex-shrink: 0; white-space: nowrap; }
+  .req-value { font-size: 0.9375rem; font-weight: 700; color: #111; text-align: right; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 
   /* Submitted files */
   .submitted-files-section { display: flex; flex-direction: column; gap: 0.875rem; }
@@ -351,16 +396,16 @@ const PAGE_CSS = `
   .action-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; padding: 0.95rem; border-radius: 0.875rem; border: none; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
   .action-btn.start { background: #2563EB; color: #fff; }
   .action-btn:hover { opacity: 0.92; }
-  .action-hint { font-size: 0.8125rem; color: #9CA3AF; }
+  .action-hint { font-size: 0.8125rem; color: #9CA3AF; text-align: center; }
 
   /* Modal — prefixed to avoid collisions */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1.5rem; }
-  .submit-modal { width: 100%; max-width: 540px; background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 88vh; overflow-y: auto; }
-  .submit-modal-head { display: flex; align-items: center; justify-content: space-between; }
-  .submit-modal-title { font-size: 1.125rem; font-weight: 700; color: #111; }
+  .submit-modal { width: 100%; max-width: 540px; background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 88vh; overflow-y: auto; box-sizing: border-box; }
+  .submit-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+  .submit-modal-title { font-size: 1.125rem; font-weight: 700; color: #111; word-break: break-word; }
   .submit-modal-close { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: #F3F4F6; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .submit-modal-close:hover { background: #E5E7EB; }
-  .asgn-modal-progress-row { display: flex; align-items: center; justify-content: space-between; }
+  .asgn-modal-progress-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
   .asgn-modal-progress-label { font-size: 0.9375rem; color: #6B7280; }
   .asgn-modal-progress-count { font-size: 0.9375rem; font-weight: 700; color: #2563EB; }
   .modal-body-row { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
@@ -371,13 +416,13 @@ const PAGE_CSS = `
   .dropzone-text { font-size: 0.9375rem; font-weight: 600; color: #374151; }
   .dropzone-sub { font-size: 0.78rem; color: #9CA3AF; }
   .criteria-list { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.25rem; }
-  .criteria-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; color: #374151; }
-  .criteria-row .criteria-label-wrap { display: flex; flex-direction: column; }
-  .criteria-row .criteria-hint { font-size: 0.72rem; color: #9CA3AF; }
+  .criteria-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; color: #374151; flex-wrap: wrap; }
+  .criteria-row .criteria-label-wrap { display: flex; flex-direction: column; min-width: 0; }
+  .criteria-row .criteria-hint { font-size: 0.72rem; color: #9CA3AF; word-break: break-word; }
   .criteria-status { flex-shrink: 0; display: flex; align-items: center; }
   .file-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .file-list-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.875rem; border-radius: 0.625rem; background: #F9FAFB; }
-  .file-list-name { flex: 1; min-width: 0; font-size: 0.875rem; color: #111; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-list-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.875rem; border-radius: 0.625rem; background: #F9FAFB; flex-wrap: wrap; }
+  .file-list-name { flex: 1; min-width: 80px; font-size: 0.875rem; color: #111; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .file-list-req { font-size: 0.72rem; color: #6B7280; flex-shrink: 0; }
   .file-list-size { font-size: 0.78rem; color: #9CA3AF; flex-shrink: 0; }
   .file-list-remove { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: none; background: none; color: #9CA3AF; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
@@ -390,11 +435,34 @@ const PAGE_CSS = `
   @media (max-width: 900px) {
     .content { padding: 1.5rem 1.25rem 2rem; }
     .modal-body-row { flex-direction: column; }
+    .dropzone, .criteria-list { min-width: 0; width: 100%; }
   }
   @media (max-width: 640px) {
-    .content { padding: 1.25rem 1rem 5rem; }
+    .content { padding: 1.25rem 1rem 5rem; gap: 1.125rem; }
     .header-card, .instructions-card { padding: 1.25rem; }
     .header-title { font-size: 1.25rem; }
+    .header-title-row { flex-direction: column; align-items: flex-start; gap: 0.625rem; }
+    .status-pill { align-self: flex-start; }
+    .crumb { font-size: 0.8125rem; }
+    .meta-row { gap: 0.625rem 1rem; }
+
+    .feedback-card { padding: 1rem 1.25rem; }
+    .feedback-top-row { flex-direction: column; align-items: flex-start; gap: 0.625rem; }
+    .feedback-score { text-align: left; }
+
+    .grading-row { flex-wrap: wrap; }
+    .req-row { padding: 0.875rem; }
+    .req-value { margin-left: 0; text-align: left; }
+    .resource-row { padding: 0.75rem 0.875rem; }
+
+    .submit-modal { padding: 1.25rem; border-radius: 1rem; max-height: 92vh; }
+    .submitted-files-grid { gap: 0.875rem; }
+    .submitted-file-item { width: 78px; }
+    .submitted-file-icon { width: 2.5rem; height: 2.5rem; }
+    .submitted-file-name { font-size: 0.72rem; }
+
+    .criteria-row { padding: 0.375rem 0; }
+    .file-list-item { gap: 0.5rem; padding: 0.5rem 0.625rem; }
   }
 `
 
@@ -505,7 +573,7 @@ return ( <div className="modal-backdrop" onClick={onClose}>
           <div className="file-list-item" key={`${f.name}-${i}`}>
             <FileText size={16} color="#6B7280" />
             <span className="file-list-name">{f.name}</span>
-            {/* ❌ removed requirement index mapping */}
+            {/*  removed requirement index mapping */}
             <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
             <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
               <X size={14} />
@@ -575,15 +643,16 @@ export default function AssignmentDetailPage() {
   if (!user) return null
 
   // ── Resource download: use presigned URL endpoint ─────────────────────────
-  async function handleResourceDownload(resourceId: string, resourceTitle: string) {
-    if (!assignment) return
-    const res = await assignmentsAPI.getResourceDownloadUrl(assignment.id, resourceId)
-    if (res.success) {
-      window.open(res.data.download_url, '_blank')
-    } else {
-      console.error(`Failed to download "${resourceTitle}":`, res.error)
-    }
+async function handleResourceDownload(resourceId: string, resourceTitle: string) {
+  if (!assignment) return
+  const res = await assignmentsAPI.getResourceDownloadUrl(assignment.id, resourceId)
+  if (res.success) {
+    const resource = assignment.resources.find((r) => r.id === resourceId)
+    await triggerDownload(res.data.download_url, resourceTitle, resource?.file_type ?? '')
+  } else {
+    console.error(`Failed to download "${resourceTitle}":`, res.error)
   }
+}
 
   function handleSubmitted(submittedFiles: SubmittedFile[]) {
     setModalOpen(false)
@@ -849,21 +918,21 @@ export default function AssignmentDetailPage() {
               )}
 
               {/* Submitted files */}
-              {assignment.submitted_files.length > 0 && (
-                <div className="submitted-files-section">
-                  <div className="section-label">Submitted Files</div>
-                  <div className="submitted-files-card">
-                    <div className="submitted-files-grid">
-                      {assignment.submitted_files.map((f) => (
-                        <a className="submitted-file-item" key={f.id} href={f.file_url} target="_blank" rel="noreferrer">
-                          <div className="submitted-file-icon"><FileText size={22} /></div>
-                          <span className="submitted-file-name">{f.filename}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+{assignment.submitted_files.length > 0 && (
+  <div className="submitted-files-section">
+    <div className="section-label">Submitted Files</div>
+    <div className="submitted-files-card">
+      <div className="submitted-files-grid">
+        {assignment.submitted_files.map((f) => (
+          <a className="submitted-file-item" key={f.id} href={f.file_url} target="_blank" rel="noreferrer">
+            <div className="submitted-file-icon"><FileText size={22} /></div>
+            <span className="submitted-file-name">{f.filename}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
               {/* Action bar */}
               {showStartSubmission && (

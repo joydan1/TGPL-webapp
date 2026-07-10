@@ -9,7 +9,6 @@ import {
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI, assignmentsAPI } from '../../../services/api'
 import type { LessonDetailResponse, LessonResource, LearnModule, LearnModuleAssignmentSummary, AssignmentResource } from '../../../services/api'
-// (types imported above)
 import { useAuth } from '../../../hooks/useAuth'
 import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 
@@ -34,7 +33,50 @@ function resourceIconBg(fileType: string) {
   if (t.includes('ppt') || t.includes('slide')) return '#FFF4ED'
   return '#F5F0FF'
 }
+function getExtensionFromResource(fileType: string, url: string): string {
+  try {
+    const path = new URL(url).pathname
+    const match = path.match(/\.([a-zA-Z0-9]+)(?:$|\?)/)
+    if (match) return match[1].toLowerCase()
+  } catch {
+    // ignore, fall through
+  }
+  const t = (fileType || '').toLowerCase()
+  const map: Record<string, string> = {
+    pdf: 'pdf', doc: 'doc', docx: 'docx', xls: 'xls', xlsx: 'xlsx',
+    sheet: 'xlsx', ppt: 'ppt', pptx: 'pptx', slide: 'pptx', zip: 'zip',
+  }
+  for (const key in map) {
+    if (t.includes(key)) return map[key]
+  }
+  return ''
+}
 
+async function triggerDownload(url: string, filename?: string, fileType?: string) {
+  try {
+    const response = await fetch(url, { mode: 'cors' })
+    if (!response.ok) throw new Error('Download request failed')
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const ext = getExtensionFromResource(fileType || '', url)
+    const safeName = (filename || 'download').replace(/[/\\?%*:|"<>]/g, '-')
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = ext ? `${safeName}.${ext}` : safeName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (err) {
+    // Fallback if fetch/CORS fails — same-tab 
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || ''
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+}
 const QUALITY_OPTIONS = [
   { label: 'Auto', sub: 'Adjusts automatically', kbps: '—'          },
   { label: '720p', sub: 'High quality',           kbps: '~2500 kbps' },
@@ -614,81 +656,55 @@ export default function CourseLearnPage() {
     )
   }
 
-  async function downloadResource(r: LessonResource) {
-    if (!slug || !lessonId) return
-    setResourceError(null)
-    setDownloadingResourceIds((prev) => new Set(prev).add(r.id))
+async function downloadResource(r: LessonResource) {
+  if (!slug || !lessonId) return
+  setResourceError(null)
+  setDownloadingResourceIds((prev) => new Set(prev).add(r.id))
 
-    const downloadWindow = window.open('', '_blank')
-    if (!downloadWindow) {
-      setResourceError('Unable to open download tab. Please allow popups.')
-      setDownloadingResourceIds((prev) => {
-        const next = new Set(prev)
-        next.delete(r.id)
-        return next
-      })
-      return
-    }
-
+  try {
     const url = r.download_url
     if (url) {
-      downloadWindow.location.href = url
-      setDownloadingResourceIds((prev) => {
-        const next = new Set(prev)
-        next.delete(r.id)
-        return next
-      })
+      await triggerDownload(url, r.title, getFileTypeLabel(r))
       return
     }
 
     const res = await coursesAPI.getResourceDownloadUrl(slug, lessonId, r.id)
+    if (res.success) {
+      await triggerDownload(res.data.download_url, r.title, getFileTypeLabel(r))
+    } else {
+      setResourceError(res.error || 'Failed to get resource download link.')
+    }
+  } finally {
     setDownloadingResourceIds((prev) => {
       const next = new Set(prev)
       next.delete(r.id)
       return next
     })
-
-    if (res.success) {
-      downloadWindow.location.href = res.data.download_url
-      return
-    }
-
-    downloadWindow.close()
-    setResourceError(res.error || 'Failed to get resource download link.')
   }
+}
 
   async function downloadAssignmentResource(assignmentId: string, r: AssignmentResource) {
-    if (!assignmentId || !r) return
-    setResourceError(null)
-    setDownloadingAssignmentResourceIds((prev) => new Set(prev).add(r.id))
+  if (!assignmentId || !r) return
+  setResourceError(null)
+  setDownloadingAssignmentResourceIds((prev) => new Set(prev).add(r.id))
 
-    const downloadWindow = window.open('', '_blank')
-    if (!downloadWindow) {
-      setResourceError('Unable to open download tab. Please allow popups.')
-      setDownloadingAssignmentResourceIds((prev) => {
-        const next = new Set(prev)
-        next.delete(r.id)
-        return next
-      })
-      return
-    }
-
+  try {
     const res = await assignmentsAPI.getResourceDownloadUrl(assignmentId, r.id)
+    if (res.success) {
+      await triggerDownload(res.data.download_url, r.title, (r as any).file_format ?? (r as any).resource_type ?? '')
+    } else {
+      setResourceError(res.error || 'Failed to get assignment resource download link.')
+    }
+  } finally {
     setDownloadingAssignmentResourceIds((prev) => {
       const next = new Set(prev)
       next.delete(r.id)
       return next
     })
-
-    if (res.success) {
-      downloadWindow.location.href = res.data.download_url
-      return
-    }
-
-    downloadWindow.close()
-    setResourceError(res.error || 'Failed to get assignment resource download link.')
   }
+}
 
+ 
   async function downloadAll(resources: LessonResource[]) {
     setResourceError(null)
     await Promise.all(resources.map((r) => downloadResource(r)))

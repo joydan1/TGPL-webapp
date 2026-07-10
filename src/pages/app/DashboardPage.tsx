@@ -358,11 +358,11 @@ export default function DashboardPage() {
         }
 
         const active = all
-          .filter((a) => a.my_submission_status === 'in_progress')
-          .sort(byDueDate)
-        const upcoming = all
-          .filter((a) => a.my_submission_status === 'not_started')
-          .sort(byDueDate)
+  .filter((a) => a.my_submission_status === 'in_progress')
+  .sort(byDueDate)
+const upcoming = all
+  .filter((a) => a.my_submission_status === 'not_started' || a.my_submission_status == null)
+  .sort(byDueDate)
 
         setAssignmentsActive(active)
         setAssignmentsUpcoming(upcoming)
