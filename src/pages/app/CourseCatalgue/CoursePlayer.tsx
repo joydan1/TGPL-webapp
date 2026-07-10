@@ -344,7 +344,13 @@ const CSS = `
     .info-title { font-size: 0.9375rem; }
     .volume-slider { display: none; }
   }
-
+@media (max-width: 640px) {
+  .page { padding: 0 0 2rem; background: #fff; }
+  .outer { padding: 0; border-radius: 0; }
+  .card { border-radius: 0; }
+  .info, .playlist, .enroll-bar { padding: 1rem 1.25rem; }
+  .logo { padding: 1.25rem 1rem 0; }
+}
   @media (max-width: 400px) {
     .enroll-bar { flex-direction: column; align-items: flex-start; }
     .enroll-btn { width: 100%; text-align: center; }
