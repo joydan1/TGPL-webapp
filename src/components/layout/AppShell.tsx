@@ -6,7 +6,7 @@ import {
   PanelLeftClose, PanelLeftOpen,
   LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
-import { ROUTES } from '../../constants/routes'
+import { ROUTES, RouteBuilder } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
 import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from './LogoutConfirmModal'
@@ -137,6 +137,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [notifOpen,    setNotifOpen]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchTerm,   setSearchTerm]   = useState('')
 
   if (!user) return null
 
@@ -154,6 +155,13 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
     if (key === 'myCourse') navigate(ROUTES.COURSES)
     if (key === 'courses')  navigate(ROUTES.COURSES)
     if (key === 'live')     navigate(ROUTES.LIVE_SESSIONS)
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    const term = searchTerm.trim()
+    const base = RouteBuilder.courseCatalogPage()
+    navigate(term ? `${base}?search=${encodeURIComponent(term)}` : base)
   }
 
   function handleSubitemClick(sub: typeof SETTINGS_SUBITEMS[number]) {
@@ -214,7 +222,13 @@ function requestLogout() {
               <div className="navbar-right">
                 <div className="search-wrap">
                   <Search size={16} color="#9CA3AF" />
-                  <input type="text" placeholder="Search anything" />
+                  <input
+                    type="text"
+                    placeholder="Search anything"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                  />
                 </div>
 
                 {/* Bell + notification panel */}

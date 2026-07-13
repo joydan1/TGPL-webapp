@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, ChevronDown, LogOut, User as UserIcon } from 'lucide-react'
-import { ROUTES } from '../../constants/routes'
+import { ROUTES, RouteBuilder } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
 import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 
@@ -14,11 +14,19 @@ export default function Navbar({ initials }: NavbarProps) {
   const { user, logout } = useAuth()
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [notifOpen,    setNotifOpen]    = useState(false)
+  const [searchTerm,   setSearchTerm]   = useState('')
 
   async function handleLogout() {
     setProfileOpen(false)
     await logout()
     navigate(ROUTES.LOGIN)
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    const term = searchTerm.trim()
+    const base = RouteBuilder.courseCatalogPage()
+    navigate(term ? `${base}?search=${encodeURIComponent(term)}` : base)
   }
 
   if (!user) return null
@@ -33,7 +41,13 @@ export default function Navbar({ initials }: NavbarProps) {
         <div className="navbar-right">
           <div className="search-wrap">
             <Search size={16} color="#9CA3AF" />
-            <input type="text" placeholder="Search anything" />
+            <input
+              type="text"
+              placeholder="Search anything"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+            />
           </div>
 
           {/* Bell */}

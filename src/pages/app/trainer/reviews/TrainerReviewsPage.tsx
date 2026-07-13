@@ -1,84 +1,13 @@
 // pages/trainer/reviews/TrainerReviewsPage.tsx
-import { useState } from 'react'
-import { Users, BookOpen, ClipboardList, Star, Award, X, Download, FileText, Plus, CheckCircle2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Users, ClipboardList, Star, Award, X, Download, FileText, CheckCircle2 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
-
-type PendingReview = {
-  id: string
-  name: string
-  avatar: string
-  assignment: string
-  courseTag: string
-  submittedLabel: string
-  overdue: boolean
-  files: { name: string; size: string }[]
-}
-
-type PastReview = {
-  id: string
-  name: string
-  avatar: string
-  assignment: string
-  score: number
-  status: 'Pass' | 'Revision'
-  date: string
-}
-
-
-const pendingReviews: PendingReview[] = [
-  {
-    id: 'fatima-al-rashidi',
-    name: 'Fatima Al-Rashidi',
-    avatar: '/avatars/fatima-al-rashidi.jpg',
-    assignment: 'Stakeholder Map Project',
-    courseTag: 'Project Management',
-    submittedLabel: 'Submitted 2h ago',
-    overdue: false,
-    files: [
-      { name: 'Stakeholder_Map_v3.pdf', size: '2.4 MB' },
-      { name: 'Stakeholder_Map_v3.pdf', size: '2.4 MB' },
-      { name: 'Stakeholder_Map_v3.pdf', size: '2.4 MB' },
-    ],
-  },
-  {
-    id: 'priya-sundaram',
-    name: 'Priya Sundaram',
-    avatar: '/avatars/priya-sundaram.jpg',
-    assignment: 'Scope Planning Quiz',
-    courseTag: 'Project Management',
-    submittedLabel: 'Submitted 2 days ago',
-    overdue: true,
-    files: [{ name: 'Scope_Planning_Quiz.pdf', size: '1.1 MB' }],
-  },
-  {
-    id: 'kwame-asante',
-    name: 'Kwame Asante',
-    avatar: '/avatars/kwame-asante.jpg',
-    assignment: 'Stakeholder Map Project',
-    courseTag: 'Project Management',
-    submittedLabel: 'Submitted 1 day ago',
-    overdue: true,
-    files: [{ name: 'Stakeholder_Map_v2.pdf', size: '2.1 MB' }],
-  },
-  {
-    id: 'daniel-chirwa',
-    name: 'Daniel Chirwa',
-    avatar: '/avatars/daniel-chirwa.jpg',
-    assignment: 'Stakeholder Map Project',
-    courseTag: 'Project Management',
-    submittedLabel: 'Submitted 5h ago',
-    overdue: false,
-    files: [{ name: 'Stakeholder_Map_v1.pdf', size: '2.0 MB' }],
-  },
-]
-
-const pastReviews: PastReview[] = [
-  { id: 'yusuf-bello', name: 'Yusuf Bello', avatar: '/avatars/yusuf-bello.jpg', assignment: 'Leadership Reflection', score: 91, status: 'Pass', date: '30 May' },
-  { id: 'chioma-eze', name: 'Chioma Eze', avatar: '/avatars/chioma-eze.jpg', assignment: 'Scope Planning Quiz', score: 78, status: 'Pass', date: '28 May' },
-  { id: 'amaka-okonkwo', name: 'Amaka Okonkwo', avatar: '/avatars/amaka-okonkwo.jpg', assignment: 'Risk Register Exercise', score: 62, status: 'Revision', date: '25 May' },
-  { id: 'fatima-a', name: 'Fatima A.', avatar: '/avatars/fatima-a.jpg', assignment: 'Module 1 Quiz', score: 85, status: 'Pass', date: '20 May' },
-  { id: 'daniel-chirwa-2', name: 'Daniel Chirwa', avatar: '/avatars/daniel-chirwa.jpg', assignment: 'Module 1 Quiz', score: 70, status: 'Pass', date: '19 May' },
-]
+import {
+  trainerReviewsAPI,
+  type TrainerPendingReview,
+  type TrainerCompletedReview,
+  type TrainerReviewSummary,
+} from '../../../../services/api'
 
 const PAGE_CSS = `
   .rv-page { padding: 1rem; background: #F5F5F5; }
@@ -89,16 +18,18 @@ const PAGE_CSS = `
   .rv-stat-value { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
   .rv-stat-title { margin: 0.3rem 0 0; color: #6B7280; font-size: 0.8rem; }
   .rv-stat-icon { width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .rv-stat-label { margin: 0.5rem 0 0; font-size: 0.8rem; font-weight: 600; }
 
   .rv-section-title { margin: 1.5rem 0 0.85rem; font-size: 1.1rem; font-weight: 700; color: #111827; }
   .rv-section-header { display: flex; align-items: center; justify-content: space-between; margin: 1.5rem 0 0.85rem; }
   .rv-view-all { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
 
+  .rv-empty-state { background: #fff; border-radius: 1rem; padding: 2rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9rem; border: 1px solid rgba(148, 163, 184, 0.12); }
+  .rv-error-state { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 1rem; padding: 1rem; font-size: 0.875rem; }
+
   .rv-pending-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
   .rv-pending-card { background: #fff; border-radius: 1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); overflow: hidden; cursor: pointer; }
   .rv-pending-body { display: flex; align-items: flex-start; gap: 0.85rem; padding: 1.1rem; }
-  .rv-pending-avatar { width: 42px; height: 42px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; }
+  .rv-pending-avatar { width: 42px; height: 42px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 700; }
   .rv-pending-name-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .rv-pending-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.95rem; }
   .rv-overdue-badge { background: #FEF3C7; color: #D97706; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; }
@@ -109,24 +40,24 @@ const PAGE_CSS = `
   .rv-past-card { background: #fff; border-radius: 1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); overflow: hidden; margin-top: 0.85rem; }
   .rv-past-row { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.1rem; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
   .rv-past-row:first-child { border-top: none; }
-  .rv-past-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; }
+  .rv-past-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 700; font-size: 0.8rem; }
   .rv-past-info { flex: 1; min-width: 140px; }
   .rv-past-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.9rem; }
   .rv-past-assignment { margin: 0.2rem 0 0; color: #6B7280; font-size: 0.8rem; }
   .rv-past-score-wrap { display: flex; align-items: center; gap: 0.5rem; }
   .rv-past-score { font-weight: 800; font-size: 0.95rem; }
   .rv-past-score.pass { color: #16A34A; }
-  .rv-past-score.revision { color: #D97706; }
-  .rv-past-status { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; white-space: nowrap; }
+  .rv-past-score.fail { color: #D97706; }
+  .rv-past-status { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; white-space: nowrap; text-transform: capitalize; }
   .rv-past-status.pass { background: #DCFCE7; color: #16A34A; }
-  .rv-past-status.revision { background: #FEF3C7; color: #D97706; }
+  .rv-past-status.fail { background: #FEF3C7; color: #D97706; }
   .rv-past-date { color: #9CA3AF; font-size: 0.78rem; margin-left: auto; }
 
   .rv-past-table-head { display: none; }
 
   @media (min-width: 640px) {
     .rv-page { padding: 1.5rem; }
-    .rv-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+    .rv-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
     .rv-pending-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .rv-past-table-head { display: flex; padding: 0.85rem 1.1rem; color: #9CA3AF; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
     .rv-past-table-head span:nth-child(1) { flex: 1; min-width: 140px; }
@@ -147,7 +78,7 @@ const PAGE_CSS = `
 
   .rv-grade-left { padding: 1.5rem; border-bottom: 1px solid #F3F4F6; }
   .rv-grade-header { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; }
-  .rv-grade-avatar { width: 48px; height: 48px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; }
+  .rv-grade-avatar { width: 48px; height: 48px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 700; }
   .rv-grade-name { margin: 0; font-weight: 800; font-size: 1.1rem; color: #111827; }
   .rv-grade-assignment-title { margin: 0.2rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .rv-grade-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.85rem; flex-wrap: wrap; font-size: 0.85rem; color: #6B7280; }
@@ -171,15 +102,22 @@ const PAGE_CSS = `
   .rv-score-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; margin-bottom: 0.5rem; }
   .rv-score-input { flex: 1; border: 1px solid #E5E7EB; border-radius: 0.85rem; padding: 0.85rem 1rem; font-size: 1rem; }
   .rv-score-of { color: #9CA3AF; font-weight: 600; }
-  .rv-add-score-btn { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; font-size: 0.875rem; margin: 0 auto; }
-  .rv-add-score-hint { text-align: center; color: #9CA3AF; font-size: 0.78rem; margin-top: 0.4rem; }
+
+  .rv-status-label { font-weight: 700; color: #111827; font-size: 0.9rem; display: block; margin: 1.25rem 0 0.6rem; }
+  .rv-status-toggle { display: flex; gap: 0.6rem; }
+  .rv-status-btn { flex: 1; border: 1px solid #E5E7EB; background: #fff; border-radius: 0.85rem; padding: 0.75rem; font-weight: 700; font-size: 0.9rem; cursor: pointer; color: #6B7280; }
+  .rv-status-btn.active-pass { border-color: #16A34A; background: #DCFCE7; color: #16A34A; }
+  .rv-status-btn.active-fail { border-color: #D97706; background: #FEF3C7; color: #D97706; }
 
   .rv-feedback-label { font-weight: 700; color: #111827; font-size: 0.9rem; display: block; margin: 1.5rem 0 0.6rem; }
   .rv-feedback-textarea { width: 100%; box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: 0.85rem; padding: 0.9rem 1rem; min-height: 140px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
 
+  .rv-form-error { margin-top: 1rem; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.75rem; padding: 0.75rem 1rem; font-size: 0.85rem; }
+
   .rv-grade-actions { display: flex; flex-direction: column-reverse; gap: 0.75rem; margin-top: 1.5rem; }
   .rv-cancel-btn { border: none; background: none; color: #6B7280; font-weight: 700; cursor: pointer; padding: 0.9rem; }
   .rv-submit-btn { border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem 1.4rem; cursor: pointer; }
+  .rv-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   @media (min-width: 768px) {
     .rv-grade-modal { grid-template-columns: 1fr 1fr; }
@@ -195,146 +133,233 @@ const PAGE_CSS = `
   .rv-success-btn { width: 100%; border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem; cursor: pointer; }
 `
 
-export default function TrainerReviewsPage() {
-  const [activeReview, setActiveReview] = useState<PendingReview | null>(null)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [scores, setScores] = useState<string[]>([''])
-  const [feedback, setFeedback] = useState('')
+function initials(name: string) {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
 
-  function openGradeModal(review: PendingReview) {
+function formatRelativeDate(iso: string) {
+  const date = new Date(iso)
+  const diffMs = Date.now() - date.getTime()
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
+  if (diffHrs < 1) return 'Just now'
+  if (diffHrs < 24) return `Submitted ${diffHrs}h ago`
+  const diffDays = Math.floor(diffHrs / 24)
+  return `Submitted ${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+}
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export default function TrainerReviewsPage() {
+  const [summary, setSummary] = useState<TrainerReviewSummary | null>(null)
+  const [pendingReviews, setPendingReviews] = useState<TrainerPendingReview[]>([])
+  const [pastReviews, setPastReviews] = useState<TrainerCompletedReview[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const [activeReview, setActiveReview] = useState<TrainerPendingReview | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [score, setScore] = useState('')
+  const [status, setStatus] = useState<'pass' | 'fail' | null>(null)
+  const [feedback, setFeedback] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadAll()
+  }, [])
+
+  async function loadAll() {
+    setLoading(true)
+    setLoadError(null)
+
+    const [summaryRes, pendingRes, completedRes] = await Promise.all([
+      trainerReviewsAPI.getSummary(),
+      trainerReviewsAPI.getPendingReviews(),
+      trainerReviewsAPI.getCompletedReviews(),
+    ])
+
+    if (summaryRes.success) setSummary(summaryRes.data)
+    if (pendingRes.success) setPendingReviews(pendingRes.data)
+    if (completedRes.success) setPastReviews(completedRes.data)
+
+    if (!summaryRes.success && !pendingRes.success && !completedRes.success) {
+      setLoadError(pendingRes.error || completedRes.error || summaryRes.error || 'Failed to load reviews')
+    }
+
+    setLoading(false)
+  }
+
+  function openGradeModal(review: TrainerPendingReview) {
     setActiveReview(review)
-    setScores([''])
+    setScore('')
+    setStatus(null)
     setFeedback('')
+    setSubmitError(null)
   }
 
   function closeGradeModal() {
+    if (submitting) return
     setActiveReview(null)
   }
 
-  function updateScore(index: number, value: string) {
-    setScores((s) => {
-      const next = [...s]
-      next[index] = value
-      return next
-    })
-  }
+  async function handleSubmitGrade() {
+    if (!activeReview) return
 
-  function addScoreField() {
-    setScores((s) => [...s, ''])
-  }
+    if (!status) {
+      setSubmitError('Select Pass or Fail before submitting.')
+      return
+    }
 
-  function handleSubmitGrade() {
-    // TODO: no grading endpoint exists yet.
-    // Wire this up to POST /api/v1/trainer/submissions/{id}/grade/ (or similar)
-    // with { scores, feedback } once the backend exposes it.
-    console.log('Grade submitted (not yet wired to backend):', {
-      learner: activeReview?.name,
-      assignment: activeReview?.assignment,
-      scores,
+    setSubmitting(true)
+    setSubmitError(null)
+
+    const result = await trainerReviewsAPI.gradeSubmission(activeReview.id, {
+      score: score.trim() === '' ? null : Number(score),
       feedback,
+      status,
     })
+
+    setSubmitting(false)
+
+    if (!result.success) {
+      setSubmitError(result.error)
+      return
+    }
+
+    // Remove from pending, and refresh summary + completed list so counts stay accurate
+    setPendingReviews((prev) => prev.filter((r) => r.id !== activeReview.id))
     setActiveReview(null)
     setShowSuccess(true)
+
+    const [summaryRes, completedRes] = await Promise.all([
+      trainerReviewsAPI.getSummary(),
+      trainerReviewsAPI.getCompletedReviews(),
+    ])
+    if (summaryRes.success) setSummary(summaryRes.data)
+    if (completedRes.success) setPastReviews(completedRes.data)
   }
 
   return (
     <TrainerShell>
       <style>{PAGE_CSS}</style>
       <div className="rv-page">
+        {loadError && <div className="rv-error-state">{loadError}</div>}
+
         <div className="rv-stats">
           <div className="rv-stat-card">
             <div className="rv-stat-top">
               <div>
-                <p className="rv-stat-value">54</p>
+                <p className="rv-stat-value">{loading ? '—' : summary?.total_reviews ?? 0}</p>
                 <p className="rv-stat-title">Total Reviews</p>
               </div>
               <div className="rv-stat-icon" style={{ background: '#DBEAFE' }}><Users size={16} color="#2563EB" /></div>
             </div>
-            <p className="rv-stat-label" style={{ color: '#16A34A' }}>+4 this week</p>
           </div>
           <div className="rv-stat-card">
             <div className="rv-stat-top">
               <div>
-                <p className="rv-stat-value">4</p>
-                <p className="rv-stat-title">Active Reviews</p>
-              </div>
-              <div className="rv-stat-icon" style={{ background: '#EDE9FE' }}><BookOpen size={16} color="#7C3AED" /></div>
-            </div>
-            <p className="rv-stat-label" style={{ color: '#16A34A' }}>+2 this week</p>
-          </div>
-          <div className="rv-stat-card">
-            <div className="rv-stat-top">
-              <div>
-                <p className="rv-stat-value">12</p>
+                <p className="rv-stat-value">{loading ? '—' : summary?.pending_count ?? 0}</p>
                 <p className="rv-stat-title">Pending reviews</p>
               </div>
               <div className="rv-stat-icon" style={{ background: '#FEF3C7' }}><ClipboardList size={16} color="#D97706" /></div>
             </div>
-            <p className="rv-stat-label" style={{ color: '#D97706' }}>4 overdue</p>
           </div>
           <div className="rv-stat-card">
             <div className="rv-stat-top">
               <div>
-                <p className="rv-stat-value">4.8</p>
-                <p className="rv-stat-title">Avg. course rating</p>
+                <p className="rv-stat-value">
+                  {loading ? '—' : summary?.average_score != null ? summary.average_score.toFixed(1) : '—'}
+                </p>
+                <p className="rv-stat-title">Avg. score</p>
               </div>
               <div className="rv-stat-icon" style={{ background: '#D1FAE5' }}><Star size={16} color="#059669" /></div>
             </div>
-            <p className="rv-stat-label" style={{ color: '#16A34A' }}>↑ 0.1 vs last month</p>
           </div>
         </div>
 
         <h3 className="rv-section-title">Pending Reviews</h3>
-        <div className="rv-pending-grid">
-          {pendingReviews.map((review) => (
-            <div key={review.id} className="rv-pending-card" onClick={() => openGradeModal(review)}>
-              <div className="rv-pending-body">
-                <img src={review.avatar} alt={review.name} className="rv-pending-avatar" />
-                <div style={{ minWidth: 0 }}>
-                  <div className="rv-pending-name-row">
-                    <p className="rv-pending-name">{review.name}</p>
-                    {review.overdue && <span className="rv-overdue-badge">Overdue</span>}
+        {loading ? (
+          <div className="rv-empty-state">Loading…</div>
+        ) : pendingReviews.length === 0 ? (
+          <div className="rv-empty-state">No pending reviews right now.</div>
+        ) : (
+          <div className="rv-pending-grid">
+            {pendingReviews.map((review) => (
+              <div key={review.id} className="rv-pending-card" onClick={() => openGradeModal(review)}>
+                <div className="rv-pending-body">
+                  <div className="rv-pending-avatar">{initials(review.learner_name)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="rv-pending-name-row">
+                      <p className="rv-pending-name">{review.learner_name}</p>
+                      {review.is_late && <span className="rv-overdue-badge">Overdue</span>}
+                    </div>
+                    <p className="rv-pending-assignment">{review.assignment_title}</p>
+                    <p className="rv-pending-meta">{review.course_title} · {formatRelativeDate(review.submitted_at)}</p>
                   </div>
-                  <p className="rv-pending-assignment">{review.assignment}</p>
-                  <p className="rv-pending-meta">{review.courseTag} · {review.submittedLabel}</p>
                 </div>
+                <button
+                  type="button"
+                  className="rv-grade-btn"
+                  onClick={(e) => { e.stopPropagation(); openGradeModal(review) }}
+                >
+                  <Award size={16} /> Grade
+                </button>
               </div>
-              <button
-                type="button"
-                className="rv-grade-btn"
-                onClick={(e) => { e.stopPropagation(); openGradeModal(review) }}
-              >
-                <Award size={16} /> Grade
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="rv-section-header">
           <h3 className="rv-section-title" style={{ margin: 0 }}>Past Reviews</h3>
-          <button className="rv-view-all">View all</button>
         </div>
-        <div className="rv-past-card">
-          <div className="rv-past-table-head">
-            <span>Learner</span>
-            <span>Assignment</span>
-            <span>Score</span>
-          </div>
-          {pastReviews.map((review) => (
-            <div key={review.id} className="rv-past-row">
-              <img src={review.avatar} alt={review.name} className="rv-past-avatar" />
-              <div className="rv-past-info">
-                <p className="rv-past-name">{review.name}</p>
-                <p className="rv-past-assignment">{review.assignment}</p>
-              </div>
-              <div className="rv-past-score-wrap">
-                <span className={`rv-past-score ${review.status === 'Pass' ? 'pass' : 'revision'}`}>{review.score}</span>
-                <span className={`rv-past-status ${review.status === 'Pass' ? 'pass' : 'revision'}`}>{review.status}</span>
-              </div>
-              <span className="rv-past-date">{review.date}</span>
+        {loading ? (
+          <div className="rv-empty-state">Loading…</div>
+        ) : pastReviews.length === 0 ? (
+          <div className="rv-empty-state">No completed reviews yet.</div>
+        ) : (
+          <div className="rv-past-card">
+            <div className="rv-past-table-head">
+              <span>Learner</span>
+              <span>Assignment</span>
+              <span>Score</span>
             </div>
-          ))}
-        </div>
+            {pastReviews.map((review) => {
+              const isPass = review.grade_status === 'pass'
+              return (
+                <div key={review.id} className="rv-past-row">
+                  <div className="rv-past-avatar">{initials(review.learner_name)}</div>
+                  <div className="rv-past-info">
+                    <p className="rv-past-name">{review.learner_name}</p>
+                    <p className="rv-past-assignment">{review.assignment_title}</p>
+                  </div>
+                  <div className="rv-past-score-wrap">
+                    <span className={`rv-past-score ${isPass ? 'pass' : 'fail'}`}>
+                      {review.score != null ? review.score : '—'}
+                    </span>
+                    {review.grade_status && (
+                      <span className={`rv-past-status ${isPass ? 'pass' : 'fail'}`}>{review.grade_status}</span>
+                    )}
+                  </div>
+                  <span className="rv-past-date">{formatShortDate(review.graded_at)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {activeReview && (
@@ -346,36 +371,42 @@ export default function TrainerReviewsPage() {
 
             <div className="rv-grade-left">
               <div className="rv-grade-header">
-                <img src={activeReview.avatar} alt={activeReview.name} className="rv-grade-avatar" />
+                <div className="rv-grade-avatar">{initials(activeReview.learner_name)}</div>
                 <div>
-                  <p className="rv-grade-name">{activeReview.name}</p>
-                  <p className="rv-grade-assignment-title">{activeReview.assignment}</p>
+                  <p className="rv-grade-name">{activeReview.learner_name}</p>
+                  <p className="rv-grade-assignment-title">{activeReview.assignment_title}</p>
                 </div>
-                {activeReview.overdue && <span className="rv-overdue-badge">Overdue</span>}
+                {activeReview.is_late && <span className="rv-overdue-badge">Overdue</span>}
               </div>
               <div className="rv-grade-meta">
-                <span>Submitted {activeReview.submittedLabel.replace('Submitted ', '')}</span>
-                <span className="rv-grade-tag">{activeReview.courseTag.toUpperCase()}</span>
+                <span>{formatRelativeDate(activeReview.submitted_at)}</span>
+                <span className="rv-grade-tag">{activeReview.course_title.toUpperCase()}</span>
               </div>
 
               <div className="rv-file-list">
-                {activeReview.files.map((file, i) => (
-                  <div className="rv-file-row" key={i}>
+                {activeReview.files.map((file) => (
+                  <div className="rv-file-row" key={file.id}>
                     <div className="rv-file-icon"><FileText size={18} /></div>
                     <div>
-                      <p className="rv-file-name">{file.name}</p>
-                      <p className="rv-file-size">{file.size}</p>
+                      <p className="rv-file-name">{file.file_name}</p>
+                      <p className="rv-file-size">{formatFileSize(file.file_size)}</p>
                     </div>
-                    <button className="rv-file-download" aria-label={`Download ${file.name}`}>
+                    <a
+                      className="rv-file-download"
+                      href={file.download_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Download ${file.file_name}`}
+                    >
                       <Download size={18} />
-                    </button>
+                    </a>
                   </div>
                 ))}
               </div>
 
               <div className="rv-note-box">
                 <p className="rv-note-title">Note to trainer</p>
-                <p className="rv-note-body">Kindly download the file(s), read through and input the grade(s) on the right-side panel.</p>
+                <p className="rv-note-body">Kindly download the file(s), read through and input the grade on the right-side panel.</p>
               </div>
             </div>
 
@@ -383,27 +414,37 @@ export default function TrainerReviewsPage() {
               <h3 className="rv-grade-form-title">Grade Assignment</h3>
               <p className="rv-grade-form-sub">Any score below 70%, the students will be required to review</p>
 
-              {scores.map((score, i) => (
-                <div key={i}>
-                  <label className="rv-score-label">
-                    Score {i + 1}{i === 0 && <span style={{ color: '#EF4444' }}>*</span>}
-                  </label>
-                  <div className="rv-score-row">
-                    <input
-                      type="number"
-                      className="rv-score-input"
-                      placeholder="—"
-                      value={score}
-                      onChange={(e) => updateScore(i, e.target.value)}
-                    />
-                    <span className="rv-score-of">/ 100</span>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="rv-add-score-btn" onClick={addScoreField}>
-                <Plus size={16} /> Add score
-              </button>
-              <p className="rv-add-score-hint">Use this if there are more than one paper that needs to be graded</p>
+              <label className="rv-score-label">Score</label>
+              <div className="rv-score-row">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="rv-score-input"
+                  placeholder="—"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                />
+                <span className="rv-score-of">/ 100</span>
+              </div>
+
+              <label className="rv-status-label">Result <span style={{ color: '#EF4444' }}>*</span></label>
+              <div className="rv-status-toggle">
+                <button
+                  type="button"
+                  className={`rv-status-btn ${status === 'pass' ? 'active-pass' : ''}`}
+                  onClick={() => setStatus('pass')}
+                >
+                  Pass
+                </button>
+                <button
+                  type="button"
+                  className={`rv-status-btn ${status === 'fail' ? 'active-fail' : ''}`}
+                  onClick={() => setStatus('fail')}
+                >
+                  Fail
+                </button>
+              </div>
 
               <label className="rv-feedback-label">Feedback</label>
               <textarea
@@ -413,9 +454,13 @@ export default function TrainerReviewsPage() {
                 onChange={(e) => setFeedback(e.target.value)}
               />
 
+              {submitError && <div className="rv-form-error">{submitError}</div>}
+
               <div className="rv-grade-actions">
-                <button className="rv-cancel-btn" onClick={closeGradeModal}>Cancel</button>
-                <button className="rv-submit-btn" onClick={handleSubmitGrade}>Submit Grade</button>
+                <button className="rv-cancel-btn" onClick={closeGradeModal} disabled={submitting}>Cancel</button>
+                <button className="rv-submit-btn" onClick={handleSubmitGrade} disabled={submitting}>
+                  {submitting ? 'Submitting…' : 'Submit Grade'}
+                </button>
               </div>
             </div>
           </div>

@@ -68,7 +68,7 @@ export default function EmailVerificationPage() {
     const result = await authAPI.sendVerificationEmail({ email: resendEmail })
     setResendMessage(
       result.success
-        ? 'New verification email sent! Check your inbox.'
+        ? 'New verification email sent! Check your inbox and spam folder.'
         : 'Failed to resend. Please try again.'
     )
     setResendLoading(false)

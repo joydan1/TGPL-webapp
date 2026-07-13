@@ -31,6 +31,7 @@ import LiveSessionsPage from './pages/app/LiveSessionsPage'
 import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
 import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
+import TrainerLiveClassesPage from './pages/app/trainer/live-classes/TrainerLiveClassesPage'
 import AddCoursePage from './pages/app/trainer/courses/AddCoursePage'
 import TrainerReviewsPage from './pages/app/trainer/reviews/TrainerReviewsPage'
 import ProfilePage from './pages/app/ProfilePage.tsx'
@@ -204,6 +205,15 @@ function App() {
     </ProtectedRoute>
   }
 />
+<Route
+  path={ROUTES.TRAINER_LIVE_CLASSES}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <TrainerLiveClassesPage />
+    </ProtectedRoute>
+  }
+/>
+
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route
           path={ROUTES.COURSES}

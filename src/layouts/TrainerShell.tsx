@@ -20,7 +20,7 @@ export const NAV_ITEMS = [
   { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
   { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
   { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_SUBMISSIONS,  Icon: Star,   badge: PENDING_REVIEWS_COUNT },
-  { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_SESSIONS, Icon: Radio  },
+  { key: 'live', label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
   { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
 ]
 

@@ -549,7 +549,7 @@ return ( <div className="modal-backdrop" onClick={onClose}>
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
       </div>
 
-      {/*  UPDATED: no more strict per-requirement enforcement */}
+      {/*   no more strict per-requirement enforcement */}
       <div className="criteria-list">
         {requirements.map((req) => (
           <div className="criteria-row" key={req.id}>

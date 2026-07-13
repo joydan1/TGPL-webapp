@@ -125,6 +125,8 @@ export type CheckoutResult =
   | { success: true; data: CheckoutResponse | FreeCourseCheckoutResponse }
   | { success: false; error: string; statusCode?: number }
 
+
+  
 // ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
 
 const SKIP_REFRESH_ROUTES = [
@@ -813,6 +815,625 @@ export const coursesAPI = {
   },
 }
 
+// ─── Live Session Types ────────────────────────────────────────────────────
+ 
+export type LiveBookingStatus = 'requested' | 'confirmed' | 'rejected' | 'cancelled'
+export type LiveSlotStatus = 'open' | 'booked' | 'closed'
+ 
+export interface LiveCourseRef {
+  slug: string
+  title: string
+}
+ 
+export interface LiveLearnerRef {
+  id: string
+  name: string
+  avatar?: string | null
+}
+ 
+export interface LiveSlot {
+  id: string
+  date: string // 'YYYY-MM-DD'
+  start_time: string // 'HH:mm'
+  end_time: string
+  status: LiveSlotStatus
+}
+ 
+export interface LiveSession {
+  id: string
+  title: string
+  course: LiveCourseRef
+  date: string
+  start_time: string
+  end_time: string
+  duration_minutes?: number
+  meeting_link?: string | null
+  recording_url?: string | null
+  recording_views?: number
+  status?: 'scheduled' | 'live' | 'completed' | 'cancelled'
+}
+ 
+export interface LiveManageBooking {
+  id: string
+  status: LiveBookingStatus
+  learner: LiveLearnerRef
+  slot: LiveSlot
+  session?: LiveSession | null
+  created_at: string
+}
+ 
+export interface CreateSlotPayload {
+  date: string
+  start_time: string
+  end_time: string
+}
+ 
+export interface PublishSessionPayload {
+  title: string
+  date: string
+  start_time: string
+  end_time: string
+}
+
+export const liveSessionsAPI = {
+  /** GET /v1/live/manage/bookings/ — bookings on the trainer's slots */
+  getManageBookings: async () => {
+    try {
+      const response = await apiClient.get<LiveManageBooking[] | { results: LiveManageBooking[] }>(
+        API_ENDPOINTS.LIVE_MANAGE_BOOKINGS,
+      )
+      const data = Array.isArray(response.data) ? response.data : response.data.results
+      return { success: true as const, data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load live sessions')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/live/manage/bookings/{id}/confirm/ */
+  confirmBooking: async (bookingId: string) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.LIVE_MANAGE_BOOKING_CONFIRM(bookingId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to confirm booking')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/live/manage/bookings/{id}/reject/ */
+  rejectBooking: async (bookingId: string) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.LIVE_MANAGE_BOOKING_REJECT(bookingId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to reject booking')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** GET /v1/live/manage/courses/{slug}/slots/ — owner's availability slots */
+  getManageCourseSlots: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.get<LiveSlot[] | { results: LiveSlot[] }>(
+        API_ENDPOINTS.LIVE_MANAGE_COURSE_SLOTS(courseSlug),
+      )
+      const data = Array.isArray(response.data) ? response.data : response.data.results
+      return { success: true as const, data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load availability slots')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/live/manage/courses/{slug}/slots/ — create an availability slot */
+  createManageCourseSlot: async (courseSlug: string, payload: CreateSlotPayload) => {
+    try {
+      const response = await apiClient.post<LiveSlot>(
+        API_ENDPOINTS.LIVE_MANAGE_COURSE_SLOTS(courseSlug),
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to create slot')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** PATCH /v1/live/manage/slots/{id}/ */
+  updateManageSlot: async (slotId: string, payload: Partial<CreateSlotPayload>) => {
+    try {
+      const response = await apiClient.patch<LiveSlot>(API_ENDPOINTS.LIVE_MANAGE_SLOT(slotId), payload)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update slot')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** DELETE /v1/live/manage/slots/{id}/ */
+  deleteManageSlot: async (slotId: string) => {
+    try {
+      await apiClient.delete(API_ENDPOINTS.LIVE_MANAGE_SLOT(slotId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to delete slot')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/live/manage/courses/{slug}/sessions/ — publish a live session */
+  publishSession: async (courseSlug: string, payload: PublishSessionPayload) => {
+    try {
+      const response = await apiClient.post<LiveSession>(
+        API_ENDPOINTS.LIVE_MANAGE_COURSE_SESSIONS(courseSlug),
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to publish session')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** PATCH /v1/live/manage/sessions/{id}/ */
+  updateSession: async (sessionId: string, payload: Partial<PublishSessionPayload>) => {
+    try {
+      const response = await apiClient.patch<LiveSession>(
+        API_ENDPOINTS.LIVE_MANAGE_SESSION(sessionId),
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update session')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/live/manage/sessions/{id}/cancel/ */
+  cancelSession: async (sessionId: string) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.LIVE_MANAGE_SESSION_CANCEL(sessionId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to cancel session')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+ 
+export type CourseDraftStatus = 'draft' | 'published' | 'hidden'
+export type CourseVisibility = 'public' | 'hidden'
+ 
+export interface CourseBasicsPayload {
+  title?: string
+  subtitle?: string
+  category?: string
+  language?: string
+  level?: string
+}
+ 
+export interface CourseDescriptionPayload {
+  full_description?: string
+  learn_items?: string[]
+  who_for?: string
+  prerequisites?: string[]
+}
+ 
+export interface CourseSettingsPayload {
+  is_free?: boolean
+  price_ngn?: number
+  has_certificate?: boolean
+  visibility?: CourseVisibility
+}
+ 
+export type CourseDraftUpdatePayload = CourseBasicsPayload &
+  CourseDescriptionPayload &
+  CourseSettingsPayload & { status?: CourseDraftStatus }
+ 
+export interface CourseDraft {
+  id: string
+  slug: string
+  status: CourseDraftStatus
+  title: string
+  subtitle?: string
+  category?: string
+  language?: string
+  level?: string
+  cover_image_url?: string | null
+  full_description?: string
+  learn_items?: string[]
+  who_for?: string
+  prerequisites?: string[]
+  is_free?: boolean
+  price_ngn?: number
+  has_certificate?: boolean
+  visibility?: CourseVisibility
+  created_at: string
+  updated_at: string
+}
+ 
+export interface CourseModule {
+  id: string
+  title: string
+  order: number
+}
+ 
+export interface CourseLesson {
+  id: string
+  module_id: string
+  title: string
+  order: number
+  video_key?: string | null
+  video_url?: string | null
+  resource_keys?: string[]
+}
+ 
+export interface CourseCurriculumModule extends CourseModule {
+  lessons: CourseLesson[]
+}
+ 
+export interface CourseCurriculumResponse {
+  course_id: string
+  modules: CourseCurriculumModule[]
+}
+ 
+export type UploadContext = 'course_cover' | 'lesson_video' | 'lesson_resource'
+ 
+export interface PresignUploadPayload {
+  context: UploadContext
+  course_id?: string
+  lesson_id?: string
+  filename: string
+  content_type: string
+  file_size: number
+}
+ 
+export interface PresignUploadResponse {
+  upload_url: string
+  method: string
+  headers: Record<string, string>
+  object_key: string
+  expires_in: number
+}
+ 
+export interface ConfirmUploadPayload {
+  context: UploadContext
+  course_id?: string
+  lesson_id?: string
+  object_key: string
+  file_name: string
+  file_size: number
+  content_type: string
+}
+ 
+export interface ConfirmUploadResponse {
+  key: string
+  url: string
+}
+ 
+// ─── Courses Manage API (trainer course-builder wizard) ───────────────────
+ 
+export const coursesManageAPI = {
+  /** POST /v1/courses/manage/ — step 1 of the wizard, creates the draft */
+  createDraft: async (payload: CourseBasicsPayload) => {
+    try {
+      const response = await apiClient.post<CourseDraft>(API_ENDPOINTS.COURSES_MANAGE_CREATE, payload)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to create course draft')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** GET /v1/courses/manage/{id}/ */
+  getDraft: async (courseId: string) => {
+    try {
+      const response = await apiClient.get<CourseDraft>(API_ENDPOINTS.COURSES_MANAGE_DETAIL(courseId))
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load course draft')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** PATCH /v1/courses/manage/{id}/ — called after every wizard step (2, 4, and final publish) */
+  updateDraft: async (courseId: string, payload: CourseDraftUpdatePayload) => {
+    try {
+      const response = await apiClient.patch<CourseDraft>(API_ENDPOINTS.COURSES_MANAGE_DETAIL(courseId), payload)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update course draft')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** GET /v1/courses/manage/{id}/curriculum/ */
+  getCurriculum: async (courseId: string) => {
+    try {
+      const response = await apiClient.get<CourseCurriculumResponse>(
+        API_ENDPOINTS.COURSES_MANAGE_CURRICULUM(courseId),
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load curriculum')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/courses/manage/{id}/modules/ */
+  createModule: async (courseId: string, title: string) => {
+    try {
+      const response = await apiClient.post<CourseModule>(API_ENDPOINTS.COURSES_MANAGE_MODULES(courseId), { title })
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to create module')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/courses/manage/{id}/modules/reorder/ */
+  reorderModules: async (courseId: string, moduleIdsInOrder: string[]) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.COURSES_MANAGE_MODULES_REORDER(courseId), {
+        module_ids: moduleIdsInOrder,
+      })
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to reorder modules')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** PATCH /v1/courses/manage/modules/{module_id}/ */
+  updateModule: async (moduleId: string, title: string) => {
+    try {
+      const response = await apiClient.patch<CourseModule>(API_ENDPOINTS.COURSES_MANAGE_MODULE_DETAIL(moduleId), {
+        title,
+      })
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update module')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** DELETE /v1/courses/manage/modules/{module_id}/ */
+  deleteModule: async (moduleId: string) => {
+    try {
+      await apiClient.delete(API_ENDPOINTS.COURSES_MANAGE_MODULE_DETAIL(moduleId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to delete module')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/courses/manage/modules/{module_id}/lessons/ */
+  createLesson: async (moduleId: string, title: string) => {
+    try {
+      const response = await apiClient.post<CourseLesson>(
+        API_ENDPOINTS.COURSES_MANAGE_MODULE_LESSONS(moduleId),
+        { title },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to create lesson')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** POST /v1/courses/manage/modules/{module_id}/lessons/reorder/ */
+  reorderLessons: async (moduleId: string, lessonIdsInOrder: string[]) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.COURSES_MANAGE_MODULE_LESSONS_REORDER(moduleId), {
+        lesson_ids: lessonIdsInOrder,
+      })
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to reorder lessons')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** PATCH /v1/courses/manage/lessons/{lesson_id}/ */
+  updateLesson: async (lessonId: string, payload: Partial<Pick<CourseLesson, 'title'>>) => {
+    try {
+      const response = await apiClient.patch<CourseLesson>(
+        API_ENDPOINTS.COURSES_MANAGE_LESSON_DETAIL(lessonId),
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update lesson')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /** DELETE /v1/courses/manage/lessons/{lesson_id}/ */
+  deleteLesson: async (lessonId: string) => {
+    try {
+      await apiClient.delete(API_ENDPOINTS.COURSES_MANAGE_LESSON_DETAIL(lessonId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to delete lesson')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+ 
+  /**
+   * Uploads a single file (cover image / lesson video / lesson resource)
+   * via presign → PUT to storage → confirm, same 3-step pattern as
+   * assignmentsAPI.submitAssignment already in this file.
+   */
+  uploadFile: async (
+    file: File,
+    context: UploadContext,
+    ids: { course_id?: string; lesson_id?: string },
+  ): Promise<
+    | { success: true; data: ConfirmUploadResponse }
+    | { success: false; error: string; statusCode?: number }
+  > => {
+    try {
+      const presignRes = await apiClient.post<PresignUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_PRESIGN, {
+        context,
+        ...ids,
+        filename: file.name,
+        content_type: file.type || 'application/octet-stream',
+        file_size: file.size,
+      } as PresignUploadPayload)
+ 
+      const { upload_url, method, headers, object_key } = presignRes.data
+ 
+      const uploadRes = await fetch(upload_url, {
+        method: method || 'PUT',
+        body: file,
+        headers:
+          headers && Object.keys(headers).length > 0
+            ? headers
+            : { 'Content-Type': file.type || 'application/octet-stream' },
+      })
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed for "${file.name}" (HTTP ${uploadRes.status})`)
+      }
+ 
+      const confirmRes = await apiClient.post<ConfirmUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_CONFIRM, {
+        context,
+        ...ids,
+        object_key,
+        file_name: file.name,
+        file_size: file.size,
+        content_type: file.type || 'application/octet-stream',
+      } as ConfirmUploadPayload)
+ 
+      return { success: true as const, data: confirmRes.data }
+    } catch (error) {
+      if (error instanceof Error && !(error as { response?: unknown }).response) {
+        return { success: false as const, error: error.message }
+      }
+      const { message, statusCode } = parseApiError(error, 'Upload failed')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+ // ─── Trainer Review Types ──────────────────────────────────────────────────
+
+export interface TrainerReviewSummary {
+  total_reviews: number
+  pending_count: number
+  average_score: number | null
+}
+
+export interface TrainerSubmissionFile {
+  id: string
+  requirement_id: string | null
+  file_name: string
+  file_size: number
+  content_type: string
+  download_url: string
+  created_at: string
+}
+
+export interface TrainerPendingReview {
+  id: string
+  learner_id: string
+  learner_name: string
+  assignment_id: string
+  assignment_title: string
+  course_id: string
+  course_title: string
+  attempt_number: number
+  state: string
+  is_late: boolean
+  submitted_at: string
+  files: TrainerSubmissionFile[]
+}
+
+export interface TrainerCompletedReview {
+  id: string
+  learner_id: string
+  learner_name: string
+  assignment_id: string
+  assignment_title: string
+  course_id: string
+  course_title: string
+  attempt_number: number
+  state: string
+  is_late: boolean
+  score: number | null
+  grade_status: string | null
+  graded_at: string
+}
+
+export interface GradeWritePayload {
+  score?: number | null
+  feedback: string
+  status: 'pass' | 'fail'
+}
+
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
+// ─── Trainer Reviews API ────────────────────────────────────────────────────
+
+export const trainerReviewsAPI = {
+  /** GET /v1/trainer/reviews/summary/ */
+  getSummary: async () => {
+    try {
+      const response = await apiClient.get<TrainerReviewSummary>(
+        '/v1/trainer/reviews/summary/',
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load review summary')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/trainer/reviews/pending/ */
+  getPendingReviews: async () => {
+    try {
+      const response = await apiClient.get<PaginatedResponse<TrainerPendingReview>>(
+        '/v1/trainer/reviews/pending/',
+      )
+      return { success: true as const, data: response.data.results, count: response.data.count }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load pending reviews')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/trainer/reviews/completed/ */
+  getCompletedReviews: async () => {
+    try {
+      const response = await apiClient.get<PaginatedResponse<TrainerCompletedReview>>(
+        '/v1/trainer/reviews/completed/',
+      )
+      return { success: true as const, data: response.data.results, count: response.data.count }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load completed reviews')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/assignments/submissions/{submission_id}/grade/ */
+  gradeSubmission: async (submissionId: string, payload: GradeWritePayload) => {
+    try {
+      const response = await apiClient.post<TrainerCompletedReview>(
+        `/v1/assignments/submissions/${submissionId}/grade/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to submit grade')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
 // ─── Assignment Types ─────────────────────────────────────────────────────────
 
 export type AssignmentStatus = 'not_started' | 'in_progress' | 'graded'
@@ -844,11 +1465,6 @@ export interface AssignmentResource {
   size_tag?: 'SMALL' | 'MEDIUM' | 'LARGE'
 }
 
-// One entry per file the learner must upload for this assignment.
-// This comes straight from the backend's `requirements` array on the
-// assignment-detail response, and its `id` is the `requirement_id`
-// that MUST be sent on every presign/confirm call for a file that
-// satisfies it.
 export interface AssignmentRequirement {
   id: string
   label: string
@@ -904,10 +1520,6 @@ export interface AssignmentDetail {
     max_files: number
   }
 }
-
-// Internal shapes — not exported (only used inside assignmentsAPI).
-// These mirror the ACTUAL backend response shapes from the Swagger spec,
-// not the previous (incorrect) guesses.
 
 interface SubmissionFileRecord {
   id: string

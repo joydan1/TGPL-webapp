@@ -3,10 +3,26 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, Check, Upload, Trash2, Plus, Globe, Eye,
   Play, SkipBack, SkipForward, Volume2, Subtitles, Maximize, Send,
-  Layers, BookOpen, Award, CheckCircle2,
+  Layers, BookOpen, Award, CheckCircle2, Loader2,
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
+import { coursesManageAPI } from '../../../../services/api'
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Wiring notes:
+ * - The backend has ONE draft-course resource (POST once to create, PATCH
+ *   repeatedly to update) — there's no separate endpoint per wizard step.
+ *   So `courseId` is created on the first "Continue" from step 1, then every
+ *   later step PATCHes the same resource.
+ * - Curriculum (step 3) creates a single default module ("Module 1") the
+ *   first time it's needed, then creates/updates lessons under it. Files
+ *   (cover image, lesson video, lesson materials) go through
+ *   coursesManageAPI.uploadFile (presign → PUT → confirm).
+ * - "Publish" = PATCH the draft with `status: 'published'`. There's no
+ *   separate publish endpoint in the given list, so this is the best guess —
+ *   confirm the real field name/value against the docs.
+ * ------------------------------------------------------------------------ */
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -19,10 +35,13 @@ const STEPS: { id: Step; label: string }[] = [
 ]
 
 type Lesson = {
-  id: string
+  id: string // local id, stable across re-renders
+  remoteId: string | null // set once the backend lesson exists
   title: string
   videoFile: File | null
   materialFiles: File[]
+  videoUploaded: boolean
+  materialsUploaded: boolean
 }
 
 type CourseForm = {
@@ -32,6 +51,7 @@ type CourseForm = {
   language: string
   level: string
   coverImage: File | null
+  coverImageUploaded: boolean
   fullDescription: string
   learnItems: string[]
   whoFor: string
@@ -52,7 +72,15 @@ function makeId() {
 }
 
 function emptyLesson(): Lesson {
-  return { id: makeId(), title: '', videoFile: null, materialFiles: [] }
+  return {
+    id: makeId(),
+    remoteId: null,
+    title: '',
+    videoFile: null,
+    materialFiles: [],
+    videoUploaded: false,
+    materialsUploaded: false,
+  }
 }
 
 const initialForm: CourseForm = {
@@ -62,6 +90,7 @@ const initialForm: CourseForm = {
   language: '',
   level: '',
   coverImage: null,
+  coverImageUploaded: false,
   fullDescription: '',
   learnItems: ['', ''],
   whoFor: '',
@@ -94,6 +123,8 @@ const PAGE_CSS = `
   .ac-body { padding: 1.25rem; }
   .ac-section-title { margin: 0; font-size: 1.15rem; font-weight: 800; color: #111827; }
   .ac-section-sub { margin: 0.4rem 0 1.25rem; color: #6B7280; font-size: 0.875rem; }
+
+  .ac-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.85rem; padding: 0.85rem 1rem; margin-bottom: 1.1rem; font-size: 0.85rem; }
 
   .ac-grid { display: grid; grid-template-columns: 1fr; gap: 1.1rem; }
   .ac-field { display: grid; gap: 0.5rem; }
@@ -196,6 +227,7 @@ const PAGE_CSS = `
   .ac-btn { border-radius: 999px; padding: 0.9rem 1.4rem; font-weight: 700; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; }
   .ac-btn.primary { background: #2563EB; color: #fff; border: none; }
   .ac-btn.secondary { background: #fff; color: #2563EB; border: 1px solid #2563EB; }
+  .ac-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   @media (min-width: 640px) {
     .ac-page { padding: 1.5rem; }
@@ -218,6 +250,11 @@ export default function AddCoursePage() {
   const [form, setForm] = useState<CourseForm>(initialForm)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
 
+  const [courseId, setCourseId] = useState<string | null>(null)
+  const [moduleId, setModuleId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
   function update<K extends keyof CourseForm>(key: K, value: CourseForm[K]) {
     setForm((f) => ({ ...f, [key]: value }))
   }
@@ -230,17 +267,201 @@ export default function AddCoursePage() {
     setStep((s) => (s - 1) as Step)
   }
 
-  function goNext() {
-    if (step < 5) setStep((s) => (s + 1) as Step)
+  // ── Step 1: Basics — creates the draft on first continue, patches after ──
+  async function saveBasicsAndContinue() {
+    setSaving(true)
+    setSaveError(null)
+
+    const basics = {
+      title: form.title,
+      subtitle: form.subtitle,
+      category: form.category,
+      language: form.language,
+      level: form.level,
+    }
+
+    let activeCourseId = courseId
+    if (!activeCourseId) {
+      const result = await coursesManageAPI.createDraft(basics)
+      if (!result.success) {
+        setSaveError(result.error || 'Failed to save course basics.')
+        setSaving(false)
+        return
+      }
+      activeCourseId = result.data.id
+      setCourseId(activeCourseId)
+    } else {
+      const result = await coursesManageAPI.updateDraft(activeCourseId, basics)
+      if (!result.success) {
+        setSaveError(result.error || 'Failed to save course basics.')
+        setSaving(false)
+        return
+      }
+    }
+
+    if (form.coverImage && !form.coverImageUploaded) {
+      const uploadResult = await coursesManageAPI.uploadFile(form.coverImage, 'course_cover', {
+        course_id: activeCourseId,
+      })
+      if (!uploadResult.success) {
+        setSaveError(uploadResult.error || 'Failed to upload cover image.')
+        setSaving(false)
+        return
+      }
+      update('coverImageUploaded', true)
+    }
+
+    setSaving(false)
+    setStep(2)
   }
 
-  function handleSubmit() {
-    console.log('Course submission payload (not yet wired to backend):', form)
+  // ── Step 2: Description ──
+  async function saveDescriptionAndContinue() {
+    if (!courseId) return
+    setSaving(true)
+    setSaveError(null)
+
+    const result = await coursesManageAPI.updateDraft(courseId, {
+      full_description: form.fullDescription,
+      learn_items: form.learnItems.filter((i) => i.trim()),
+      who_for: form.whoFor,
+      prerequisites: form.prerequisites.filter((i) => i.trim()),
+    })
+
+    setSaving(false)
+    if (!result.success) {
+      setSaveError(result.error || 'Failed to save the description.')
+      return
+    }
+    setStep(3)
+  }
+
+  // ── Step 3: Curriculum — one default module, then create/update lessons ──
+  async function saveCurriculumAndContinue() {
+    if (!courseId) return
+    setSaving(true)
+    setSaveError(null)
+
+    let activeModuleId = moduleId
+    if (!activeModuleId) {
+      const moduleResult = await coursesManageAPI.createModule(courseId, 'Module 1')
+      if (!moduleResult.success) {
+        setSaveError(moduleResult.error || 'Failed to create the module.')
+        setSaving(false)
+        return
+      }
+      activeModuleId = moduleResult.data.id
+      setModuleId(activeModuleId)
+    }
+
+    for (const lesson of form.lessons) {
+      if (!lesson.title.trim()) continue
+
+      let remoteId = lesson.remoteId
+      if (!remoteId) {
+        const lessonResult = await coursesManageAPI.createLesson(activeModuleId, lesson.title)
+        if (!lessonResult.success) {
+          setSaveError(lessonResult.error || `Failed to create lesson "${lesson.title}".`)
+          setSaving(false)
+          return
+        }
+        remoteId = lessonResult.data.id
+      } else {
+        await coursesManageAPI.updateLesson(remoteId, { title: lesson.title })
+      }
+
+      if (lesson.videoFile && !lesson.videoUploaded) {
+        const uploadResult = await coursesManageAPI.uploadFile(lesson.videoFile, 'lesson_video', {
+          lesson_id: remoteId,
+        })
+        if (!uploadResult.success) {
+          setSaveError(uploadResult.error || `Failed to upload video for "${lesson.title}".`)
+          setSaving(false)
+          return
+        }
+      }
+
+      if (lesson.materialFiles.length > 0 && !lesson.materialsUploaded) {
+        for (const file of lesson.materialFiles) {
+          const uploadResult = await coursesManageAPI.uploadFile(file, 'lesson_resource', {
+            lesson_id: remoteId,
+          })
+          if (!uploadResult.success) {
+            setSaveError(uploadResult.error || `Failed to upload "${file.name}".`)
+            setSaving(false)
+            return
+          }
+        }
+      }
+
+      updateLesson(lesson.id, {
+        remoteId,
+        videoUploaded: lesson.videoFile ? true : lesson.videoUploaded,
+        materialsUploaded: lesson.materialFiles.length > 0 ? true : lesson.materialsUploaded,
+      })
+    }
+
+    setSaving(false)
+    setStep(4)
+  }
+
+  // ── Step 4: Settings ──
+  async function saveSettingsAndContinue() {
+    if (!courseId) return
+    setSaving(true)
+    setSaveError(null)
+
+    const result = await coursesManageAPI.updateDraft(courseId, {
+      is_free: form.isFree,
+      price_ngn: form.isFree ? 0 : Number(form.priceNgn) || 0,
+      has_certificate: form.hasCertificate,
+      visibility: form.visibility,
+    })
+
+    setSaving(false)
+    if (!result.success) {
+      setSaveError(result.error || 'Failed to save course settings.')
+      return
+    }
+    setStep(5)
+  }
+
+  function goNext() {
+    if (step === 1) return saveBasicsAndContinue()
+    if (step === 2) return saveDescriptionAndContinue()
+    if (step === 3) return saveCurriculumAndContinue()
+    if (step === 4) return saveSettingsAndContinue()
+  }
+
+  // ── Step 5: Publish ──
+  async function handleSubmit() {
+    if (!courseId) return
+    setSaving(true)
+    setSaveError(null)
+    // NOTE: guessing `status: 'published'` — there's no separate "publish"
+    // endpoint in the given list, only PATCH on the draft resource.
+    const result = await coursesManageAPI.updateDraft(courseId, { status: 'published' })
+    setSaving(false)
+    if (!result.success) {
+      setSaveError(result.error || 'Failed to publish the course.')
+      return
+    }
     setShowSuccessModal(true)
   }
 
-  function handleSaveDraft() {
-    console.log('Saved as draft (not yet wired to backend):', form)
+  async function handleSaveDraft() {
+    if (!courseId) {
+      navigate(ROUTES.TRAINER_COURSES)
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    const result = await coursesManageAPI.updateDraft(courseId, { status: 'draft' })
+    setSaving(false)
+    if (!result.success) {
+      setSaveError(result.error || 'Failed to save draft.')
+      return
+    }
     navigate(ROUTES.TRAINER_COURSES)
   }
 
@@ -308,6 +529,8 @@ export default function AddCoursePage() {
           </div>
 
           <div className="ac-body">
+            {saveError && <div className="ac-error">{saveError}</div>}
+
             {step === 1 && (
               <>
                 <h3 className="ac-section-title">Course basics</h3>
@@ -364,7 +587,9 @@ export default function AddCoursePage() {
                         type="file"
                         accept="image/png,image/jpeg"
                         style={{ display: 'none' }}
-                        onChange={(e) => update('coverImage', e.target.files?.[0] ?? null)}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, coverImage: e.target.files?.[0] ?? null, coverImageUploaded: false }))
+                        }
                       />
                       <Upload size={22} />
                       <span className="ac-upload-label">
@@ -478,7 +703,9 @@ export default function AddCoursePage() {
                           type="file"
                           accept="video/mp4,video/quicktime,video/webm"
                           style={{ display: 'none' }}
-                          onChange={(e) => updateLesson(lesson.id, { videoFile: e.target.files?.[0] ?? null })}
+                          onChange={(e) =>
+                            updateLesson(lesson.id, { videoFile: e.target.files?.[0] ?? null, videoUploaded: false })
+                          }
                         />
                         <div className="ac-upload-chip-icon"><Upload size={16} /></div>
                         <div>
@@ -495,7 +722,12 @@ export default function AddCoursePage() {
                           multiple
                           accept=".doc,.docx,.xls,.xlsx,.pdf,.ppt,.pptx"
                           style={{ display: 'none' }}
-                          onChange={(e) => updateLesson(lesson.id, { materialFiles: Array.from(e.target.files ?? []) })}
+                          onChange={(e) =>
+                            updateLesson(lesson.id, {
+                              materialFiles: Array.from(e.target.files ?? []),
+                              materialsUploaded: false,
+                            })
+                          }
                         />
                         <div className="ac-upload-chip-icon"><Upload size={16} /></div>
                         <div>
@@ -633,7 +865,7 @@ export default function AddCoursePage() {
                     <h4 className="ac-preview-title">{form.title || 'Untitled course'}</h4>
                     <p className="ac-preview-sub">{form.subtitle || 'No subtitle provided'}</p>
                     <div className="ac-preview-badges">
-                      <span className="ac-preview-badge"><Layers size={14} /> 3 modules</span>
+                      <span className="ac-preview-badge"><Layers size={14} /> 1 module</span>
                       <span className="ac-preview-badge"><BookOpen size={14} /> {totalLessons} lesson{totalLessons === 1 ? '' : 's'}</span>
                       {form.hasCertificate && <span className="ac-preview-badge"><Award size={14} /> Certificate</span>}
                     </div>
@@ -659,7 +891,7 @@ export default function AddCoursePage() {
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Modules</span>
-                    <span className="ac-review-row-value">3</span>
+                    <span className="ac-review-row-value">1</span>
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Lessons</span>
@@ -695,19 +927,21 @@ export default function AddCoursePage() {
           <div className="ac-footer">
             {step < 5 ? (
               <>
-                <button className="ac-btn secondary" onClick={goBack}>
+                <button className="ac-btn secondary" onClick={goBack} disabled={saving}>
                   <ChevronLeft size={18} /> Back
                 </button>
-                <button className="ac-btn primary" onClick={goNext}>
-                  {step === 4 ? 'Review Course' : 'Continue'} <ChevronRight size={18} />
+                <button className="ac-btn primary" onClick={goNext} disabled={saving}>
+                  {saving ? <Loader2 size={18} className="ac-spin" /> : null}
+                  {saving ? 'Saving…' : step === 4 ? 'Review Course' : 'Continue'}
+                  {!saving && <ChevronRight size={18} />}
                 </button>
               </>
             ) : (
               <div className="ac-review-actions">
-                <button className="ac-btn primary full" onClick={handleSubmit}>
-                  <Send size={18} /> Publish course
+                <button className="ac-btn primary full" onClick={handleSubmit} disabled={saving}>
+                  <Send size={18} /> {saving ? 'Publishing…' : 'Publish course'}
                 </button>
-                <button className="ac-btn secondary full" onClick={handleSaveDraft}>
+                <button className="ac-btn secondary full" onClick={handleSaveDraft} disabled={saving}>
                   Save as draft
                 </button>
               </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { RouteBuilder } from '../../../constants/routes'
 import { apiClient } from '../../../services/api'
+
 
 // ─── API types ────────────────────────────────────────────────────────────────
 interface CourseListItem {
@@ -30,11 +31,17 @@ function shouldUsePreviewRoute(course: CourseListItem) {
   return course.is_free || course.title.toLowerCase().startsWith('introductory')
 }
 
-async function fetchCatalogue(search: string): Promise<CourseListItem[]> {
+type CatalogueFilters = {
+  search: string
+  page: number
+}
+
+async function fetchCatalogue(filters: CatalogueFilters): Promise<PaginatedCourses> {
   const params = new URLSearchParams()
-  if (search.trim()) params.set('search', search.trim())
+  if (filters.search.trim()) params.set('search', filters.search.trim())
+  if (filters.page > 1) params.set('page', String(filters.page))
   const response = await apiClient.get<PaginatedCourses>(`/v1/courses/?${params}`)
-  return response.data.results
+  return response.data
 }
 
 // ─── Thumbnail ────────────────────────────────────────────────────────────────
@@ -72,17 +79,28 @@ function CourseThumb({ course, video }: { course: CourseListItem; video: boolean
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function CourseCatalogPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Prefill from ?search= if the navbar sent us here with a term
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
+  const [page, setPage] = useState(1)
+
   const [courses, setCourses] = useState<CourseListItem[]>([])
+  const [count, setCount] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrevious, setHasPrevious] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (q: string) => {
+  const load = useCallback(async (filters: CatalogueFilters) => {
     setLoading(true)
     setError(null)
     try {
-      const results = await fetchCatalogue(q)
-      setCourses(results)
+      const data = await fetchCatalogue(filters)
+      setCourses(data.results)
+      setCount(data.count)
+      setHasNext(Boolean(data.next))
+      setHasPrevious(Boolean(data.previous))
     } catch {
       setError('Failed to load courses. Please try again.')
     } finally {
@@ -90,14 +108,29 @@ export default function CourseCatalogPage() {
     }
   }, [])
 
-  // Initial load
-  useEffect(() => { load('') }, [load])
-
-  // Debounced search — re-query the API so server-side search runs
+  // Reset to page 1 whenever search changes
   useEffect(() => {
-    const id = setTimeout(() => load(search), 350)
+    setPage(1)
+  }, [search])
+
+  // Keep the URL's ?search= in sync so a refresh or shared link preserves it
+  useEffect(() => {
+    if (search.trim()) {
+      setSearchParams({ search: search.trim() }, { replace: true })
+    } else {
+      setSearchParams({}, { replace: true })
+    }
+  }, [search, setSearchParams])
+
+  // Debounced fetch — re-query the API so server-side search runs
+  useEffect(() => {
+    const id = setTimeout(() => {
+      load({ search, page })
+    }, 350)
     return () => clearTimeout(id)
-  }, [search, load])
+  }, [search, page, load])
+
+  const totalPages = Math.max(1, Math.ceil(count / (courses.length || 1)))
 
   return (
     <>
@@ -130,6 +163,10 @@ export default function CourseCatalogPage() {
         .course-instructor { font-size: 0.8125rem; color: #999; margin: 0; }
         .catalog-state { text-align: center; padding: 3rem 1rem; color: #ABABAB; font-size: 0.9375rem; }
         .catalog-state.error { color: #EF4444; }
+        .catalog-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.75rem; }
+        .catalog-page-btn { border: 1px solid #E8E8E8; background: #fff; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; color: #374151; cursor: pointer; }
+        .catalog-page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .catalog-page-info { font-size: 0.8rem; color: #9CA3AF; }
         .catalog-footer { margin-top: 2.5rem; font-size: 0.875rem; color: #ABABAB; text-align: center; }
         @media (max-width: 600px) { .catalog-card { padding: 1.5rem 1rem 1.75rem; } .catalog-card h1 { font-size: 1.375rem; } .catalog-grid { grid-template-columns: 1fr 1fr; gap: 0.875rem; } }
         @media (max-width: 400px) { .catalog-grid { grid-template-columns: 1fr; } }
@@ -172,27 +209,51 @@ export default function CourseCatalogPage() {
           )}
 
           {!loading && !error && courses.length > 0 && (
-            <div className="catalog-grid">
-              {courses.map((course) => {
-                const freePreview = shouldUsePreviewRoute(course)
-                const to = freePreview
-                  ? `/courses/${course.slug}/preview`
-                  : RouteBuilder.course(course.slug)
+            <>
+              <div className="catalog-grid">
+                {courses.map((course) => {
+                  const freePreview = shouldUsePreviewRoute(course)
+                  const to = freePreview
+                    ? `/courses/${course.slug}/preview`
+                    : RouteBuilder.course(course.slug)
 
-                return (
-                  <Link key={course.id} className="course-card" to={to}>
-                    <CourseThumb course={course} video={freePreview} />
-                    <div className="course-body">
-                      <p className="course-tag">{course.category}</p>
-                      <p className="course-title">{course.title}</p>
-                      {course.trainer_name && (
-                        <p className="course-instructor">{course.trainer_name}</p>
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+                  return (
+                    <Link key={course.id} className="course-card" to={to}>
+                      <CourseThumb course={course} video={freePreview} />
+                      <div className="course-body">
+                        <p className="course-tag">{course.category}</p>
+                        <p className="course-title">{course.title}</p>
+                        {course.trainer_name && (
+                          <p className="course-instructor">{course.trainer_name}</p>
+                        )}
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {(hasNext || hasPrevious) && (
+                <div className="catalog-pagination">
+                  <button
+                    className="catalog-page-btn"
+                    disabled={!hasPrevious}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </button>
+                  <span className="catalog-page-info">
+                    Page {page} of {totalPages} · {count} course{count === 1 ? '' : 's'}
+                  </span>
+                  <button
+                    className="catalog-page-btn"
+                    disabled={!hasNext}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

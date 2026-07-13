@@ -50,7 +50,6 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
       }}
     >
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        {/* Icon — no badge, just the icon itself */}
         <div
           style={{
             flexShrink: 0,
