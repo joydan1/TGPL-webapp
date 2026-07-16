@@ -7,22 +7,7 @@ import {
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
-import { coursesManageAPI } from '../../../../services/api'
-
-/* ────────────────────────────────────────────────────────────────────────
- * Wiring notes:
- * - The backend has ONE draft-course resource (POST once to create, PATCH
- *   repeatedly to update) — there's no separate endpoint per wizard step.
- *   So `courseId` is created on the first "Continue" from step 1, then every
- *   later step PATCHes the same resource.
- * - Curriculum (step 3) creates a single default module ("Module 1") the
- *   first time it's needed, then creates/updates lessons under it. Files
- *   (cover image, lesson video, lesson materials) go through
- *   coursesManageAPI.uploadFile (presign → PUT → confirm).
- * - "Publish" = PATCH the draft with `status: 'published'`. There's no
- *   separate publish endpoint in the given list, so this is the best guess —
- *   confirm the real field name/value against the docs.
- * ------------------------------------------------------------------------ */
+import { coursesManageAPI, type CourseLevel } from '../../../../services/api'
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -35,8 +20,8 @@ const STEPS: { id: Step; label: string }[] = [
 ]
 
 type Lesson = {
-  id: string // local id, stable across re-renders
-  remoteId: string | null // set once the backend lesson exists
+  id: string
+  remoteId: string | null
   title: string
   videoFile: File | null
   materialFiles: File[]
@@ -49,23 +34,28 @@ type CourseForm = {
   subtitle: string
   category: string
   language: string
-  level: string
+  level: CourseLevel | ''
   coverImage: File | null
-  coverImageUploaded: boolean
-  fullDescription: string
-  learnItems: string[]
-  whoFor: string
+  description: string
+  expectedOutcomes: string[]
+  targetAudience: string
+  audienceDescription: string
   prerequisites: string[]
   lessons: Lesson[]
   isFree: boolean
-  priceNgn: string
+  priceNaira: string
   hasCertificate: boolean
   visibility: 'public' | 'hidden'
 }
 
 const CATEGORY_OPTIONS = ['Management', 'Leadership', 'Data & Analytics', 'Product', 'Design', 'Engineering']
 const LANGUAGE_OPTIONS = ['English', 'French', 'Portuguese']
-const LEVEL_OPTIONS = ['Beginner', 'Intermediate', 'Advanced']
+const LEVEL_OPTIONS: { label: string; value: CourseLevel }[] = [
+  { label: 'Beginner', value: 'beginner' },
+  { label: 'Intermediate', value: 'intermediate' },
+  { label: 'Advanced', value: 'advanced' },
+  { label: 'Expert', value: 'expert' },
+]
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10)
@@ -90,14 +80,14 @@ const initialForm: CourseForm = {
   language: '',
   level: '',
   coverImage: null,
-  coverImageUploaded: false,
-  fullDescription: '',
-  learnItems: ['', ''],
-  whoFor: '',
+  description: '',
+  expectedOutcomes: ['', ''],
+  targetAudience: '',
+  audienceDescription: '',
   prerequisites: [''],
   lessons: [emptyLesson(), emptyLesson()],
   isFree: false,
-  priceNgn: '',
+  priceNaira: '',
   hasCertificate: true,
   visibility: 'public',
 }
@@ -267,7 +257,6 @@ export default function AddCoursePage() {
     setStep((s) => (s - 1) as Step)
   }
 
-  // ── Step 1: Basics — creates the draft on first continue, patches after ──
   async function saveBasicsAndContinue() {
     setSaving(true)
     setSaveError(null)
@@ -277,7 +266,7 @@ export default function AddCoursePage() {
       subtitle: form.subtitle,
       category: form.category,
       language: form.language,
-      level: form.level,
+      level: form.level || undefined,
     }
 
     let activeCourseId = courseId
@@ -299,32 +288,20 @@ export default function AddCoursePage() {
       }
     }
 
-    if (form.coverImage && !form.coverImageUploaded) {
-      const uploadResult = await coursesManageAPI.uploadFile(form.coverImage, 'course_cover', {
-        course_id: activeCourseId,
-      })
-      if (!uploadResult.success) {
-        setSaveError(uploadResult.error || 'Failed to upload cover image.')
-        setSaving(false)
-        return
-      }
-      update('coverImageUploaded', true)
-    }
-
     setSaving(false)
     setStep(2)
   }
 
-  // ── Step 2: Description ──
   async function saveDescriptionAndContinue() {
     if (!courseId) return
     setSaving(true)
     setSaveError(null)
 
     const result = await coursesManageAPI.updateDraft(courseId, {
-      full_description: form.fullDescription,
-      learn_items: form.learnItems.filter((i) => i.trim()),
-      who_for: form.whoFor,
+      description: form.description,
+      expected_outcomes: form.expectedOutcomes.filter((i) => i.trim()),
+      target_audience: form.targetAudience.trim() ? [form.targetAudience.trim()] : [],
+      audience_description: form.audienceDescription,
       prerequisites: form.prerequisites.filter((i) => i.trim()),
     })
 
@@ -336,7 +313,6 @@ export default function AddCoursePage() {
     setStep(3)
   }
 
-  // ── Step 3: Curriculum — one default module, then create/update lessons ──
   async function saveCurriculumAndContinue() {
     if (!courseId) return
     setSaving(true)
@@ -405,17 +381,17 @@ export default function AddCoursePage() {
     setStep(4)
   }
 
-  // ── Step 4: Settings ──
   async function saveSettingsAndContinue() {
     if (!courseId) return
     setSaving(true)
     setSaveError(null)
 
+    const priceKobo = form.isFree ? 0 : Math.round((Number(form.priceNaira) || 0) * 100)
+
     const result = await coursesManageAPI.updateDraft(courseId, {
       is_free: form.isFree,
-      price_ngn: form.isFree ? 0 : Number(form.priceNgn) || 0,
+      price_kobo: priceKobo,
       has_certificate: form.hasCertificate,
-      visibility: form.visibility,
     })
 
     setSaving(false)
@@ -433,35 +409,25 @@ export default function AddCoursePage() {
     if (step === 4) return saveSettingsAndContinue()
   }
 
-  // ── Step 5: Publish ──
   async function handleSubmit() {
     if (!courseId) return
     setSaving(true)
     setSaveError(null)
-    // NOTE: guessing `status: 'published'` — there's no separate "publish"
-    // endpoint in the given list, only PATCH on the draft resource.
-    const result = await coursesManageAPI.updateDraft(courseId, { status: 'published' })
-    setSaving(false)
-    if (!result.success) {
-      setSaveError(result.error || 'Failed to publish the course.')
-      return
+
+    if (form.visibility === 'public') {
+      const result = await coursesManageAPI.publishDraft(courseId)
+      if (!result.success) {
+        setSaveError(result.error || 'Failed to publish the course.')
+        setSaving(false)
+        return
+      }
     }
+
+    setSaving(false)
     setShowSuccessModal(true)
   }
 
-  async function handleSaveDraft() {
-    if (!courseId) {
-      navigate(ROUTES.TRAINER_COURSES)
-      return
-    }
-    setSaving(true)
-    setSaveError(null)
-    const result = await coursesManageAPI.updateDraft(courseId, { status: 'draft' })
-    setSaving(false)
-    if (!result.success) {
-      setSaveError(result.error || 'Failed to save draft.')
-      return
-    }
+  function handleSaveDraft() {
     navigate(ROUTES.TRAINER_COURSES)
   }
 
@@ -470,17 +436,17 @@ export default function AddCoursePage() {
     navigate(ROUTES.TRAINER_DASHBOARD)
   }
 
-  function updateListItem(field: 'learnItems' | 'prerequisites', index: number, value: string) {
+  function updateListItem(field: 'expectedOutcomes' | 'prerequisites', index: number, value: string) {
     setForm((f) => {
       const list = [...f[field]]
       list[index] = value
       return { ...f, [field]: list }
     })
   }
-  function addListItem(field: 'learnItems' | 'prerequisites') {
+  function addListItem(field: 'expectedOutcomes' | 'prerequisites') {
     setForm((f) => ({ ...f, [field]: [...f[field], ''] }))
   }
-  function removeListItem(field: 'learnItems' | 'prerequisites', index: number) {
+  function removeListItem(field: 'expectedOutcomes' | 'prerequisites', index: number) {
     setForm((f) => ({ ...f, [field]: f[field].filter((_, i) => i !== index) }))
   }
 
@@ -493,8 +459,17 @@ export default function AddCoursePage() {
   function addLesson() {
     setForm((f) => ({ ...f, lessons: [...f.lessons, emptyLesson()] }))
   }
-  function removeLesson(id: string) {
+
+  async function removeLesson(id: string) {
+    const lesson = form.lessons.find((l) => l.id === id)
     setForm((f) => ({ ...f, lessons: f.lessons.filter((l) => l.id !== id) }))
+
+    if (lesson?.remoteId) {
+      const result = await coursesManageAPI.deleteLesson(lesson.remoteId)
+      if (!result.success) {
+        setSaveError(result.error || 'Lesson removed locally, but failed to delete it on the server.')
+      }
+    }
   }
 
   const totalLessons = form.lessons.length
@@ -574,9 +549,13 @@ export default function AddCoursePage() {
 
                   <div className="ac-field full">
                     <label className="ac-label">Level <span className="ac-required">*</span></label>
-                    <select className="ac-select" value={form.level} onChange={(e) => update('level', e.target.value)}>
+                    <select
+                      className="ac-select"
+                      value={form.level}
+                      onChange={(e) => update('level', e.target.value as CourseLevel)}
+                    >
                       <option value="">e.g Beginner</option>
-                      {LEVEL_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                      {LEVEL_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
                   </div>
 
@@ -588,7 +567,7 @@ export default function AddCoursePage() {
                         accept="image/png,image/jpeg"
                         style={{ display: 'none' }}
                         onChange={(e) =>
-                          setForm((f) => ({ ...f, coverImage: e.target.files?.[0] ?? null, coverImageUploaded: false }))
+                          setForm((f) => ({ ...f, coverImage: e.target.files?.[0] ?? null }))
                         }
                       />
                       <Upload size={22} />
@@ -596,7 +575,7 @@ export default function AddCoursePage() {
                         {form.coverImage ? form.coverImage.name : 'Upload cover image'}
                       </span>
                     </label>
-                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB</p>
+                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · cover upload is coming soon — this selection isn't saved yet</p>
                   </div>
                 </div>
               </>
@@ -612,32 +591,44 @@ export default function AddCoursePage() {
                   <textarea
                     className="ac-textarea"
                     placeholder="This course covers the fundamentals of project management, from planning and scheduling to stakeholder communication and risk management…"
-                    value={form.fullDescription}
-                    onChange={(e) => update('fullDescription', e.target.value)}
+                    value={form.description}
+                    onChange={(e) => update('description', e.target.value)}
                   />
                   <p className="ac-hint">Aim for 150–300 words. Describe what the course covers and the value it delivers.</p>
                 </div>
 
                 <div className="ac-field" style={{ marginBottom: '1.25rem' }}>
                   <label className="ac-label">What learners will learn <span className="ac-required">*</span></label>
-                  {form.learnItems.map((item, i) => (
+                  {form.expectedOutcomes.map((item, i) => (
                     <div className="ac-list-item" key={i}>
                       <span className="ac-list-dot" />
                       <input
                         className="ac-input ac-list-input"
                         placeholder="e.g. Create a full project plan from initiation to closure"
                         value={item}
-                        onChange={(e) => updateListItem('learnItems', i, e.target.value)}
+                        onChange={(e) => updateListItem('expectedOutcomes', i, e.target.value)}
                       />
-                      <button className="ac-list-delete" onClick={() => removeListItem('learnItems', i)} aria-label="Remove item">
+                      <button className="ac-list-delete" onClick={() => removeListItem('expectedOutcomes', i)} aria-label="Remove item">
                         <Trash2 size={16} />
                       </button>
                     </div>
                   ))}
-                  <button className="ac-add-item-btn" onClick={() => addListItem('learnItems')}>
+                  <button className="ac-add-item-btn" onClick={() => addListItem('expectedOutcomes')}>
                     <Plus size={16} /> Add item
                   </button>
                   <p className="ac-hint">List 4–8 concrete outcomes. These appear as bullet points on the course page.</p>
+                </div>
+
+                <div className="ac-field" style={{ marginBottom: '1.25rem' }}>
+                  <label className="ac-label">Target audience (short)</label>
+                  <input
+                    className="ac-input"
+                    maxLength={80}
+                    placeholder="e.g. Early-career project professionals"
+                    value={form.targetAudience}
+                    onChange={(e) => update('targetAudience', e.target.value)}
+                  />
+                  <p className="ac-hint">Shown as a short tag under the "Who this is for" paragraph — max 80 characters.</p>
                 </div>
 
                 <div className="ac-field" style={{ marginBottom: '1.25rem' }}>
@@ -646,8 +637,8 @@ export default function AddCoursePage() {
                     className="ac-textarea"
                     style={{ minHeight: 90 }}
                     placeholder="Early-career professionals (0–4 years experience) who work on or aspire to lead projects…"
-                    value={form.whoFor}
-                    onChange={(e) => update('whoFor', e.target.value)}
+                    value={form.audienceDescription}
+                    onChange={(e) => update('audienceDescription', e.target.value)}
                   />
                   <p className="ac-hint">Describe the ideal learner — their role, experience level, and goals.</p>
                 </div>
@@ -776,9 +767,10 @@ export default function AddCoursePage() {
                       className="ac-input"
                       placeholder="e.g. 40,000"
                       disabled={form.isFree}
-                      value={form.priceNgn}
-                      onChange={(e) => update('priceNgn', e.target.value)}
+                      value={form.priceNaira}
+                      onChange={(e) => update('priceNaira', e.target.value)}
                     />
+                    <p className="ac-hint">Set a price for learners to enrol.</p>
                   </div>
                 </div>
 
@@ -822,6 +814,9 @@ export default function AddCoursePage() {
                   </div>
                   {form.visibility === 'hidden' && <Check size={18} className="ac-visibility-check" />}
                 </div>
+                <p className="ac-hint" style={{ marginTop: '0.5rem' }}>
+                  This only takes effect when you publish in the next step — it isn't saved yet.
+                </p>
               </>
             )}
 
@@ -883,7 +878,9 @@ export default function AddCoursePage() {
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Level</span>
-                    <span className="ac-review-row-value">{form.level || '—'}</span>
+                    <span className="ac-review-row-value">
+                      {LEVEL_OPTIONS.find((l) => l.value === form.level)?.label || '—'}
+                    </span>
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Language</span>
@@ -899,7 +896,7 @@ export default function AddCoursePage() {
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Price</span>
-                    <span className="ac-review-row-value">{form.isFree ? 'Free' : `₦${form.priceNgn || '0'}`}</span>
+                    <span className="ac-review-row-value">{form.isFree ? 'Free' : `₦${form.priceNaira || '0'}`}</span>
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Certificate</span>
@@ -913,7 +910,7 @@ export default function AddCoursePage() {
 
                 <div className="ac-outcomes-box">
                   <p className="ac-outcomes-title">Learning outcomes</p>
-                  {form.learnItems.filter((i) => i.trim()).map((item, i) => (
+                  {form.expectedOutcomes.filter((i) => i.trim()).map((item, i) => (
                     <div className="ac-outcome-item" key={i}>
                       <Check size={15} />
                       <span>{item}</span>
@@ -939,7 +936,7 @@ export default function AddCoursePage() {
             ) : (
               <div className="ac-review-actions">
                 <button className="ac-btn primary full" onClick={handleSubmit} disabled={saving}>
-                  <Send size={18} /> {saving ? 'Publishing…' : 'Publish course'}
+                  <Send size={18} /> {saving ? 'Publishing…' : form.visibility === 'public' ? 'Publish course' : 'Save as hidden'}
                 </button>
                 <button className="ac-btn secondary full" onClick={handleSaveDraft} disabled={saving}>
                   Save as draft
@@ -956,8 +953,14 @@ export default function AddCoursePage() {
             <div className="ac-modal-icon">
               <CheckCircle2 size={40} />
             </div>
-            <h3 className="ac-modal-title">Course Uploaded Successfully!</h3>
-            <p className="ac-modal-sub">Your course has been uploaded successfully.</p>
+            <h3 className="ac-modal-title">
+              {form.visibility === 'public' ? 'Course Published!' : 'Course Saved!'}
+            </h3>
+            <p className="ac-modal-sub">
+              {form.visibility === 'public'
+                ? 'Your course is now live in the catalogue.'
+                : 'Your course has been saved as hidden. You can publish it any time from your courses list.'}
+            </p>
             <button className="ac-btn primary full" onClick={handleBackToDashboard}>
               Back to Dashboard
             </button>

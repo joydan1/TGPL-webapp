@@ -31,6 +31,8 @@ import LiveSessionsPage from './pages/app/LiveSessionsPage'
 import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
 import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
+import TrainerProfilePage from './pages/app/trainer/TrainerProfilePage'
+import TrainerCourseManagePage from './pages/app/trainer/courses/TrainerCourseManagePage'
 import TrainerLiveClassesPage from './pages/app/trainer/live-classes/TrainerLiveClassesPage'
 import AddCoursePage from './pages/app/trainer/courses/AddCoursePage'
 import TrainerReviewsPage from './pages/app/trainer/reviews/TrainerReviewsPage'
@@ -181,11 +183,20 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
   path={ROUTES.TRAINER_COURSES}
   element={
     <ProtectedRoute requiredRole="trainer">
       <TrainerCoursesPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.TRAINER_PROFILE}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <TrainerProfilePage />
     </ProtectedRoute>
   }
 />
@@ -198,7 +209,16 @@ function App() {
   }
 />
 <Route
-  path={ROUTES.TRAINER_SUBMISSIONS}
+  path={ROUTES.TRAINER_COURSE_MANAGE}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <TrainerCourseManagePage />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path={ROUTES.TRAINER_REVIEWS}
   element={
     <ProtectedRoute requiredRole="trainer">
       <TrainerReviewsPage />

@@ -4,7 +4,7 @@ import {
   Home, BookOpen, Star, Radio, Settings,
   Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon, Shield, HelpCircle,
+  LogOut, User as UserIcon, Shield, HelpCircle, Award,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
@@ -19,7 +19,7 @@ const PENDING_REVIEWS_COUNT = 4
 export const NAV_ITEMS = [
   { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
   { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
-  { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_SUBMISSIONS,  Icon: Star,   badge: PENDING_REVIEWS_COUNT },
+  { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,  Icon: Star,   badge: PENDING_REVIEWS_COUNT },
   { key: 'live', label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
   { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
 ]
@@ -28,6 +28,7 @@ export const NAV_ITEMS = [
 // navigation; `danger` is a red destructive-style row (Log out).
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,   route: ROUTES.PROFILE },
+  { key: 'trainerProfile', label: 'Trainer Profile', Icon: Award,      route: ROUTES.TRAINER_PROFILE },
   { key: 'security',      label: 'Security',        Icon: Shield,     route: ROUTES.SETTINGS_SECURITY },
   { key: 'notifications', label: 'Notifications',   Icon: Bell,       route: ROUTES.SETTINGS_NOTIFICATIONS },
   { key: 'help',          label: 'Help & Support',  Icon: HelpCircle, route: ROUTES.HELP_SUPPORT },

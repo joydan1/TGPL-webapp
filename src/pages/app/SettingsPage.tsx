@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Shield, Bell, HelpCircle, LogOut, ChevronRight } from 'lucide-react'
+import { User, Shield, Bell, HelpCircle, LogOut, Award, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
@@ -32,6 +32,7 @@ const PAGE_CSS = `
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { logout, user } = useAuth()
+  console.log('SettingsPage user:', user)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   const handleConfirmLogout = async () => {
@@ -51,7 +52,13 @@ export default function SettingsPage() {
           <span className="settings-row-label">Profile</span>
           <ChevronRight size={18} className="settings-row-chevron" />
         </button>
-
+{user?.role === 'trainer' && (
+  <button className="settings-row" onClick={() => navigate(ROUTES.TRAINER_PROFILE)}>
+    <div className="settings-row-icon"><Award size={19} /></div>
+    <span className="settings-row-label">Trainer Profile</span>
+    <ChevronRight size={18} className="settings-row-chevron" />
+  </button>
+)}
         <button className="settings-row" onClick={() => navigate(ROUTES.SETTINGS_SECURITY)}>
           <div className="settings-row-icon"><Shield size={19} /></div>
           <span className="settings-row-label">Security</span>

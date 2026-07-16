@@ -1,28 +1,10 @@
-// pages/trainer/courses/TrainerCoursesPage.tsx
+// pages/app/trainer/TrainerCoursesPage.tsx
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TrainerShell from '../../../layouts/TrainerShell'
 import { Plus } from 'lucide-react'
-import { ROUTES } from '../../../constants/routes'
-
-type Course = {
-  id: string
-  title: string
-  category: string
-  uploadedLabel: string
-  image: string
-  progress: number
-}
-
-const courses: Course[] = [
-  {
-    id: 'project-management',
-    title: 'Project Management Course',
-    category: 'Management',
-    uploadedLabel: 'Uploaded 2 months ago',
-    image: '/image1.png',
-    progress: 37,
-  },
-]
+import { ROUTES, RouteBuilder } from '../../../constants/routes'
+import { coursesManageAPI, type TrainerCourseListItem } from '../../../services/api'
 
 const PAGE_CSS = `
   .courses-page { padding: 1rem; background: #F5F5F5; }
@@ -30,13 +12,32 @@ const PAGE_CSS = `
 
   .courses-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 
+  .courses-empty { background: #fff; border-radius: 1rem; padding: 3rem 1.5rem; text-align: center; color: #6B7280; border: 1px solid rgba(148, 163, 184, 0.12); grid-column: 1 / -1; }
+  .courses-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 1rem; padding: 1rem; grid-column: 1 / -1; }
+  .courses-loading { padding: 2rem; text-align: center; color: #9CA3AF; grid-column: 1 / -1; }
+
   .course-card { background: #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); display: flex; flex-direction: column; }
   .course-card-img { width: 100%; height: 176px; object-fit: cover; background: #E2E8F0; display: block; }
   .course-card-body { padding: 1.1rem; display: grid; gap: 0.4rem; }
+  .course-card-status-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .course-card-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
+  .course-status-badge { font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; text-transform: capitalize; white-space: nowrap; }
+  .course-status-badge.draft { background: #FEF3C7; color: #D97706; }
+  .course-status-badge.published { background: #DCFCE7; color: #16A34A; }
+  .course-status-badge.archived { background: #F3F4F6; color: #6B7280; }
   .course-card-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: #111827; }
-  .course-card-date { margin: 0; color: #6B7280; font-size: 0.8rem; }
+  .course-card-meta { margin: 0; color: #6B7280; font-size: 0.8rem; }
+  .course-card-date { margin: 0; color: #9CA3AF; font-size: 0.78rem; }
   .course-card-preview { margin-top: 0.5rem; border: none; background: none; padding: 0; color: #2563EB; font-weight: 700; cursor: pointer; text-align: left; font-size: 0.9rem; }
+  .course-card-preview:disabled { color: #9CA3AF; cursor: default; }
+
+  .course-card-actions-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
+  .course-action-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; font-weight: 700; font-size: 0.8rem; padding: 0.5rem 0.85rem; border-radius: 0.7rem; cursor: pointer; }
+  .course-action-btn:hover { background: #F9FAFB; }
+  .course-action-btn:disabled { opacity: 0.5; cursor: default; }
+  .course-action-btn.unpublish { color: #D97706; border-color: #FDE68A; }
+  .course-action-btn.publish { color: #16A34A; border-color: #BBF7D0; }
+  .course-delete-note { margin-top: 0.35rem; color: #9CA3AF; font-size: 0.72rem; font-style: italic; }
 
   .add-course-card { border: 2px dashed #93C5FD; background: #EFF6FF; border-radius: 1rem; min-height: 260px; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
   .add-course-btn { appearance: none; border: none; border-radius: 999px; padding: 0.9rem 1.25rem; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; white-space: nowrap; }
@@ -52,26 +53,142 @@ const PAGE_CSS = `
   }
 `
 
+function formatUpdatedAgo(iso: string): string {
+  const date = new Date(iso)
+  const diffMs = Date.now() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays < 1) return 'Updated today'
+  if (diffDays === 1) return 'Updated yesterday'
+  if (diffDays < 30) return `Updated ${diffDays} days ago`
+  const diffMonths = Math.floor(diffDays / 30)
+  return `Updated ${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`
+}
+
 export default function TrainerCoursesPage() {
   const navigate = useNavigate()
+  const [courses, setCourses] = useState<TrainerCourseListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionErrorId, setActionErrorId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    const result = await coursesManageAPI.listMyCourses()
+    if (result.success) {
+      setCourses(result.data)
+    } else {
+      setError(result.error)
+    }
+    setLoading(false)
+  }
+
+  function handlePreview(courseId: string) {
+  navigate(RouteBuilder.trainerCourseManage(courseId))
+}
+
+  async function handleUnpublish(courseId: string) {
+    setPendingActionId(courseId)
+    setActionErrorId(null)
+    setActionError(null)
+    const result = await coursesManageAPI.unpublishDraft(courseId)
+    setPendingActionId(null)
+    if (!result.success) {
+      setActionErrorId(courseId)
+      setActionError(result.error)
+      return
+    }
+    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'draft' } : c)))
+  }
+
+  async function handlePublish(courseId: string) {
+    setPendingActionId(courseId)
+    setActionErrorId(null)
+    setActionError(null)
+    const result = await coursesManageAPI.publishDraft(courseId)
+    setPendingActionId(null)
+    if (!result.success) {
+      setActionErrorId(courseId)
+      setActionError(result.error)
+      return
+    }
+    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'published' } : c)))
+  }
 
   return (
     <TrainerShell>
       <style>{PAGE_CSS}</style>
       <div className="courses-page">
-        <h3 className="courses-title">Active Course</h3>
+        <h3 className="courses-title">My Courses</h3>
         <div className="courses-grid">
-          {courses.map((course) => (
-            <div key={course.id} className="course-card">
-              <img src={course.image} alt={course.title} className="course-card-img" />
-              <div className="course-card-body">
-                <p className="course-card-cat">{course.category}</p>
-                <h4 className="course-card-name">{course.title}</h4>
-                <p className="course-card-date">{course.uploadedLabel}</p>
-                <button type="button" className="course-card-preview">Preview</button>
+          {loading ? (
+            <div className="courses-loading">Loading your courses…</div>
+          ) : error ? (
+            <div className="courses-error">{error}</div>
+          ) : courses.length === 0 ? (
+            <div className="courses-empty">You haven't created any courses yet. Start your first one below.</div>
+          ) : (
+            courses.map((course) => (
+              <div key={course.id} className="course-card">
+                <img
+                  src={course.thumbnail_url || '/image1.png'}
+                  alt={course.title}
+                  className="course-card-img"
+                  onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
+                />
+                <div className="course-card-body">
+                  <div className="course-card-status-row">
+                    <p className="course-card-cat">{course.subtitle || 'Course'}</p>
+                    <span className={`course-status-badge ${course.status}`}>{course.status}</span>
+                  </div>
+                  <h4 className="course-card-name">{course.title}</h4>
+                  <p className="course-card-meta">
+                    {course.module_count} module{course.module_count === 1 ? '' : 's'} · {course.lesson_count} lesson{course.lesson_count === 1 ? '' : 's'}
+                  </p>
+                  <p className="course-card-date">{formatUpdatedAgo(course.updated_at)}</p>
+                  <button
+  type="button"
+  className="course-card-preview"
+  onClick={() => handlePreview(course.id)}
+>
+  Preview
+</button>
+
+                  <div className="course-card-actions-row">
+                    {course.status === 'published' ? (
+                      <button
+                        type="button"
+                        className="course-action-btn unpublish"
+                        onClick={() => handleUnpublish(course.id)}
+                        disabled={pendingActionId === course.id}
+                      >
+                        {pendingActionId === course.id ? 'Unpublishing…' : 'Unpublish'}
+                      </button>
+                    ) : course.status === 'draft' ? (
+                      <button
+                        type="button"
+                        className="course-action-btn publish"
+                        onClick={() => handlePublish(course.id)}
+                        disabled={pendingActionId === course.id}
+                      >
+                        {pendingActionId === course.id ? 'Publishing…' : 'Publish'}
+                      </button>
+                    ) : null}
+                  </div>
+                  {actionErrorId === course.id && actionError && (
+                    <p style={{ color: '#EF4444', fontSize: '0.78rem', margin: '0.35rem 0 0' }}>{actionError}</p>
+                  )}
+                  <p className="course-delete-note">Deleting courses isn't supported yet — ask an admin if this needs to be removed permanently.</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
 
           <div className="add-course-card">
             <button

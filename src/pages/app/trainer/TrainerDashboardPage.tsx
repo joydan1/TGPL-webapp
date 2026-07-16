@@ -1,62 +1,15 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TrainerShell from '../../../layouts/TrainerShell'
 import { Plus, Users, BookOpen, ClipboardList, Star } from 'lucide-react'
 import { ROUTES } from '../../../constants/routes'
 import { useAuth } from '../../../hooks/useAuth'
-
-const stats = [
-  {
-    title: 'Active learners',
-    value: '1,842',
-    label: '+34 this week',
-    labelColor: '#16A34A',
-    icon: Users,
-    iconBg: '#DBEAFE',
-    iconColor: '#2563EB',
-  },
-  {
-    title: 'Courses published',
-    value: '1',
-    label: '0 in draft',
-    labelColor: '#16A34A',
-    icon: BookOpen,
-    iconBg: '#EDE9FE',
-    iconColor: '#7C3AED',
-  },
-  {
-    title: 'Pending reviews',
-    value: '12',
-    label: '4 overdue',
-    labelColor: '#D97706',
-    icon: ClipboardList,
-    iconBg: '#FEF3C7',
-    iconColor: '#D97706',
-  },
-  {
-    title: 'Avg. course rating',
-    value: '4.8',
-    label: '↑ 0.1 vs last month',
-    labelColor: '#16A34A',
-    icon: Star,
-    iconBg: '#D1FAE5',
-    iconColor: '#059669',
-  },
-]
-
-const pendingReviews = [
-  {
-    name: 'Fatima Al-Rashidi',
-    course: 'Stakeholder Map Project',
-    time: '2h ago',
-    avatar: '/avatars/fatima-al-rashidi.jpg',
-  },
-  {
-    name: 'Daniel Chirwa',
-    course: 'Stakeholder Map Project',
-    time: '5h ago',
-    avatar: '/avatars/daniel-chirwa.jpg',
-  },
-]
+import {
+  coursesManageAPI,
+  trainerReviewsAPI,
+  type TrainerCourseListItem,
+  type TrainerPendingReview,
+} from '../../../services/api'
 
 const PAGE_CSS = `
   .db-page { padding: 1rem; background: #F5F5F5; }
@@ -89,17 +42,17 @@ const PAGE_CSS = `
   .db-review-list { margin-top: 0.85rem; display: grid; gap: 0.75rem; }
   .db-review-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem; border-radius: 1rem; background: #F8FAFF; border: 1px solid #E5E7EB; flex-wrap: wrap; }
   .db-review-person { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
-  .db-review-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; }
+  .db-review-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #64748B; }
   .db-review-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.9rem; }
   .db-review-course { margin: 0.25rem 0 0; color: #64748B; font-size: 0.8rem; }
   .db-review-meta { text-align: right; }
   .db-review-time { margin: 0; color: #6B7280; font-size: 0.75rem; }
   .db-review-btn { margin-top: 0.5rem; border: none; border-radius: 999px; background: #2563EB; color: #fff; padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+  .db-empty-note { color: #9CA3AF; font-size: 0.85rem; text-align: center; padding: 1rem 0; margin: 0; }
 
   .db-course-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); max-width: 340px; }
   .db-course-img-wrap { position: relative; }
   .db-course-img { width: 100%; height: 176px; object-fit: cover; border-radius: 1rem; background: #E2E8F0; display: block; }
-  .db-course-ring { position: absolute; bottom: 0.75rem; right: 0.75rem; }
   .db-course-body { margin-top: 1rem; display: grid; gap: 0.5rem; }
   .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
   .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
@@ -119,59 +72,155 @@ const PAGE_CSS = `
   .db-name { font-size: 2.25rem; }
 }
 `
+
 function getGreeting(): string {
   const hour = new Date().getHours()
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'
 }
-function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }) {
-  const stroke = 4
-  const radius = (size - stroke) / 2
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference - (percent / 100) * circumference
 
-  return (
-    <div style={{ position: 'relative', width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.35)" strokeWidth={stroke} fill="none" />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#fff"
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-      </svg>
-      <span
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '0.65rem',
-          fontWeight: 700,
-          color: '#fff',
-        }}
-      >
-        {percent}%
-      </span>
-    </div>
-  )
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function timeUntil(iso: string): string {
+  const diffMs = new Date(iso).getTime() - Date.now()
+  if (diffMs <= 0) return 'starting soon'
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 60) return `Starting in ${mins}m`
+  const hours = Math.floor(mins / 60)
+  return `Starting in ${hours}h`
 }
 
 export default function TrainerDashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
+  const [publishedCount, setPublishedCount] = useState<number | null>(null)
+  const [draftCount, setDraftCount] = useState<number | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+
+  const [pendingReviews, setPendingReviews] = useState<TrainerPendingReview[]>([])
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [overdueCount, setOverdueCount] = useState<number | null>(null)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
+
+  const [activeCourse, setActiveCourse] = useState<TrainerCourseListItem | null>(null)
+  const [courseError, setCourseError] = useState<string | null>(null)
+
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadDashboard()
+  }, [])
+
+  async function loadDashboard() {
+    setLoading(true)
+
+    const [publishedRes, draftRes, summaryRes, pendingRes, myCoursesRes] = await Promise.all([
+      coursesManageAPI.listMyCourses({ status: 'published' }),
+      coursesManageAPI.listMyCourses({ status: 'draft' }),
+      trainerReviewsAPI.getSummary(),
+      trainerReviewsAPI.getPendingReviews(),
+      coursesManageAPI.listMyCourses(),
+    ])
+
+    if (publishedRes.success && draftRes.success) {
+      setPublishedCount(publishedRes.count)
+      setDraftCount(draftRes.count)
+    } else {
+      setStatsError('Failed to load course stats')
+    }
+
+    if (summaryRes.success) {
+      setPendingCount(summaryRes.data.pending_count)
+    }
+
+    if (pendingRes.success) {
+      setPendingReviews(pendingRes.data.slice(0, 2))
+      setOverdueCount(pendingRes.data.filter((r) => r.is_late).length)
+    } else {
+      setReviewsError(pendingRes.error)
+    }
+
+    if (myCoursesRes.success) {
+      setActiveCourse(myCoursesRes.data[0] ?? null)
+    } else {
+      setCourseError(myCoursesRes.error)
+    }
+
+    setLoading(false)
+  }
+
   if (!user) return null
 
   const firstName = (user.name || '').split(' ')[0] || 'there'
+
+  // TODO: no endpoint returns an active-learner count for a trainer anywhere
+  // in the Swagger spec. Left as a static placeholder until backend adds one.
+  const activeLearnersDisplay = '—'
+
+  // TODO: there is no course-rating system in this API. TrainerReviewSummary's
+  // average_score is an assignment GRADING score, not a course rating — do not
+  // reuse it here. Left as a static placeholder until backend confirms scope.
+  const avgRatingDisplay = '—'
+
+  const stats = [
+    {
+      title: 'Active learners',
+      value: activeLearnersDisplay,
+      label: 'Not available yet',
+      labelColor: '#9CA3AF',
+      icon: Users,
+      iconBg: '#DBEAFE',
+      iconColor: '#2563EB',
+    },
+    {
+      title: 'Courses published',
+      value: publishedCount !== null ? String(publishedCount) : '—',
+      label: draftCount !== null ? `${draftCount} in draft` : '—',
+      labelColor: '#16A34A',
+      icon: BookOpen,
+      iconBg: '#EDE9FE',
+      iconColor: '#7C3AED',
+    },
+    {
+      title: 'Pending reviews',
+      value: pendingCount !== null ? String(pendingCount) : '—',
+      label: overdueCount !== null ? `${overdueCount} overdue` : '—',
+      labelColor: '#D97706',
+      icon: ClipboardList,
+      iconBg: '#FEF3C7',
+      iconColor: '#D97706',
+    },
+    {
+      title: 'Avg. course rating',
+      value: avgRatingDisplay,
+      label: 'Not available yet',
+      labelColor: '#9CA3AF',
+      icon: Star,
+      iconBg: '#D1FAE5',
+      iconColor: '#059669',
+    },
+  ]
 
   return (
     <TrainerShell>
@@ -188,6 +237,7 @@ export default function TrainerDashboardPage() {
           </button>
         </div>
 
+        {statsError && <p className="db-empty-note">{statsError}</p>}
         <div className="db-stats">
           {stats.map((stat) => {
             const Icon = stat.icon
@@ -199,8 +249,8 @@ export default function TrainerDashboardPage() {
                     <Icon size={16} color={stat.iconColor} />
                   </div>
                 </div>
-                <p className="db-stat-value">{stat.value}</p>
-                <p className="db-stat-label" style={{ color: stat.labelColor }}>{stat.label}</p>
+                <p className="db-stat-value">{loading ? '…' : stat.value}</p>
+                <p className="db-stat-label" style={{ color: stat.labelColor }}>{loading ? '' : stat.label}</p>
               </div>
             )
           })}
@@ -210,11 +260,21 @@ export default function TrainerDashboardPage() {
           <div style={{ display: 'grid', gap: '1rem' }}>
             <div>
               <h3 className="db-section-title">Upcoming Live Session(s)</h3>
+              {/*
+                TODO: no trainer-facing "list my upcoming live sessions across
+                all courses" endpoint exists in the Swagger spec. The
+                live-sessions section only supports booking/slot management
+                and per-session actions (go-live/end/cancel), scoped to a
+                single course at a time. Left as static content until backend
+                adds an aggregate endpoint, or until we build a client-side
+                merge across coursesManageAPI.listMyCourses() +
+                liveSessionsAPI.getManageCourseSlots() per course.
+              */}
               <div className="db-live-card">
                 <div>
                   <p className="db-live-badge">
                     <span className="db-live-dot" />
-                    Starting in 2h
+                    {timeUntil(new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString())}
                   </p>
                   <h2 className="db-live-title">Q&A: Stakeholder Communication in Practice</h2>
                   <p className="db-live-sub">Today · 3:00 PM WAT · 47 registered</p>
@@ -226,21 +286,25 @@ export default function TrainerDashboardPage() {
             <div className="db-reviews-card">
               <div className="db-reviews-header">
                 <h3 className="db-section-title" style={{ margin: 0 }}>Pending reviews</h3>
-                <button className="db-view-all">View all</button>
+                <button className="db-view-all" onClick={() => navigate(ROUTES.TRAINER_REVIEWS)}>View all</button>
               </div>
               <div className="db-review-list">
+                {reviewsError && <p className="db-empty-note">{reviewsError}</p>}
+                {!reviewsError && !loading && pendingReviews.length === 0 && (
+                  <p className="db-empty-note">No pending reviews right now.</p>
+                )}
                 {pendingReviews.map((review) => (
-                  <div key={review.name} className="db-review-row">
+                  <div key={review.id} className="db-review-row">
                     <div className="db-review-person">
-                      <img src={review.avatar} alt={review.name} className="db-review-avatar" />
+                      <div className="db-review-avatar">{initials(review.learner_name)}</div>
                       <div style={{ minWidth: 0 }}>
-                        <p className="db-review-name">{review.name}</p>
-                        <p className="db-review-course">{review.course}</p>
+                        <p className="db-review-name">{review.learner_name}</p>
+                        <p className="db-review-course">{review.assignment_title}</p>
                       </div>
                     </div>
                     <div className="db-review-meta">
-                      <p className="db-review-time">{review.time}</p>
-                      <button className="db-review-btn">Review</button>
+                      <p className="db-review-time">{timeAgo(review.submitted_at)}</p>
+                      <button className="db-review-btn" onClick={() => navigate(ROUTES.TRAINER_REVIEWS)}>Review</button>
                     </div>
                   </div>
                 ))}
@@ -250,20 +314,42 @@ export default function TrainerDashboardPage() {
 
           <div>
             <h3 className="db-section-title">Active Course</h3>
-            <div className="db-course-card">
-              <div className="db-course-img-wrap">
-                <img src="/image1.png" alt="Active course" className="db-course-img" />
-                <div className="db-course-ring">
-                  <ProgressRing percent={37} />
+            {courseError && <p className="db-empty-note">{courseError}</p>}
+            {!courseError && !loading && !activeCourse && (
+              <p className="db-empty-note">No courses yet.</p>
+            )}
+            {activeCourse && (
+              <div className="db-course-card">
+                <div className="db-course-img-wrap">
+                  <img
+                    src={activeCourse.thumbnail_url || '/image1.png'}
+                    alt={activeCourse.title}
+                    className="db-course-img"
+                  />
+                  {/*
+                    TODO: the "progress ring" in the original design showed
+                    learner-style completion percent, but TrainerCourseListItem
+                    has no such field — there is no "how built-out is my course"
+                    metric from the backend. Dropped the ring; showing
+                    module/lesson counts instead until a real metric exists.
+                  */}
                 </div>
+                <div className="db-course-body">
+                  {/* TODO: TrainerCourseListItem has no `category` field — showing subtitle instead */}
+                  <p className="db-course-cat">{activeCourse.subtitle || activeCourse.status}</p>
+                  <h4 className="db-course-name">{activeCourse.title}</h4>
+                  <p className="db-course-date">
+                    {activeCourse.module_count} modules · {activeCourse.lesson_count} lessons
+                  </p>
+                </div>
+                <button
+                  className="db-course-preview-btn"
+                  onClick={() => navigate(ROUTES.TRAINER_COURSE_MANAGE.replace(':id', activeCourse.id))}
+                >
+                  Manage
+                </button>
               </div>
-              <div className="db-course-body">
-                <p className="db-course-cat">Management</p>
-                <h4 className="db-course-name">Project Management Course</h4>
-                <p className="db-course-date">Uploaded 2 months ago</p>
-              </div>
-              <button className="db-course-preview-btn">Preview</button>
-            </div>
+            )}
           </div>
         </section>
       </div>

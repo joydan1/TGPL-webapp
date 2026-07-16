@@ -59,11 +59,13 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   TRAINER_COURSE_ADD: '/trainer/courses/addcourse',
   TRAINER_COURSE_EDIT: '/trainer/courses/:id/edit',
   TRAINER_COURSE_MANAGE: '/trainer/courses/:id/manage',
+  TRAINER_PROFILE: '/trainer/profile',
   TRAINER_COURSE_MODULES: '/trainer/courses/:id/modules',
   TRAINER_MODULE_EDIT: '/trainer/modules/:id/edit',
   TRAINER_ASSIGNMENTS: '/trainer/assignments',
   TRAINER_ASSIGNMENT_DETAIL: '/trainer/assignments/:id',
-  TRAINER_SUBMISSIONS: '/trainer/submissions',
+  TRAINER_REVIEWS: '/trainer/reviews',
+  TRAINER_SUBMISSION: '/trainer/submissions',
   TRAINER_SUBMISSION_DETAIL: '/trainer/submissions/:id',
   TRAINER_SUBMISSION_GRADE: '/trainer/submissions/:id/grade',
   TRAINER_LEARNERS: '/trainer/learners',
@@ -313,12 +315,14 @@ liveSessionJoin: (id: string | number) =>
  trainerCourseCreate: () => ROUTES.TRAINER_COURSE_ADD,
   trainerCourseEdit: (id: string | number) =>
     getRoute(ROUTES.TRAINER_COURSE_EDIT, { id }),
+  trainerProfile: () => ROUTES.TRAINER_PROFILE,
+
   trainerCourseManage: (id: string | number) =>
     getRoute(ROUTES.TRAINER_COURSE_MANAGE, { id }),
   trainerLearners: () => ROUTES.TRAINER_LEARNERS,
   trainerLearnerDetail: (id: string | number) =>
     getRoute(ROUTES.TRAINER_LEARNER_DETAIL, { id }),
-  trainerSubmissions: () => ROUTES.TRAINER_SUBMISSIONS,
+  trainerReviews: () => ROUTES.TRAINER_REVIEWS,
   trainerSubmissionDetail: (id: string | number) =>
     getRoute(ROUTES.TRAINER_SUBMISSION_DETAIL, { id }),
   trainerSubmissionGrade: (id: string | number) =>

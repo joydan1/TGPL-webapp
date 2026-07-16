@@ -833,9 +833,10 @@ export interface LiveLearnerRef {
  
 export interface LiveSlot {
   id: string
-  date: string // 'YYYY-MM-DD'
-  start_time: string // 'HH:mm'
-  end_time: string
+  course_id: string
+  trainer_id: string
+  starts_at: string
+  ends_at: string
   status: LiveSlotStatus
 }
  
@@ -863,11 +864,11 @@ export interface LiveManageBooking {
 }
  
 export interface CreateSlotPayload {
-  date: string
-  start_time: string
-  end_time: string
+  starts_at: string
+  ends_at: string
+  status?: LiveSlotStatus
 }
- 
+
 export interface PublishSessionPayload {
   title: string
   date: string
@@ -1001,36 +1002,46 @@ export const liveSessionsAPI = {
     }
   },
 }
- 
-export type CourseDraftStatus = 'draft' | 'published' | 'hidden'
+export type CourseDraftStatus = 'draft' | 'published' | 'archived'
 export type CourseVisibility = 'public' | 'hidden'
- 
+export type CourseLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
+
 export interface CourseBasicsPayload {
   title?: string
   subtitle?: string
   category?: string
   language?: string
-  level?: string
+  level?: CourseLevel
 }
- 
+
 export interface CourseDescriptionPayload {
-  full_description?: string
-  learn_items?: string[]
-  who_for?: string
+  description?: string
+  expected_outcomes?: string[]
+  target_audience?: string[]       // short tag, max 80 chars
+  audience_description?: string  // longer prose
   prerequisites?: string[]
 }
- 
+
 export interface CourseSettingsPayload {
   is_free?: boolean
-  price_ngn?: number
+  price_kobo?: number
   has_certificate?: boolean
-  visibility?: CourseVisibility
 }
- 
+export interface TrainerCourseListItem {
+  id: string
+  title: string
+  subtitle: string
+  status: CourseDraftStatus
+  thumbnail_url: string | null
+  module_count: number
+  lesson_count: number
+  updated_at: string
+}
+
 export type CourseDraftUpdatePayload = CourseBasicsPayload &
   CourseDescriptionPayload &
-  CourseSettingsPayload & { status?: CourseDraftStatus }
- 
+  CourseSettingsPayload
+
 export interface CourseDraft {
   id: string
   slug: string
@@ -1039,19 +1050,20 @@ export interface CourseDraft {
   subtitle?: string
   category?: string
   language?: string
-  level?: string
+  level?: CourseLevel
   cover_image_url?: string | null
-  full_description?: string
-  learn_items?: string[]
-  who_for?: string
+  description?: string
+  expected_outcomes?: string[]
+  target_audience?: string[]
+  audience_description?: string
   prerequisites?: string[]
   is_free?: boolean
-  price_ngn?: number
+  price_kobo?: number
   has_certificate?: boolean
-  visibility?: CourseVisibility
   created_at: string
   updated_at: string
 }
+
  
 export interface CourseModule {
   id: string
@@ -1074,7 +1086,6 @@ export interface CourseCurriculumModule extends CourseModule {
 }
  
 export interface CourseCurriculumResponse {
-  course_id: string
   modules: CourseCurriculumModule[]
 }
  
@@ -1147,19 +1158,40 @@ export const coursesManageAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
- 
-  /** GET /v1/courses/manage/{id}/curriculum/ */
-  getCurriculum: async (courseId: string) => {
+ /** GET /v1/courses/manage/ — the caller's own courses (all statuses) */
+  listMyCourses: async (params?: { status?: CourseDraftStatus; page?: number }) => {
     try {
-      const response = await apiClient.get<CourseCurriculumResponse>(
-        API_ENDPOINTS.COURSES_MANAGE_CURRICULUM(courseId),
-      )
-      return { success: true as const, data: response.data }
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.page) query.set('page', String(params.page))
+      const qs = query.toString()
+
+      const response = await apiClient.get<{
+        count: number
+        next: string | null
+        previous: string | null
+        results: TrainerCourseListItem[]
+      }>(`/v1/courses/manage/${qs ? `?${qs}` : ''}`)
+
+      return { success: true as const, data: response.data.results, count: response.data.count }
     } catch (error) {
-      const { message, statusCode } = parseApiError(error, 'Failed to load curriculum')
+      const { message, statusCode } = parseApiError(error, 'Failed to load your courses')
       return { success: false as const, error: message, statusCode }
     }
   },
+
+  /** GET /v1/courses/manage/{id}/curriculum/ */
+getCurriculum: async (courseId: string) => {
+  try {
+    const response = await apiClient.get<CourseCurriculumModule[]>(
+      API_ENDPOINTS.COURSES_MANAGE_CURRICULUM(courseId),
+    )
+    return { success: true as const, data: response.data }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Failed to load curriculum')
+    return { success: false as const, error: message, statusCode }
+  }
+},
  
   /** POST /v1/courses/manage/{id}/modules/ */
   createModule: async (courseId: string, title: string) => {
@@ -1235,7 +1267,32 @@ export const coursesManageAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
- 
+ /** POST /v1/courses/manage/{id}/publish/ — validated draft → published */
+  publishDraft: async (courseId: string) => {
+    try {
+      const response = await apiClient.post<CourseDraft>(
+        `/v1/courses/manage/${courseId}/publish/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to publish course')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/courses/manage/{id}/unpublish/ — published → draft */
+  unpublishDraft: async (courseId: string) => {
+    try {
+      const response = await apiClient.post<CourseDraft>(
+        `/v1/courses/manage/${courseId}/unpublish/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to unpublish course')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
   /** PATCH /v1/courses/manage/lessons/{lesson_id}/ */
   updateLesson: async (lessonId: string, payload: Partial<Pick<CourseLesson, 'title'>>) => {
     try {
@@ -1431,6 +1488,55 @@ export const trainerReviewsAPI = {
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to submit grade')
       return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+// ─── Trainer Profile Types ──────────────────────────────────────────────────
+
+export type TrainerCompletionStatus = 'incomplete' | 'complete'
+
+export interface TrainerProfile {
+  id: string
+  credential: string | null
+  bio: string | null
+  subject_areas: string[]
+  accepts_bookings: boolean
+  completion_status: TrainerCompletionStatus
+  created_at: string
+}
+
+export interface TrainerProfilePayload {
+  credential?: string | null
+  bio?: string | null
+  subject_areas?: string[]
+  accepts_bookings?: boolean
+}
+
+// ─── Trainer Profile API ────────────────────────────────────────────────────
+
+export const trainerProfileAPI = {
+  /** GET /v1/users/me/trainer-profile/ — auto-creates on first access, never 404s */
+  getTrainerProfile: async () => {
+    try {
+      const response = await apiClient.get<TrainerProfile>('/v1/users/me/trainer-profile/')
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to get trainer profile')
+      return { success: false as const, error: message }
+    }
+  },
+
+  /** PATCH /v1/users/me/trainer-profile/ */
+  updateTrainerProfile: async (payload: TrainerProfilePayload) => {
+    try {
+      const response = await apiClient.patch<TrainerProfile>(
+        '/v1/users/me/trainer-profile/',
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message } = parseApiError(error, 'Failed to update trainer profile')
+      return { success: false as const, error: message }
     }
   },
 }

@@ -20,18 +20,6 @@ import { useAuth } from '../../../../hooks/useAuth'
 import { liveSessionsAPI } from '../../../../services/api'
 import type { LiveManageBooking, LiveSession } from '../../../../services/api'
 
-/* ────────────────────────────────────────────────────────────────────────
- * Data shape note:
- * There's no single "list my published sessions" endpoint, so this page
- * derives its session list from GET /v1/live/manage/bookings/ (each booking
- * carries its .session). Bookings are grouped by session.id so one session
- * with several learners renders as ONE card, matching the mockup.
- *
- * "Go Live" / "Start Now" open a confirm modal that hands off to the
- * session's Google Meet link (session.meeting_link). "View Recording" on a
- * past session opens session.recording_url. Both field names are
- * best-guesses — confirm against a real payload and adjust if needed.
- * ------------------------------------------------------------------------ */
 
 type SessionCard = {
   session: LiveSession
@@ -210,47 +198,50 @@ export default function TrainerLiveClassesPage() {
   }, [bookings])
 
   async function handleCreateSlot() {
-    if (!courseSlug || !form.date || !form.startTime) {
-      setSubmitError('Course, date and start time are required.')
-      return
-    }
-    setSubmitting(true)
-    setSubmitError(null)
+  if (!courseSlug || !form.date || !form.startTime) {
+    setSubmitError('Course, date and start time are required.')
+    return
+  }
+  setSubmitting(true)
+  setSubmitError(null)
 
-    const start = new Date(`${form.date}T${form.startTime}`)
-    const end = new Date(start.getTime() + form.duration * 60000)
-    const endTime = end.toTimeString().slice(0, 5)
+  const start = new Date(`${form.date}T${form.startTime}`)
+  const end = new Date(start.getTime() + form.duration * 60000)
+  const endTime = end.toTimeString().slice(0, 5)
 
-    const slotResult = await liveSessionsAPI.createManageCourseSlot(courseSlug, {
+  const slotResult = await liveSessionsAPI.createManageCourseSlot(courseSlug, {
+    starts_at: start.toISOString(),
+    ends_at: end.toISOString(),
+  })
+  if (!slotResult.success) {
+    setSubmitError(slotResult.error || 'Failed to schedule session.')
+    setSubmitting(false)
+    return
+  }
+
+  if (form.title.trim()) {
+    // TODO: publishSession's payload schema is unconfirmed against the
+    // Swagger spec — it may also expect starts_at/ends_at like the slots
+    // endpoint rather than date/start_time/end_time. Verify before relying
+    // on this branch; leaving as-is (date/start_time/end_time) until then.
+    const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
+      title: form.title.trim(),
       date: form.date,
       start_time: form.startTime,
       end_time: endTime,
     })
-    if (!slotResult.success) {
-      setSubmitError(slotResult.error || 'Failed to schedule session.')
+    if (!sessionResult.success) {
+      setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
       setSubmitting(false)
       return
     }
-
-    if (form.title.trim()) {
-      const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
-        title: form.title.trim(),
-        date: form.date,
-        start_time: form.startTime,
-        end_time: endTime,
-      })
-      if (!sessionResult.success) {
-        setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
-        setSubmitting(false)
-        return
-      }
-    }
-
-    setShowSchedule(false)
-    setForm({ date: '', startTime: '', duration: 60, title: '' })
-    setSubmitting(false)
-    await loadBookings()
   }
+
+  setShowSchedule(false)
+  setForm({ date: '', startTime: '', duration: 60, title: '' })
+  setSubmitting(false)
+  await loadBookings()
+}
 
   if (!user) return null
 
