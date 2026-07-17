@@ -207,7 +207,6 @@ export default function TrainerLiveClassesPage() {
 
   const start = new Date(`${form.date}T${form.startTime}`)
   const end = new Date(start.getTime() + form.duration * 60000)
-  const endTime = end.toTimeString().slice(0, 5)
 
   const slotResult = await liveSessionsAPI.createManageCourseSlot(courseSlug, {
     starts_at: start.toISOString(),
@@ -220,15 +219,13 @@ export default function TrainerLiveClassesPage() {
   }
 
   if (form.title.trim()) {
-    // TODO: publishSession's payload schema is unconfirmed against the
-    // Swagger spec — it may also expect starts_at/ends_at like the slots
-    // endpoint rather than date/start_time/end_time. Verify before relying
-    // on this branch; leaving as-is (date/start_time/end_time) until then.
+    // Confirmed via Swagger: publishSession expects starts_at/ends_at as
+    // full ISO 8601 UTC datetimes, same shape as the slots endpoint —
+    // not date/start_time/end_time. topic and join_url are optional.
     const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
       title: form.title.trim(),
-      date: form.date,
-      start_time: form.startTime,
-      end_time: endTime,
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
     })
     if (!sessionResult.success) {
       setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
@@ -242,7 +239,6 @@ export default function TrainerLiveClassesPage() {
   setSubmitting(false)
   await loadBookings()
 }
-
   if (!user) return null
 
   const list = activeTab === 'upcoming' ? upcoming : past
@@ -341,7 +337,7 @@ export default function TrainerLiveClassesPage() {
                   )}
                   <div className="lc-card-body">
                     <p className="lc-card-title">{session.title}</p>
-                    <p className="lc-card-sub">{session.course.title}</p>
+                    <p className="lc-card-sub">{session.course?.title ?? '—'}</p>
                     <div className="lc-card-meta">
                       <span>
                         <Calendar size={13} /> {formatDateLabel(start)}

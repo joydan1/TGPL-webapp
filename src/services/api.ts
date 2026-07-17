@@ -859,15 +859,21 @@ export interface LiveSlot {
 export interface LiveSession {
   id: string
   title: string
-  course: LiveCourseRef
-  date: string
-  start_time: string
-  end_time: string
+  // Confirmed via Swagger (POST .../sessions/ response):
+  course_id?: string
+  topic?: string
+  starts_at?: string
+  ends_at?: string
+  status?: 'upcoming' | 'live' | 'ended' | 'cancelled' | 'scheduled' | 'completed'
+  join_url?: string | null
+  course?: LiveCourseRef
+  date?: string
+  start_time?: string
+  end_time?: string
   duration_minutes?: number
   meeting_link?: string | null
   recording_url?: string | null
   recording_views?: number
-  status?: 'scheduled' | 'live' | 'completed' | 'cancelled'
 }
  
 export interface LiveManageBooking {
@@ -884,12 +890,10 @@ export interface CreateSlotPayload {
   ends_at: string
   status?: LiveSlotStatus
 }
-
 export interface PublishSessionPayload {
   title: string
-  date: string
-  start_time: string
-  end_time: string
+  starts_at: string
+  ends_at: string
 }
 
 export const liveSessionsAPI = {
