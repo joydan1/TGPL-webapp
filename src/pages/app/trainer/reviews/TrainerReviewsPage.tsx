@@ -1,6 +1,6 @@
 // pages/trainer/reviews/TrainerReviewsPage.tsx
 import { useEffect, useState } from 'react'
-import { Users, ClipboardList, Star, Award, X, Download, FileText, CheckCircle2 } from 'lucide-react'
+import { Users, ClipboardList, Star, Award, X, Download, FileText, CheckCircle2, RotateCcw } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import {
   trainerReviewsAPI,
@@ -126,6 +126,9 @@ const PAGE_CSS = `
   }
 
   /* ── Success modal ── */
+  .rv-past-score.revision { color: #2563EB; }
+.rv-past-status.revision { background: #DBEAFE; color: #2563EB; }
+  .rv-status-btn.active-revision { border-color: #2563EB; background: #DBEAFE; color: #2563EB; }
   .rv-success-modal { background: #fff; border-radius: 1.25rem; padding: 2rem 1.5rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
   .rv-success-icon { width: 72px; height: 72px; border-radius: 999px; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
   .rv-success-title { margin: 0; font-size: 1.25rem; font-weight: 800; color: #111827; }
@@ -169,11 +172,12 @@ export default function TrainerReviewsPage() {
   const [pastReviews, setPastReviews] = useState<TrainerCompletedReview[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-
+  const [successType, setSuccessType] = useState<'graded' | 'revision' | null>(null)
   const [activeReview, setActiveReview] = useState<TrainerPendingReview | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [score, setScore] = useState('')
-  const [status, setStatus] = useState<'pass' | 'fail' | null>(null)
+  const [status, setStatus] = useState<'pass' | 'fail' | 'revision' | null>(null)
+  const [revisionReason, setRevisionReason] = useState('')
   const [feedback, setFeedback] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -208,6 +212,7 @@ export default function TrainerReviewsPage() {
     setScore('')
     setStatus(null)
     setFeedback('')
+    setRevisionReason('')
     setSubmitError(null)
   }
 
@@ -220,18 +225,20 @@ export default function TrainerReviewsPage() {
     if (!activeReview) return
 
     if (!status) {
-      setSubmitError('Select Pass or Fail before submitting.')
+      setSubmitError('Select Pass, Fail, or Request Revision before submitting.')
       return
     }
 
     setSubmitting(true)
     setSubmitError(null)
 
-    const result = await trainerReviewsAPI.gradeSubmission(activeReview.id, {
-      score: score.trim() === '' ? null : Number(score),
-      feedback,
-      status,
-    })
+    const result = status === 'revision'
+      ? await trainerReviewsAPI.requestRevision(activeReview.id, { reason: revisionReason })
+      : await trainerReviewsAPI.gradeSubmission(activeReview.id, {
+          score: score.trim() === '' ? null : Number(score),
+          feedback,
+          status,
+        })
 
     setSubmitting(false)
 
@@ -240,9 +247,9 @@ export default function TrainerReviewsPage() {
       return
     }
 
-    // Remove from pending, and refresh summary + completed list so counts stay accurate
     setPendingReviews((prev) => prev.filter((r) => r.id !== activeReview.id))
     setActiveReview(null)
+    setSuccessType(status === 'revision' ? 'revision' : 'graded')
     setShowSuccess(true)
 
     const [summaryRes, completedRes] = await Promise.all([
@@ -339,6 +346,10 @@ export default function TrainerReviewsPage() {
             </div>
             {pastReviews.map((review) => {
               const isPass = review.grade_status === 'pass'
+              const isRevision = review.grade_status == null
+              const statusClass = isRevision ? 'revision' : isPass ? 'pass' : 'fail'
+              const statusLabel = isRevision ? 'Revision requested' : review.grade_status
+
               return (
                 <div key={review.id} className="rv-past-row">
                   <div className="rv-past-avatar">{initials(review.learner_name)}</div>
@@ -347,11 +358,11 @@ export default function TrainerReviewsPage() {
                     <p className="rv-past-assignment">{review.assignment_title}</p>
                   </div>
                   <div className="rv-past-score-wrap">
-                    <span className={`rv-past-score ${isPass ? 'pass' : 'fail'}`}>
+                    <span className={`rv-past-score ${statusClass}`}>
                       {review.score != null ? review.score : '—'}
                     </span>
-                    {review.grade_status && (
-                      <span className={`rv-past-status ${isPass ? 'pass' : 'fail'}`}>{review.grade_status}</span>
+                    {statusLabel && (
+                      <span className={`rv-past-status ${statusClass}`}>{statusLabel}</span>
                     )}
                   </div>
                   <span className="rv-past-date">{formatShortDate(review.graded_at)}</span>
@@ -360,123 +371,155 @@ export default function TrainerReviewsPage() {
             })}
           </div>
         )}
-      </div>
 
-      {activeReview && (
-        <div className="rv-modal-overlay" onClick={closeGradeModal}>
-          <div className="rv-grade-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="rv-grade-close" onClick={closeGradeModal} aria-label="Close">
-              <X size={18} />
-            </button>
+        {activeReview && (
+          <div className="rv-modal-overlay" onClick={closeGradeModal}>
+            <div className="rv-grade-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="rv-grade-close" onClick={closeGradeModal} aria-label="Close">
+                <X size={18} />
+              </button>
 
-            <div className="rv-grade-left">
-              <div className="rv-grade-header">
-                <div className="rv-grade-avatar">{initials(activeReview.learner_name)}</div>
-                <div>
-                  <p className="rv-grade-name">{activeReview.learner_name}</p>
-                  <p className="rv-grade-assignment-title">{activeReview.assignment_title}</p>
-                </div>
-                {activeReview.is_late && <span className="rv-overdue-badge">Overdue</span>}
-              </div>
-              <div className="rv-grade-meta">
-                <span>{formatRelativeDate(activeReview.submitted_at)}</span>
-                <span className="rv-grade-tag">{activeReview.course_title.toUpperCase()}</span>
-              </div>
-
-              <div className="rv-file-list">
-                {activeReview.files.map((file) => (
-                  <div className="rv-file-row" key={file.id}>
-                    <div className="rv-file-icon"><FileText size={18} /></div>
-                    <div>
-                      <p className="rv-file-name">{file.file_name}</p>
-                      <p className="rv-file-size">{formatFileSize(file.file_size)}</p>
-                    </div>
-                    <a
-                      className="rv-file-download"
-                      href={file.download_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Download ${file.file_name}`}
-                    >
-                      <Download size={18} />
-                    </a>
+              <div className="rv-grade-left">
+                <div className="rv-grade-header">
+                  <div className="rv-grade-avatar">{initials(activeReview.learner_name)}</div>
+                  <div>
+                    <p className="rv-grade-name">{activeReview.learner_name}</p>
+                    <p className="rv-grade-assignment-title">{activeReview.assignment_title}</p>
                   </div>
-                ))}
+                  {activeReview.is_late && <span className="rv-overdue-badge">Overdue</span>}
+                </div>
+                <div className="rv-grade-meta">
+                  <span>{formatRelativeDate(activeReview.submitted_at)}</span>
+                  <span className="rv-grade-tag">{activeReview.course_title.toUpperCase()}</span>
+                </div>
+
+                <div className="rv-file-list">
+                  {activeReview.files.map((file) => (
+                    <div className="rv-file-row" key={file.id}>
+                      <div className="rv-file-icon"><FileText size={18} /></div>
+                      <div>
+                        <p className="rv-file-name">{file.file_name}</p>
+                        <p className="rv-file-size">{formatFileSize(file.file_size)}</p>
+                      </div>
+                      <a
+                        className="rv-file-download"
+                        href={file.download_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Download ${file.file_name}`}
+                      >
+                        <Download size={18} />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rv-note-box">
+                  <p className="rv-note-title">Note to trainer</p>
+                  <p className="rv-note-body">Kindly download the file(s), read through and input the grade on the right-side panel.</p>
+                </div>
               </div>
 
-              <div className="rv-note-box">
-                <p className="rv-note-title">Note to trainer</p>
-                <p className="rv-note-body">Kindly download the file(s), read through and input the grade on the right-side panel.</p>
-              </div>
-            </div>
+              <div className="rv-grade-right">
+                <h3 className="rv-grade-form-title">Grade Assignment</h3>
+                <p className="rv-grade-form-sub">Any score below 70%, the students will be required to review</p>
 
-            <div className="rv-grade-right">
-              <h3 className="rv-grade-form-title">Grade Assignment</h3>
-              <p className="rv-grade-form-sub">Any score below 70%, the students will be required to review</p>
+                <label className="rv-status-label">Result <span style={{ color: '#EF4444' }}>*</span></label>
+                <div className="rv-status-toggle">
+                  <button
+                    type="button"
+                    className={`rv-status-btn ${status === 'pass' ? 'active-pass' : ''}`}
+                    onClick={() => setStatus('pass')}
+                  >
+                    Pass
+                  </button>
+                  <button
+                    type="button"
+                    className={`rv-status-btn ${status === 'fail' ? 'active-fail' : ''}`}
+                    onClick={() => setStatus('fail')}
+                  >
+                    Fail
+                  </button>
+                  <button
+                    type="button"
+                    className={`rv-status-btn ${status === 'revision' ? 'active-revision' : ''}`}
+                    onClick={() => setStatus('revision')}
+                  >
+                    <RotateCcw size={14} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} />
+                    Request Revision
+                  </button>
+                </div>
 
-              <label className="rv-score-label">Score</label>
-              <div className="rv-score-row">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className="rv-score-input"
-                  placeholder="—"
-                  value={score}
-                  onChange={(e) => setScore(e.target.value)}
-                />
-                <span className="rv-score-of">/ 100</span>
-              </div>
+                {status !== 'revision' && (
+                  <>
+                    <label className="rv-score-label">Score</label>
+                    <div className="rv-score-row">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        className="rv-score-input"
+                        placeholder="—"
+                        value={score}
+                        onChange={(e) => setScore(e.target.value)}
+                      />
+                      <span className="rv-score-of">/ 100</span>
+                    </div>
+                  </>
+                )}
 
-              <label className="rv-status-label">Result <span style={{ color: '#EF4444' }}>*</span></label>
-              <div className="rv-status-toggle">
-                <button
-                  type="button"
-                  className={`rv-status-btn ${status === 'pass' ? 'active-pass' : ''}`}
-                  onClick={() => setStatus('pass')}
-                >
-                  Pass
-                </button>
-                <button
-                  type="button"
-                  className={`rv-status-btn ${status === 'fail' ? 'active-fail' : ''}`}
-                  onClick={() => setStatus('fail')}
-                >
-                  Fail
-                </button>
-              </div>
+                {status === 'revision' ? (
+                  <>
+                    <label className="rv-feedback-label">Reason for revision (optional)</label>
+                    <textarea
+                      className="rv-feedback-textarea"
+                      placeholder="Let the learner know what needs to change…"
+                      value={revisionReason}
+                      onChange={(e) => setRevisionReason(e.target.value)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="rv-feedback-label">Feedback</label>
+                    <textarea
+                      className="rv-feedback-textarea"
+                      placeholder="Add your feedback here…"
+                      value={feedback}
+                      onChange={(e) => setFeedback(e.target.value)}
+                    />
+                  </>
+                )}
 
-              <label className="rv-feedback-label">Feedback</label>
-              <textarea
-                className="rv-feedback-textarea"
-                placeholder="Add your feedback here…"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-              />
+                {submitError && <div className="rv-form-error">{submitError}</div>}
 
-              {submitError && <div className="rv-form-error">{submitError}</div>}
-
-              <div className="rv-grade-actions">
-                <button className="rv-cancel-btn" onClick={closeGradeModal} disabled={submitting}>Cancel</button>
-                <button className="rv-submit-btn" onClick={handleSubmitGrade} disabled={submitting}>
-                  {submitting ? 'Submitting…' : 'Submit Grade'}
-                </button>
+                <div className="rv-grade-actions">
+                  <button className="rv-cancel-btn" onClick={closeGradeModal} disabled={submitting}>Cancel</button>
+                  <button className="rv-submit-btn" onClick={handleSubmitGrade} disabled={submitting}>
+                    {submitting ? 'Submitting…' : 'Submit Grade'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showSuccess && (
-        <div className="rv-modal-overlay">
-          <div className="rv-success-modal">
-            <div className="rv-success-icon"><CheckCircle2 size={40} /></div>
-            <h3 className="rv-success-title">Successful</h3>
-            <p className="rv-success-sub">The assessment has been graded successfully.</p>
-            <button className="rv-success-btn" onClick={() => setShowSuccess(false)}>Close</button>
+        {showSuccess && (
+          <div className="rv-modal-overlay">
+            <div className="rv-success-modal">
+              <div className="rv-success-icon"><CheckCircle2 size={40} /></div>
+              <h3 className="rv-success-title">
+                {successType === 'revision' ? 'Revision requested' : 'Successful'}
+              </h3>
+              <p className="rv-success-sub">
+                {successType === 'revision'
+                  ? 'The learner has been notified to revise and resubmit.'
+                  : 'The assessment has been graded successfully.'}
+              </p>
+              <button className="rv-success-btn" onClick={() => setShowSuccess(false)}>Close</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </TrainerShell>
   )
 }

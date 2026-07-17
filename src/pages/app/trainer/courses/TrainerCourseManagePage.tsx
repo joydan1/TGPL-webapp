@@ -1,18 +1,14 @@
 // pages/app/trainer/courses/TrainerCourseManagePage.tsx
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import {
-  ChevronLeft, Plus, Trash2, Check, X, Loader2, GripVertical,
+import { ChevronLeft, Plus, Trash2, Check, X, Loader2, GripVertical,
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
-import {
-  coursesManageAPI,
-  type CourseDraft,
-  type CourseCurriculumModule,
-  type CourseLevel,
-} from '../../../../services/api'
-
+import { coursesManageAPI, type CourseDraft,type CourseCurriculumModule,
+  type CourseLevel,} from '../../../../services/api'
+import ConfirmDialog from '../../../../components/ConfirmDialog'
+import { useConfirm } from '../../../../hooks/useConfirm'
 
 const CATEGORY_OPTIONS = ['Management', 'Leadership', 'Data & Analytics', 'Product', 'Design', 'Engineering']
 const LANGUAGE_OPTIONS = ['English', 'French', 'Portuguese']
@@ -87,7 +83,7 @@ const PAGE_CSS = `
 export default function TrainerCourseManagePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-
+const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm()
   const [course, setCourse] = useState<CourseDraft | null>(null)
   const [modules, setModules] = useState<CourseCurriculumModule[]>([])
   const [loading, setLoading] = useState(true)
@@ -209,26 +205,37 @@ export default function TrainerCourseManagePage() {
     setModules((prev) => prev.map((m) => (m.id === moduleId ? { ...m, title } : m)))
   }
 
-  async function handleModuleBlur(moduleId: string, title: string) {
-    if (!title.trim()) return
-    const result = await coursesManageAPI.updateModule(moduleId, title)
-    if (!result.success) setCurriculumError(result.error)
-  }
+ async function handleModuleBlur(moduleId: string, title: string) {
+  if (!title.trim()) return
+  const result = await coursesManageAPI.updateModule(moduleId, { title })
+  if (!result.success) setCurriculumError(result.error)
+}
+async function handleDeleteModule(moduleId: string) {
+  const mod = modules.find((m) => m.id === moduleId)
+  const lessonCount = mod?.lessons.length ?? 0
+  const lessonWarning =
+    lessonCount > 0
+      ? ` This will also delete ${lessonCount} lesson${lessonCount === 1 ? '' : 's'} inside it — there's no separate warning from the backend for that.`
+      : ''
 
-  async function handleDeleteModule(moduleId: string) {
-    const confirmed = window.confirm('Delete this module and all its lessons? This cannot be undone.')
-    if (!confirmed) return
-    setCurriculumBusy(true)
-    setCurriculumError(null)
-    const result = await coursesManageAPI.deleteModule(moduleId)
-    setCurriculumBusy(false)
-    if (!result.success) {
-      setCurriculumError(result.error)
-      return
-    }
-    setModules((prev) => prev.filter((m) => m.id !== moduleId))
-  }
+  const confirmed = await confirm({
+    title: `Delete "${mod?.title || 'this module'}"?`,
+    message: `This can't be undone.${lessonWarning}`,
+    confirmLabel: 'Delete module',
+    destructive: true,
+  })
+  if (!confirmed) return
 
+  setCurriculumBusy(true)
+  setCurriculumError(null)
+  const result = await coursesManageAPI.deleteModule(moduleId)
+  setCurriculumBusy(false)
+  if (!result.success) {
+    setCurriculumError(result.error)
+    return
+  }
+  setModules((prev) => prev.filter((m) => m.id !== moduleId))
+}
   async function handleAddLesson(moduleId: string) {
     setCurriculumBusy(true)
     setCurriculumError(null)
@@ -454,6 +461,15 @@ export default function TrainerCourseManagePage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        destructive={confirmState.destructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </TrainerShell>
   )
 }

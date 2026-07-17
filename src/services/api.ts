@@ -579,9 +579,6 @@ export interface LessonDetailResponse {
   duration_display: string
   status: LessonStatus
   notes?: string | null
-  // NOTE: backend currently returns `downloadable_resources` in some
-  // responses while the frontend expects `resources`. Make both fields
-  // optional here to reflect reality until the API is stabilized.
   resources?: LessonResource[]
   downloadable_resources?: LessonResource[]
   assignments?: LessonAssignmentSummary[]
@@ -608,14 +605,6 @@ export interface SavePositionResponse {
   position_seconds: number
   updated_at: string
 }
-
-// ─── Course "learn" view types ─────────────────────────────────────────────────
-// GET /v1/courses/{course_slug}/learn/
-// This is the ONLY place assignments show up before you have a specific
-// assignment_id — they're returned per-module (sibling to that module's
-// `lessons` array), NOT nested inside individual lesson-detail responses.
-// Lesson content itself (video/resources) still comes from the lesson-detail
-// endpoint; this view is metadata + the module → assignment mapping.
 
 export interface LearnCourseHeader {
   id: string
@@ -648,10 +637,6 @@ export interface LearnModuleLessonSummary {
   is_preview: boolean
 }
 
-// The assignment summary as it appears nested under a module in the
-// learn-view response. Use `assignmentsAPI.getAssignment(id)` to fetch the
-// full detail (instructions, requirements, resources, submissions) once you
-// have the id from here.
 export interface LearnModuleAssignmentSummary {
   id: string
   title: string
@@ -716,10 +701,6 @@ export const coursesAPI = {
     }
   },
 
-  // GET /v1/courses/{course_slug}/learn/
-  // Course header + progress + ordered module → lesson tree, with each
-  // module's assignments array. This is where assignment metadata actually
-  // lives — see CourseLearnViewResponse above for why it's not on the lesson.
   getCourseLearnView: async (courseSlug: string) => {
     try {
       const response = await apiClient.get<CourseLearnViewResponse>(
@@ -814,7 +795,42 @@ export const coursesAPI = {
     }
   },
 }
+export type TrainerSessionStatus = 'upcoming' | 'live' | 'ended' | 'cancelled'
 
+export interface TrainerSession {
+  id: string
+  course_id: string
+  course_slug: string
+  course_title: string
+  title: string
+  topic: string
+  starts_at: string
+  ends_at: string
+  duration_minutes: number
+  status: TrainerSessionStatus
+  join_url: string | null
+}
+
+export const trainerSessionsAPI = {
+  /** GET /v1/trainer/sessions/?status=upcoming|live|past — past includes ended + cancelled */
+  getSessions: async (status: 'upcoming' | 'live' | 'past' = 'upcoming', page?: number) => {
+    try {
+      const query = new URLSearchParams()
+      query.set('status', status)
+      if (page) query.set('page', String(page))
+      const response = await apiClient.get<{
+        count: number
+        next: string | null
+        previous: string | null
+        results: TrainerSession[]
+      }>(`/v1/trainer/sessions/?${query.toString()}`)
+      return { success: true as const, data: response.data.results, count: response.data.count }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load sessions')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
 // ─── Live Session Types ────────────────────────────────────────────────────
  
 export type LiveBookingStatus = 'requested' | 'confirmed' | 'rejected' | 'cancelled'
@@ -1068,18 +1084,23 @@ export interface CourseDraft {
 export interface CourseModule {
   id: string
   title: string
+  description?: string | null
   order: number
 }
- 
+
 export interface CourseLesson {
   id: string
   module_id: string
   title: string
+  body?: string | null
+  duration_seconds?: number
+  is_preview?: boolean
   order: number
   video_key?: string | null
   video_url?: string | null
   resource_keys?: string[]
 }
+
  
 export interface CourseCurriculumModule extends CourseModule {
   lessons: CourseLesson[]
@@ -1217,12 +1238,10 @@ getCurriculum: async (courseId: string) => {
     }
   },
  
-  /** PATCH /v1/courses/manage/modules/{module_id}/ */
-  updateModule: async (moduleId: string, title: string) => {
+ /** PATCH /v1/courses/manage/modules/{module_id}/ */
+  updateModule: async (moduleId: string, payload: Partial<Pick<CourseModule, 'title' | 'description'>>) => {
     try {
-      const response = await apiClient.patch<CourseModule>(API_ENDPOINTS.COURSES_MANAGE_MODULE_DETAIL(moduleId), {
-        title,
-      })
+      const response = await apiClient.patch<CourseModule>(API_ENDPOINTS.COURSES_MANAGE_MODULE_DETAIL(moduleId), payload)
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to update module')
@@ -1292,9 +1311,11 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
-
-  /** PATCH /v1/courses/manage/lessons/{lesson_id}/ */
-  updateLesson: async (lessonId: string, payload: Partial<Pick<CourseLesson, 'title'>>) => {
+/** PATCH /v1/courses/manage/lessons/{lesson_id}/ */
+  updateLesson: async (
+    lessonId: string,
+    payload: Partial<Pick<CourseLesson, 'title' | 'body' | 'duration_seconds' | 'is_preview' | 'video_url'>>,
+  ) => {
     try {
       const response = await apiClient.patch<CourseLesson>(
         API_ENDPOINTS.COURSES_MANAGE_LESSON_DETAIL(lessonId),
@@ -1318,11 +1339,7 @@ getCurriculum: async (courseId: string) => {
     }
   },
  
-  /**
-   * Uploads a single file (cover image / lesson video / lesson resource)
-   * via presign → PUT to storage → confirm, same 3-step pattern as
-   * assignmentsAPI.submitAssignment already in this file.
-   */
+ 
   uploadFile: async (
     file: File,
     context: UploadContext,
@@ -1369,6 +1386,23 @@ getCurriculum: async (courseId: string) => {
         return { success: false as const, error: error.message }
       }
       const { message, statusCode } = parseApiError(error, 'Upload failed')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+export interface TrainerDashboardSummary {
+  active_learners: number
+  courses_published: number
+}
+
+export const trainerDashboardAPI = {
+  /** GET /v1/trainer/dashboard/summary/ */
+  getSummary: async () => {
+    try {
+      const response = await apiClient.get<TrainerDashboardSummary>('/v1/trainer/dashboard/summary/')
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load dashboard summary')
       return { success: false as const, error: message, statusCode }
     }
   },
@@ -1420,6 +1454,9 @@ export interface TrainerCompletedReview {
   score: number | null
   grade_status: string | null
   graded_at: string
+}
+export interface RequestRevisionPayload {
+  reason?: string
 }
 
 export interface GradeWritePayload {
@@ -1477,6 +1514,19 @@ export const trainerReviewsAPI = {
     }
   },
 
+/** POST /v1/assignments/submissions/{submission_id}/request-revision/ */
+  requestRevision: async (submissionId: string, payload: RequestRevisionPayload) => {
+    try {
+      const response = await apiClient.post<TrainerCompletedReview>(
+        `/v1/assignments/submissions/${submissionId}/request-revision/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to request revision')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
   /** POST /v1/assignments/submissions/{submission_id}/grade/ */
   gradeSubmission: async (submissionId: string, payload: GradeWritePayload) => {
     try {

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Star, Radio, Settings,
@@ -8,24 +7,12 @@ import {
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
+import { trainerReviewsAPI } from '../services/api'
 import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationPanel'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
+import { useState, useEffect } from 'react'
 
-// TODO: hardcoded pending-reviews count for the sidebar badge. Wire this up
-// to real data (e.g. the same source as the "Pending reviews" stat card)
-// once there's a shared trainer-stats hook/context.
-const PENDING_REVIEWS_COUNT = 4
 
-export const NAV_ITEMS = [
-  { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
-  { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
-  { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,  Icon: Star,   badge: PENDING_REVIEWS_COUNT },
-  { key: 'live', label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
-  { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
-]
-
-// Sub-items shown when the Settings row is expanded. `route` is used for
-// navigation; `danger` is a red destructive-style row (Log out).
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,   route: ROUTES.PROFILE },
   { key: 'trainerProfile', label: 'Trainer Profile', Icon: Award,      route: ROUTES.TRAINER_PROFILE },
@@ -140,16 +127,37 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   const location = useLocation()
   const { user, logout } = useAuth()
 
-  const [collapsed,         setCollapsed]         = useState(false)
-  const [profileOpen,       setProfileOpen]       = useState(false)
-  const [notifOpen,         setNotifOpen]         = useState(false)
-  const [settingsOpen,      setSettingsOpen]      = useState(false)
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [collapsed,           setCollapsed]           = useState(false)
+  const [profileOpen,         setProfileOpen]         = useState(false)
+  const [notifOpen,           setNotifOpen]           = useState(false)
+  const [settingsOpen,        setSettingsOpen]        = useState(false)
+  const [logoutConfirmOpen,   setLogoutConfirmOpen]   = useState(false)
+  const [pendingReviewsCount, setPendingReviewsCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadPendingCount() {
+      const result = await trainerReviewsAPI.getSummary()
+      if (!cancelled && result.success) {
+        setPendingReviewsCount(result.data.pending_count)
+      }
+    }
+    loadPendingCount()
+    return () => { cancelled = true }
+  }, [])
+
+  const navItems = [
+    { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
+    { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
+    { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star,   badge: pendingReviewsCount || undefined },
+    { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
+    { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
+  ]
 
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
-  const activeRoute = NAV_ITEMS.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
+  const activeRoute = navItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
 
   function handleNav(key: string, route: string) {
     if (key === 'settings') {
@@ -284,38 +292,38 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
               </button>
             </div>
             <nav className="sidebar-nav">
-              {NAV_ITEMS.map(({ key, label, route, Icon, badge }) => {
-                const active = activeRoute === route
-                return (
-                  <div key={key}>
-                    <div
-                      className={`nav-item${active ? ' active' : ''}`}
-                      onClick={() => handleNav(key, route)}
-                    >
-                      <Icon size={18} />
-                      <span className="nav-label">{label}</span>
-                      {!!badge && <span className="nav-badge">{badge}</span>}
-                      {key === 'settings' && (
-                        <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
-                      )}
-                    </div>
-                    {key === 'settings' && settingsOpen && (
-                      <div className="nav-subitems">
-                        {SETTINGS_SUBITEMS.map((sub) => (
-                          <button
-                            key={sub.key}
-                            className={`nav-subitem${sub.danger ? ' danger' : ''}`}
-                            onClick={() => handleSubitemClick(sub)}
-                          >
-                            <sub.Icon size={15} />
-                            {sub.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+             {navItems.map(({ key, label, route, Icon, badge }) => {
+  const active = activeRoute === route
+  return (
+    <div key={key}>
+      <div
+        className={`nav-item${active ? ' active' : ''}`}
+        onClick={() => handleNav(key, route)}
+      >
+        <Icon size={18} />
+        <span className="nav-label">{label}</span>
+        {!!badge && <span className="nav-badge">{badge}</span>}
+        {key === 'settings' && (
+          <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
+        )}
+      </div>
+      {key === 'settings' && settingsOpen && (
+        <div className="nav-subitems">
+          {SETTINGS_SUBITEMS.map((sub) => (
+            <button
+              key={sub.key}
+              className={`nav-subitem${sub.danger ? ' danger' : ''}`}
+              onClick={() => handleSubitemClick(sub)}
+            >
+              <sub.Icon size={15} />
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})}
             </nav>
             <div className="sidebar-user">
               <div className="user-avatar">{initials}</div>
@@ -335,7 +343,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
         {/* ── Mobile tab bar ── */}
         <div className="mobile-tabbar">
           <div className="mobile-tabbar-inner">
-            {NAV_ITEMS.map(({ key, label, route, Icon, badge }) => (
+          {navItems.map(({ key, label, route, Icon, badge }) => (
               <button
                 key={key}
                 className={`tab-item${activeRoute === route ? ' active' : ''}`}

@@ -5,6 +5,8 @@ import TrainerShell from '../../../layouts/TrainerShell'
 import { Plus } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesManageAPI, type TrainerCourseListItem } from '../../../services/api'
+import ConfirmDialog from '../../../components/ConfirmDialog'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 const PAGE_CSS = `
   .courses-page { padding: 1rem; background: #F5F5F5; }
@@ -39,6 +41,9 @@ const PAGE_CSS = `
   .course-action-btn.publish { color: #16A34A; border-color: #BBF7D0; }
   .course-delete-note { margin-top: 0.35rem; color: #9CA3AF; font-size: 0.72rem; font-style: italic; }
 
+  .course-action-errors { margin: 0.35rem 0 0; padding-left: 1.1rem; color: #EF4444; font-size: 0.78rem; }
+  .course-action-errors li { margin: 0.1rem 0; }
+
   .add-course-card { border: 2px dashed #93C5FD; background: #EFF6FF; border-radius: 1rem; min-height: 260px; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
   .add-course-btn { appearance: none; border: none; border-radius: 999px; padding: 0.9rem 1.25rem; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; white-space: nowrap; }
 
@@ -52,6 +57,28 @@ const PAGE_CSS = `
     .courses-grid { grid-template-columns: repeat(auto-fill, 340px); }
   }
 `
+
+// The backend can fail a publish/unpublish action in two shapes:
+//  1. A plain string error message
+//  2. A validation payload: { errors: [{ field, step, message }, ...] }
+// This type + helper normalizes both into something safe to store/render.
+type ApiFieldError = { field?: string; step?: number; message: string }
+type ApiValidationError = { errors?: ApiFieldError[] }
+
+function extractFieldErrors(error: unknown): ApiFieldError[] | null {
+  if (error && typeof error === 'object') {
+    const validation = error as ApiValidationError
+    if (Array.isArray(validation.errors) && validation.errors.length > 0) {
+      return validation.errors
+    }
+  }
+  return null
+}
+
+function formatApiErrorFallback(error: unknown): string {
+  if (typeof error === 'string' && error.trim() !== '') return error
+  return 'Something went wrong. Please try again.'
+}
 
 function formatUpdatedAgo(iso: string): string {
   const date = new Date(iso)
@@ -70,8 +97,11 @@ export default function TrainerCoursesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionErrorId, setActionErrorId] = useState<string | null>(null)
+  const [actionFieldErrors, setActionFieldErrors] = useState<ApiFieldError[] | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [pendingActionId, setPendingActionId] = useState<string | null>(null)
+
+  const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm()
 
   useEffect(() => {
     load()
@@ -84,38 +114,68 @@ export default function TrainerCoursesPage() {
     if (result.success) {
       setCourses(result.data)
     } else {
-      setError(result.error)
+      setError(formatApiErrorFallback(result.error))
     }
     setLoading(false)
   }
 
   function handlePreview(courseId: string) {
-  navigate(RouteBuilder.trainerCourseManage(courseId))
-}
+    navigate(RouteBuilder.trainerCourseManage(courseId))
+  }
 
-  async function handleUnpublish(courseId: string) {
-    setPendingActionId(courseId)
+  function applyActionError(courseId: string, rawError: unknown) {
+    setActionErrorId(courseId)
+    const fieldErrors = extractFieldErrors(rawError)
+    if (fieldErrors) {
+      setActionFieldErrors(fieldErrors)
+      setActionError(null)
+    } else {
+      setActionFieldErrors(null)
+      setActionError(formatApiErrorFallback(rawError))
+    }
+  }
+
+  function clearActionError() {
     setActionErrorId(null)
+    setActionFieldErrors(null)
     setActionError(null)
+  }
+
+  async function handleUnpublish(courseId: string, courseTitle: string) {
+    const confirmed = await confirm({
+      title: `Unpublish "${courseTitle}"?`,
+      message: 'Learners will lose access to this course until you publish it again.',
+      confirmLabel: 'Unpublish',
+      destructive: true,
+    })
+    if (!confirmed) return
+
+    setPendingActionId(courseId)
+    clearActionError()
     const result = await coursesManageAPI.unpublishDraft(courseId)
     setPendingActionId(null)
     if (!result.success) {
-      setActionErrorId(courseId)
-      setActionError(result.error)
+      applyActionError(courseId, result.error)
       return
     }
     setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'draft' } : c)))
   }
 
-  async function handlePublish(courseId: string) {
+  async function handlePublish(courseId: string, courseTitle: string) {
+    const confirmed = await confirm({
+      title: `Publish "${courseTitle}"?`,
+      message: 'This makes the course visible and enrollable for learners right away.',
+      confirmLabel: 'Publish',
+      destructive: false,
+    })
+    if (!confirmed) return
+
     setPendingActionId(courseId)
-    setActionErrorId(null)
-    setActionError(null)
+    clearActionError()
     const result = await coursesManageAPI.publishDraft(courseId)
     setPendingActionId(null)
     if (!result.success) {
-      setActionErrorId(courseId)
-      setActionError(result.error)
+      applyActionError(courseId, result.error)
       return
     }
     setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'published' } : c)))
@@ -153,19 +213,19 @@ export default function TrainerCoursesPage() {
                   </p>
                   <p className="course-card-date">{formatUpdatedAgo(course.updated_at)}</p>
                   <button
-  type="button"
-  className="course-card-preview"
-  onClick={() => handlePreview(course.id)}
->
-  Preview
-</button>
+                    type="button"
+                    className="course-card-preview"
+                    onClick={() => handlePreview(course.id)}
+                  >
+                    Preview
+                  </button>
 
                   <div className="course-card-actions-row">
                     {course.status === 'published' ? (
                       <button
                         type="button"
                         className="course-action-btn unpublish"
-                        onClick={() => handleUnpublish(course.id)}
+                        onClick={() => handleUnpublish(course.id, course.title)}
                         disabled={pendingActionId === course.id}
                       >
                         {pendingActionId === course.id ? 'Unpublishing…' : 'Unpublish'}
@@ -174,16 +234,25 @@ export default function TrainerCoursesPage() {
                       <button
                         type="button"
                         className="course-action-btn publish"
-                        onClick={() => handlePublish(course.id)}
+                        onClick={() => handlePublish(course.id, course.title)}
                         disabled={pendingActionId === course.id}
                       >
                         {pendingActionId === course.id ? 'Publishing…' : 'Publish'}
                       </button>
                     ) : null}
                   </div>
+
+                  {actionErrorId === course.id && actionFieldErrors && (
+                    <ul className="course-action-errors">
+                      {actionFieldErrors.map((e, i) => (
+                        <li key={i}>{e.message}</li>
+                      ))}
+                    </ul>
+                  )}
                   {actionErrorId === course.id && actionError && (
                     <p style={{ color: '#EF4444', fontSize: '0.78rem', margin: '0.35rem 0 0' }}>{actionError}</p>
                   )}
+
                   <p className="course-delete-note">Deleting courses isn't supported yet — ask an admin if this needs to be removed permanently.</p>
                 </div>
               </div>
@@ -202,6 +271,15 @@ export default function TrainerCoursesPage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        destructive={confirmState.destructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </TrainerShell>
   )
 }
