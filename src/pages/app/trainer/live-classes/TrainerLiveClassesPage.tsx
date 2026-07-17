@@ -17,37 +17,43 @@ import {
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { useAuth } from '../../../../hooks/useAuth'
-import { liveSessionsAPI } from '../../../../services/api'
-import type { LiveManageBooking, LiveSession } from '../../../../services/api'
+import { liveSessionsAPI, trainerSessionsAPI } from '../../../../services/api'
+import type { LiveManageBooking, TrainerSession } from '../../../../services/api'
 
+// The confirmed TrainerSession shape (from GET /v1/trainer/sessions/) doesn't
+// include recording or Google Meet fields — those aren't backed by the API
+// yet (recording views live on Google Drive, meeting links depend on the
+// Meet integration status). Keep them optional here so the UI can render
+// gracefully once/if the backend adds them, without pretending they exist now.
+type SessionWithExtras = TrainerSession & {
+  recording_url?: string | null
+  recording_views?: number
+  meeting_link?: string | null
+}
 
 type SessionCard = {
-  session: LiveSession
+  session: SessionWithExtras
   confirmedCount: number
   bookingsCount: number
 }
 
-function groupBySession(bookings: LiveManageBooking[]): SessionCard[] {
-  const map = new Map<string, SessionCard>()
+function buildBookingCounts(bookings: LiveManageBooking[]): Map<string, { confirmed: number; total: number }> {
+  const map = new Map<string, { confirmed: number; total: number }>()
   for (const b of bookings) {
     if (!b.session) continue
     const existing = map.get(b.session.id)
     if (existing) {
-      existing.bookingsCount += 1
-      if (b.status === 'confirmed') existing.confirmedCount += 1
+      existing.total += 1
+      if (b.status === 'confirmed') existing.confirmed += 1
     } else {
-      map.set(b.session.id, {
-        session: b.session,
-        bookingsCount: 1,
-        confirmedCount: b.status === 'confirmed' ? 1 : 0,
-      })
+      map.set(b.session.id, { total: 1, confirmed: b.status === 'confirmed' ? 1 : 0 })
     }
   }
-  return Array.from(map.values())
+  return map
 }
 
-function sessionDateTime(session: LiveSession): Date {
-  return new Date(`${session.date}T${session.start_time}`)
+function sessionDateTime(session: TrainerSession): Date {
+  return new Date(session.starts_at)
 }
 
 function formatDateLabel(date: Date): string {
@@ -138,11 +144,14 @@ const PAGE_CSS = `
 export default function TrainerLiveClassesPage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
+
+  const [upcomingSessions, setUpcomingSessions] = useState<TrainerSession[]>([])
+  const [pastSessions, setPastSessions] = useState<TrainerSession[]>([])
   const [bookings, setBookings] = useState<LiveManageBooking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [goLiveTarget, setGoLiveTarget] = useState<LiveSession | null>(null)
+  const [goLiveTarget, setGoLiveTarget] = useState<SessionWithExtras | null>(null)
   const [showSchedule, setShowSchedule] = useState(false)
   // TODO: swap for a real course dropdown once a "my courses" list endpoint is wired in
   const [courseSlug, setCourseSlug] = useState('')
@@ -150,95 +159,133 @@ export default function TrainerLiveClassesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const loadBookings = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await liveSessionsAPI.getManageBookings()
-    if (result.success) {
-      setBookings(result.data)
+
+    const [upcomingRes, pastRes, bookingsRes] = await Promise.all([
+      trainerSessionsAPI.getSessions('upcoming'),
+      trainerSessionsAPI.getSessions('past'),
+      liveSessionsAPI.getManageBookings(),
+    ])
+
+    if (upcomingRes.success) {
+      setUpcomingSessions(upcomingRes.data)
     } else {
-      setError(result.error || 'Failed to load live sessions.')
+      setError(upcomingRes.error || 'Failed to load upcoming sessions.')
     }
+
+    if (pastRes.success) {
+      setPastSessions(pastRes.data)
+    } else if (!error) {
+      setError(pastRes.error || 'Failed to load past sessions.')
+    }
+
+    if (bookingsRes.success) {
+      setBookings(bookingsRes.data)
+    }
+    // Bookings failing isn't fatal to the page — it only degrades the
+    // per-card confirmed count and stats, so don't overwrite a more useful
+    // session-load error with it.
+
     setLoading(false)
-  }, [])
+  }, [error])
 
   useEffect(() => {
-    loadBookings()
-  }, [loadBookings])
+    loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const now = useMemo(() => new Date(), [])
-  const allSessions = useMemo(() => groupBySession(bookings), [bookings])
+  const bookingCounts = useMemo(() => buildBookingCounts(bookings), [bookings])
 
-  const upcoming = useMemo(
+  const upcoming: SessionCard[] = useMemo(
     () =>
-      allSessions
-        .filter((s) => s.session.status !== 'cancelled' && sessionDateTime(s.session) >= now)
-        .sort((a, b) => sessionDateTime(a.session).getTime() - sessionDateTime(b.session).getTime()),
-    [allSessions, now],
+      upcomingSessions
+        .filter((s) => s.status !== 'cancelled')
+        .sort((a, b) => sessionDateTime(a).getTime() - sessionDateTime(b).getTime())
+        .map((session) => {
+          const counts = bookingCounts.get(session.id)
+          return {
+            session: session as SessionWithExtras,
+            confirmedCount: counts?.confirmed ?? 0,
+            bookingsCount: counts?.total ?? 0,
+          }
+        }),
+    [upcomingSessions, bookingCounts],
   )
 
-  const past = useMemo(
+  const past: SessionCard[] = useMemo(
     () =>
-      allSessions
-        .filter((s) => sessionDateTime(s.session) < now)
-        .sort((a, b) => sessionDateTime(b.session).getTime() - sessionDateTime(a.session).getTime()),
-    [allSessions, now],
+      pastSessions
+        .sort((a, b) => sessionDateTime(b).getTime() - sessionDateTime(a).getTime())
+        .map((session) => {
+          const counts = bookingCounts.get(session.id)
+          return {
+            session: session as SessionWithExtras,
+            confirmedCount: counts?.confirmed ?? 0,
+            bookingsCount: counts?.total ?? 0,
+          }
+        }),
+    [pastSessions, bookingCounts],
   )
 
   const stats = useMemo(() => {
     const confirmed = bookings.filter((b) => b.status === 'confirmed')
     const uniqueLearners = new Set(confirmed.map((b) => b.learner.id))
-    const uniqueSessions = new Set(bookings.map((b) => b.session?.id).filter(Boolean))
-    const avgAttendance = uniqueSessions.size ? Math.round(confirmed.length / uniqueSessions.size) : 0
+    const totalSessions = upcomingSessions.length + pastSessions.length
+    const uniqueBookedSessions = new Set(bookings.map((b) => b.session?.id).filter(Boolean))
+    const avgAttendance = uniqueBookedSessions.size
+      ? Math.round(confirmed.length / uniqueBookedSessions.size)
+      : 0
     return {
-      totalSessions: uniqueSessions.size,
+      totalSessions,
       studentsReached: uniqueLearners.size,
       avgAttendance,
     }
-  }, [bookings])
+  }, [bookings, upcomingSessions, pastSessions])
 
   async function handleCreateSlot() {
-  if (!courseSlug || !form.date || !form.startTime) {
-    setSubmitError('Course, date and start time are required.')
-    return
-  }
-  setSubmitting(true)
-  setSubmitError(null)
+    if (!courseSlug || !form.date || !form.startTime) {
+      setSubmitError('Course, date and start time are required.')
+      return
+    }
+    setSubmitting(true)
+    setSubmitError(null)
 
-  const start = new Date(`${form.date}T${form.startTime}`)
-  const end = new Date(start.getTime() + form.duration * 60000)
+    const start = new Date(`${form.date}T${form.startTime}`)
+    const end = new Date(start.getTime() + form.duration * 60000)
 
-  const slotResult = await liveSessionsAPI.createManageCourseSlot(courseSlug, {
-    starts_at: start.toISOString(),
-    ends_at: end.toISOString(),
-  })
-  if (!slotResult.success) {
-    setSubmitError(slotResult.error || 'Failed to schedule session.')
-    setSubmitting(false)
-    return
-  }
-
-  if (form.title.trim()) {
-    // Confirmed via Swagger: publishSession expects starts_at/ends_at as
-    // full ISO 8601 UTC datetimes, same shape as the slots endpoint —
-    // not date/start_time/end_time. topic and join_url are optional.
-    const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
-      title: form.title.trim(),
+    const slotResult = await liveSessionsAPI.createManageCourseSlot(courseSlug, {
       starts_at: start.toISOString(),
       ends_at: end.toISOString(),
     })
-    if (!sessionResult.success) {
-      setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
+    if (!slotResult.success) {
+      setSubmitError(slotResult.error || 'Failed to schedule session.')
       setSubmitting(false)
       return
     }
+
+    if (form.title.trim()) {
+      // Confirmed via Swagger: publishSession expects starts_at/ends_at as
+      // full ISO 8601 UTC datetimes, same shape as the slots endpoint.
+      const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
+        title: form.title.trim(),
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+      })
+      if (!sessionResult.success) {
+        setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
+        setSubmitting(false)
+        return
+      }
+    }
+
+    setShowSchedule(false)
+    setForm({ date: '', startTime: '', duration: 60, title: '' })
+    setSubmitting(false)
+    await loadAll()
   }
 
-  setShowSchedule(false)
-  setForm({ date: '', startTime: '', duration: 60, title: '' })
-  setSubmitting(false)
-  await loadBookings()
-}
   if (!user) return null
 
   const list = activeTab === 'upcoming' ? upcoming : past
@@ -337,7 +384,7 @@ export default function TrainerLiveClassesPage() {
                   )}
                   <div className="lc-card-body">
                     <p className="lc-card-title">{session.title}</p>
-                    <p className="lc-card-sub">{session.course?.title ?? '—'}</p>
+                    <p className="lc-card-sub">{session.course_title}</p>
                     <div className="lc-card-meta">
                       <span>
                         <Calendar size={13} /> {formatDateLabel(start)}
@@ -348,6 +395,8 @@ export default function TrainerLiveClassesPage() {
                       </span>
                       {activeTab === 'past' && (
                         <span>
+                          {/* TODO: recording_views has no backend source yet (recordings live on
+                              Google Drive, view counts aren't tracked) — shows 0 until that's wired up. */}
                           <Eye size={13} /> {session.recording_views ?? 0} views
                         </span>
                       )}
@@ -397,11 +446,11 @@ export default function TrainerLiveClassesPage() {
             <p className="lc-meet-copy">This process will direct you to Google Meet where you can begin the live class session.</p>
             <a
               className="lc-meet-btn"
-              href={goLiveTarget.meeting_link || '#'}
+              href={goLiveTarget.join_url || goLiveTarget.meeting_link || '#'}
               target="_blank"
               rel="noreferrer"
               onClick={(e) => {
-                if (!goLiveTarget.meeting_link) e.preventDefault()
+                if (!goLiveTarget.join_url && !goLiveTarget.meeting_link) e.preventDefault()
                 setGoLiveTarget(null)
               }}
             >
