@@ -1109,11 +1109,10 @@ export interface CourseCurriculumModule extends CourseModule {
 export interface CourseCurriculumResponse {
   modules: CourseCurriculumModule[]
 }
- 
-export type UploadContext = 'course_cover' | 'lesson_video' | 'lesson_resource'
+export type UploadTarget = 'course_cover' | 'lesson_video' | 'lesson_resource'
  
 export interface PresignUploadPayload {
-  context: UploadContext
+  target: UploadTarget
   course_id?: string
   lesson_id?: string
   filename: string
@@ -1128,9 +1127,8 @@ export interface PresignUploadResponse {
   object_key: string
   expires_in: number
 }
- 
 export interface ConfirmUploadPayload {
-  context: UploadContext
+  target: UploadTarget
   course_id?: string
   lesson_id?: string
   object_key: string
@@ -1339,10 +1337,9 @@ getCurriculum: async (courseId: string) => {
     }
   },
  
- 
-  uploadFile: async (
+ uploadFile: async (
     file: File,
-    context: UploadContext,
+    target: UploadTarget,
     ids: { course_id?: string; lesson_id?: string },
   ): Promise<
     | { success: true; data: ConfirmUploadResponse }
@@ -1350,15 +1347,15 @@ getCurriculum: async (courseId: string) => {
   > => {
     try {
       const presignRes = await apiClient.post<PresignUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_PRESIGN, {
-        context,
+        target,
         ...ids,
         filename: file.name,
         content_type: file.type || 'application/octet-stream',
         file_size: file.size,
       } as PresignUploadPayload)
- 
+
       const { upload_url, method, headers, object_key } = presignRes.data
- 
+
       const uploadRes = await fetch(upload_url, {
         method: method || 'PUT',
         body: file,
@@ -1370,16 +1367,16 @@ getCurriculum: async (courseId: string) => {
       if (!uploadRes.ok) {
         throw new Error(`Upload failed for "${file.name}" (HTTP ${uploadRes.status})`)
       }
- 
+
       const confirmRes = await apiClient.post<ConfirmUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_CONFIRM, {
-        context,
+        target,
         ...ids,
         object_key,
         file_name: file.name,
         file_size: file.size,
         content_type: file.type || 'application/octet-stream',
       } as ConfirmUploadPayload)
- 
+
       return { success: true as const, data: confirmRes.data }
     } catch (error) {
       if (error instanceof Error && !(error as { response?: unknown }).response) {
@@ -1389,6 +1386,7 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
+
 }
 export interface TrainerDashboardSummary {
   active_learners: number
