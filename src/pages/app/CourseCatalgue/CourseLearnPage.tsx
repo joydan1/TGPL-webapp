@@ -180,6 +180,8 @@ const PAGE_CSS = `
   .tab-btn .tab-lock-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #D1D5DB; margin-left: 0.375rem; }
   .tab-panel { display: flex; flex-direction: column; gap: 1rem; }
 
+  .overview-text { font-size: 0.9375rem; color: #374151; line-height: 1.7; white-space: pre-wrap; }
+
   .notes-textarea { width: 100%; min-height: 180px; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; font-size: 0.9375rem; color: #111; font-family: inherit; resize: vertical; outline: none; transition: border-color 0.15s; background: #fff; }
   .notes-textarea:focus { border-color: #2563EB; }
   .notes-textarea::placeholder { color: #9CA3AF; }
@@ -351,7 +353,10 @@ export default function CourseLearnPage() {
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
   // ── Notes / tabs ──
-  const [activeTab, setActiveTab]             = useState<'notes' | 'resources' | 'discussion'>('notes')
+  // 'overview' shows the lesson description the trainer adds when creating
+  // the lesson (saved server-side as the lesson's `body`). It's the default
+  // active tab since it's the first thing a learner should see.
+  const [activeTab, setActiveTab]             = useState<'overview' | 'notes' | 'resources' | 'discussion'>('overview')
   const [notes, setNotes]                     = useState('')
   const [savingNotes, setSavingNotes]         = useState(false)
   const [justSaved, setJustSaved]             = useState(false)
@@ -385,10 +390,16 @@ export default function CourseLearnPage() {
         // Backend currently returns `downloadable_resources` in some cases
         // while frontend expects `resources`. Normalize here so the UI
         // reliably reads `lesson.resources`.
+        // Also normalize the lesson's description/overview text: the trainer
+        // wizard saves it as `body` (see coursesManageAPI.updateLesson), but
+        // some lesson-detail responses may surface it as `description`
+        // instead — check both so the learner-side Overview tab always
+        // has content when the trainer has set one.
         const normalized = {
           ...res.data,
           resources: (res.data as any).resources ?? (res.data as any).downloadable_resources ?? [],
           notes: (res.data as any).notes ?? (res.data as any).note ?? null,
+          description: (res.data as any).description ?? (res.data as any).body ?? null,
         }
         setLesson(normalized as LessonDetailResponse)
         const serverNotes = (normalized as any).notes ?? ''
@@ -468,7 +479,7 @@ export default function CourseLearnPage() {
     setCurrentTime(0)
     setDuration(0)
     setBuffering(false)
-    setActiveTab('notes')
+    setActiveTab('overview')
     setSelectedResources(new Set())
     setAskHelpOpen(false)
     setCompleteInfo(null)
@@ -725,6 +736,7 @@ async function downloadResource(r: LessonResource) {
   const prevLesson = lesson?.previous_lesson ?? null
   const nextLesson = lesson?.next_lesson ?? null
   const isDownloadingResource = downloadingResourceIds.size > 0
+  const lessonDescription = (lesson as any)?.description ?? null
 
   return (
     <>
@@ -920,6 +932,7 @@ async function downloadResource(r: LessonResource) {
               {/* ── Tabs ── */}
               <div>
                 <div className="tabs-row">
+                  <button className={`tab-btn${activeTab === 'overview'  ? ' active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
                   <button className={`tab-btn${activeTab === 'notes'     ? ' active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
                   <button className={`tab-btn${activeTab === 'resources' ? ' active' : ''}`} onClick={() => setActiveTab('resources')}>Resources</button>
                   <button className="tab-btn" disabled>
@@ -928,6 +941,16 @@ async function downloadResource(r: LessonResource) {
                 </div>
 
                 <div style={{ paddingTop: '1.25rem' }}>
+                  {activeTab === 'overview' && (
+                    <div className="tab-panel">
+                      {lessonDescription && lessonDescription.trim() ? (
+                        <p className="overview-text">{lessonDescription}</p>
+                      ) : (
+                        <div className="resources-empty">No description added for this lesson yet.</div>
+                      )}
+                    </div>
+                  )}
+
                   {activeTab === 'notes' && (
                     <div className="tab-panel">
                       <textarea

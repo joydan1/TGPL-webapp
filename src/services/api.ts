@@ -45,7 +45,7 @@ export interface SignupPayload {
   password: string
   firstName: string
   lastName: string
-  role: 'learner' | 'trainer'
+  role: 'learner' | 'trainer' | 'admin'
 }
 
 export interface LoginPayload {
@@ -892,8 +892,10 @@ export interface CreateSlotPayload {
 }
 export interface PublishSessionPayload {
   title: string
+  topic?: string
   starts_at: string
   ends_at: string
+  join_url?: string
 }
 
 export const liveSessionsAPI = {
@@ -1018,6 +1020,31 @@ export const liveSessionsAPI = {
       return { success: true as const }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to cancel session')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/live/manage/sessions/{id}/end/ — flip LIVE → ENDED */
+  endSession: async (sessionId: string) => {
+    try {
+      const response = await apiClient.post<LiveSession>(API_ENDPOINTS.LIVE_MANAGE_SESSION_END(sessionId))
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to end session')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/live/manage/sessions/{id}/go-live/ — flip UPCOMING → LIVE, reveals join_url to learners. 409 if already ended/cancelled. */
+  goLiveSession: async (sessionId: string) => {
+    try {
+      const response = await apiClient.post<LiveSession>(API_ENDPOINTS.LIVE_MANAGE_SESSION_GO_LIVE(sessionId))
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(
+        error,
+        'Failed to go live. The session may have already ended or been cancelled.',
+      )
       return { success: false as const, error: message, statusCode }
     }
   },
@@ -1313,6 +1340,19 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
+
+  getLesson: async (lessonId: string) => {
+    try {
+      const response = await apiClient.get<CourseLesson>(
+        API_ENDPOINTS.COURSES_MANAGE_LESSON_DETAIL(lessonId),
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load lesson')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
 /** PATCH /v1/courses/manage/lessons/{lesson_id}/ */
   updateLesson: async (
     lessonId: string,
@@ -1630,6 +1670,7 @@ export interface AssignmentRequirement {
   max_bytes: number
   required: boolean
   order: number
+  naming_hint?: string
 }
 
 export interface SubmittedFile {
@@ -1765,43 +1806,56 @@ export const assignmentsAPI = {
         const file = files[i]
         const requirementId = requirements[i].id
 
-        // 2a. presign
-        const presignRes = await apiClient.post<PresignResponse>(
-          `/v1/assignments/submissions/${submissionId}/files/presign/`,
-          {
-            requirement_id: requirementId,
-            filename: file.name,
-            content_type: file.type || 'application/octet-stream',
-            file_size: file.size,
-          },
-        )
-        const { upload_url, method, headers, object_key } = presignRes.data
+        try {
+          // 2a. presign
+          const presignRes = await apiClient.post<PresignResponse>(
+            `/v1/assignments/submissions/${submissionId}/files/presign/`,
+            {
+              requirement_id: requirementId,
+              filename: file.name,
+              content_type: file.type || 'application/octet-stream',
+              file_size: file.size,
+            },
+          )
+          const { upload_url, method, headers, object_key } = presignRes.data
 
-        // 2b. upload directly to storage, using the method/headers the backend returned
-        const uploadRes = await fetch(upload_url, {
-          method: method || 'PUT',
-          body: file,
-          headers:
-            headers && Object.keys(headers).length > 0
-              ? headers
-              : { 'Content-Type': file.type || 'application/octet-stream' },
-        })
-        if (!uploadRes.ok) {
-          throw new Error(`Upload failed for "${file.name}" (HTTP ${uploadRes.status})`)
+          // 2b. upload directly to storage, using the method/headers the backend returned
+          const uploadRes = await fetch(upload_url, {
+            method: method || 'PUT',
+            body: file,
+            headers:
+              headers && Object.keys(headers).length > 0
+                ? headers
+                : { 'Content-Type': file.type || 'application/octet-stream' },
+          })
+          if (!uploadRes.ok) {
+            throw new Error(`Upload failed (HTTP ${uploadRes.status})`)
+          }
+
+          // 2c. confirm — validation was tightened here server-side: mismatched
+          // extension/content-type, wrong file type, or over the slot's size
+          // limit now comes back as a 400 naming what failed.
+          await apiClient.post(
+            `/v1/assignments/submissions/${submissionId}/files/confirm/`,
+            {
+              requirement_id: requirementId,
+              object_key,
+              file_name: file.name,
+              file_size: file.size,
+              content_type: file.type || 'application/octet-stream',
+            },
+          )
+        } catch (fileError) {
+          // Surface which file failed and why, rather than a generic
+          // "Submission failed" that leaves the learner guessing.
+          if (fileError instanceof Error && !(fileError as { response?: unknown }).response) {
+            return { success: false as const, error: `"${file.name}": ${fileError.message}` }
+          }
+          const { message, statusCode } = parseApiError(fileError, `"${file.name}" was rejected`)
+          return { success: false as const, error: `"${file.name}": ${message}`, statusCode }
         }
-
-        // 2c. confirm
-        await apiClient.post(
-          `/v1/assignments/submissions/${submissionId}/files/confirm/`,
-          {
-            requirement_id: requirementId,
-            object_key,
-            file_name: file.name,
-            file_size: file.size,
-            content_type: file.type || 'application/octet-stream',
-          },
-        )
       }
+      
 
       // Step 3 — finalise and read back the authoritative file records
       const submitRes = await apiClient.post<SubmissionAttemptResponse>(

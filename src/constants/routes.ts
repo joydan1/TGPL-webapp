@@ -81,24 +81,10 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   // ===========================
   // ADMIN ROUTES (Authenticated admins only)
   // ===========================
+  ADMIN_LOGIN: '/admin/login',
+  ADMIN_SIGNUP: '/admin/signup',
   ADMIN_DASHBOARD: '/admin/dashboard',
-  ADMIN_USERS: '/admin/users',
-  ADMIN_USERS_CREATE: '/admin/users/create',
-  ADMIN_USER_DETAIL: '/admin/users/:id',
-  ADMIN_USER_EDIT: '/admin/users/:id/edit',
-  ADMIN_COURSES: '/admin/courses',
-  ADMIN_COURSE_CREATE: '/admin/courses/create',
-  ADMIN_COURSE_DETAIL: '/admin/courses/:id',
-  ADMIN_COURSE_EDIT: '/admin/courses/:id/edit',
-  ADMIN_TRAINERS: '/admin/trainers',
-  ADMIN_TRAINER_DETAIL: '/admin/trainers/:id',
-  ADMIN_LEARNERS: '/admin/learners',
-  ADMIN_LEARNER_DETAIL: '/admin/learners/:id',
-  ADMIN_ANALYTICS: '/admin/analytics',
-  ADMIN_PAYMENTS: '/admin/payments',
-  ADMIN_PAYMENT_DETAIL: '/admin/payments/:id',
-  ADMIN_SETTINGS: '/admin/settings',
-  ADMIN_SYSTEM_HEALTH: '/admin/system-health',
+ ADMIN_RESET_PASSWORD: '/admin/reset-password',
 
   // ===========================
   // ERROR PAGES
@@ -141,8 +127,7 @@ export const ROUTE_GROUPS = {
   ],
   ADMIN: [
     ROUTES.ADMIN_DASHBOARD,
-    ROUTES.ADMIN_USERS,
-    ROUTES.ADMIN_COURSES,
+   
   ],
 } as const
 
@@ -257,20 +242,7 @@ export const ROUTE_METADATA: Record<
     requiredRole: 'admin',
     showInNav: true,
   },
-  [ROUTES.ADMIN_USERS]: {
-    title: 'Users',
-    description: 'Manage platform users',
-    requiresAuth: true,
-    requiredRole: 'admin',
-    showInNav: true,
-  },
-  [ROUTES.ADMIN_COURSES]: {
-    title: 'Courses',
-    description: 'Manage all courses',
-    requiresAuth: true,
-    requiredRole: 'admin',
-    showInNav: true,
-  },
+  
 } as const
 
 
@@ -335,29 +307,7 @@ liveSessionJoin: (id: string | number) =>
 
   // Admin routes
   adminDashboard: () => ROUTES.ADMIN_DASHBOARD,
-  adminUsers: () => ROUTES.ADMIN_USERS,
-  adminUserCreate: () => ROUTES.ADMIN_USERS_CREATE,
-  adminUserDetail: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_USER_DETAIL, { id }),
-  adminUserEdit: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_USER_EDIT, { id }),
-  adminCourses: () => ROUTES.ADMIN_COURSES,
-  adminCourseCreate: () => ROUTES.ADMIN_COURSE_CREATE,
-  adminCourseDetail: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_COURSE_DETAIL, { id }),
-  adminCourseEdit: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_COURSE_EDIT, { id }),
-  adminTrainers: () => ROUTES.ADMIN_TRAINERS,
-  adminTrainerDetail: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_TRAINER_DETAIL, { id }),
-  adminLearners: () => ROUTES.ADMIN_LEARNERS,
-  adminLearnerDetail: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_LEARNER_DETAIL, { id }),
-  adminAnalytics: () => ROUTES.ADMIN_ANALYTICS,
-  adminPayments: () => ROUTES.ADMIN_PAYMENTS,
-  adminPaymentDetail: (id: string | number) =>
-    getRoute(ROUTES.ADMIN_PAYMENT_DETAIL, { id }),
-  adminSettings: () => ROUTES.ADMIN_SETTINGS,
+  
 
   // Error routes
   notFound: () => ROUTES.NOT_FOUND,

@@ -70,12 +70,6 @@ interface AssignmentNavContext {
   moduleTitle?: string
 }
 
-// Picks the attempt that should drive the page's status/feedback/submitted
-// files. Prefers the most recent attempt that actually has content (files
-// uploaded, or a submitted_at timestamp) over a later, still-empty attempt —
-// e.g. if the submission modal was opened again after a real submission,
-// which can append a fresh empty "in_progress" attempt to the array. Falls
-// back to the last entry if nothing has content yet (genuinely brand new).
 function latestAttempt(raw: RawAssignmentDetail): RawSubmissionAttempt | null {
   if (!raw.my_submissions || raw.my_submissions.length === 0) return null
 
@@ -90,16 +84,8 @@ function latestAttempt(raw: RawAssignmentDetail): RawSubmissionAttempt | null {
 function deriveStatus(attempt: RawSubmissionAttempt | null): AssignmentStatus {
   if (!attempt || attempt.state === 'not_started') return 'not_started'
   if (attempt.state === 'graded') return 'graded'
-  // A dangling attempt can sit in "in_progress" forever with no files and
-  // no submitted_at — e.g. the modal creates/resumes an attempt as soon as
-  // it's opened, but submit was never completed (presign/upload/confirm
-  // failed partway through, or the modal was closed early). submitted_at
-  // is the only reliable signal that something was actually turned in;
-  // without it, treat the attempt as not_started so the learner still
-  // sees "Start submission" instead of getting stuck on the
-  // awaiting-grading banner with no way to try again.
   if (!attempt.submitted_at) return 'not_started'
-  return 'in_progress' // covers submitted / revision_requested / anything else with a real submission
+  return 'in_progress'
 }
 
 function deriveFeedback(attempt: RawSubmissionAttempt | null): AssignmentDetail['feedback'] {
@@ -119,7 +105,6 @@ function deriveFeedback(attempt: RawSubmissionAttempt | null): AssignmentDetail[
 function normalizeGradingCriteria(
   raw: unknown,
 ): { id: string; label: string; points: number }[] {
-  // Observed shape: [{ label, max_points }, ...]
   if (Array.isArray(raw)) {
     return raw.map((c, i) => {
       if (c && typeof c === 'object' && 'label' in c) {
@@ -135,7 +120,6 @@ function normalizeGradingCriteria(
     })
   }
 
-  // Fallback: plain { label: points } map
   if (raw && typeof raw === 'object') {
     return Object.entries(raw as Record<string, number>).map(([label, points], i) => ({
       id: String(i),
@@ -144,7 +128,6 @@ function normalizeGradingCriteria(
     }))
   }
 
-  // Truly a string, null, or undefined — nothing renderable
   if (raw != null) {
     console.warn('Unrecognized grading_criteria shape, ignoring:', raw)
   }
@@ -161,9 +144,6 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
     course_title: ctx.courseTitle ?? '',
     module_title: ctx.moduleTitle ?? '',
     due_at: raw.deadline ?? '',
-    // TODO: backend does not return points or grade weighting anywhere on
-    // this endpoint. Left at 0 and hidden in the UI below until there's a
-    // real source (course structure endpoint?).
     points: 0,
     grade_weight_percent: 0,
     status: deriveStatus(attempt),
@@ -180,7 +160,7 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
       id: r.id,
       title: r.title,
       file_type: r.file_format ?? r.resource_type,
-      file_url: '', // never provided directly — always goes through getResourceDownloadUrl
+      file_url: '',
       size_display: r.file_size ? `${(r.file_size / 1024).toFixed(0)} KB` : '',
       size_tag: undefined,
     })),
@@ -203,7 +183,6 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDueDate(iso: string): string {
   if (!iso) return 'No due date'
   const d = new Date(iso)
@@ -241,7 +220,6 @@ function getExtensionFromResource(fileType: string, url: string): string {
     const match = path.match(/\.([a-zA-Z0-9]+)(?:$|\?)/)
     if (match) return match[1].toLowerCase()
   } catch {
-    // ignore, fall through
   }
   const t = (fileType || '').toLowerCase()
   const map: Record<string, string> = {
@@ -280,14 +258,12 @@ async function triggerDownload(url: string, filename?: string, fileType?: string
   }
 }
 
-// ─── Page CSS (page-specific only — shell handled by AppShell) ────────────────
 const PAGE_CSS = `
   .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.5rem; }
 
   .state-screen { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #9CA3AF; font-size: 0.9375rem; }
   .state-screen.error { color: #EF4444; }
 
-  /* Header card */
   .header-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem 1.75rem; display: flex; flex-direction: column; gap: 0.625rem; }
   .crumb-row { display: flex; align-items: center; gap: 0.625rem; }
   .crumb-back { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: none; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
@@ -307,7 +283,6 @@ const PAGE_CSS = `
   .meta-item { display: flex; align-items: center; gap: 0.4rem; }
   .meta-pts { font-weight: 700; color: #111; }
 
-  /* Feedback / banner cards */
   .feedback-card { border-radius: 1rem; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.625rem; }
   .feedback-card.graded { background: #ECFDF3; }
   .feedback-card.revision { background: #FFFBEB; }
@@ -336,7 +311,6 @@ const PAGE_CSS = `
   .info-banner-main { font-size: 0.9375rem; font-weight: 600; color: #92400E; }
   .info-banner-sub { font-size: 0.8125rem; color: #B45309; opacity: 0.85; }
 
-  /* Instructions card */
   .instructions-card { background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.5rem; }
   .section-label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; color: #6B7280; text-transform: uppercase; }
   .intro-text { font-size: 0.9375rem; line-height: 1.7; color: #374151; white-space: pre-wrap; }
@@ -362,7 +336,6 @@ const PAGE_CSS = `
   .grading-row span:first-child { color: #374151; }
   .grading-row span:last-child { font-weight: 700; color: #111; white-space: nowrap; }
 
-  /* Resources */
   .resources-section { display: flex; flex-direction: column; gap: 0.875rem; }
   .resources-list { display: flex; flex-direction: column; gap: 0.625rem; }
   .resource-row { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; }
@@ -374,7 +347,6 @@ const PAGE_CSS = `
   .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
   .resource-download:hover { background: #DBEAFE; }
 
-  /* Submission requirements */
   .req-list { display: flex; flex-direction: column; gap: 0.625rem; }
   .req-row { display: flex; align-items: flex-start; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; flex-wrap: wrap; }
   .req-icon-wrap { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #F5F0FF; }
@@ -383,7 +355,6 @@ const PAGE_CSS = `
   .req-sub { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.125rem; }
   .req-value { font-size: 0.9375rem; font-weight: 700; color: #111; text-align: right; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 
-  /* Submitted files */
   .submitted-files-section { display: flex; flex-direction: column; gap: 0.875rem; }
   .submitted-files-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem; }
   .submitted-files-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
@@ -391,14 +362,12 @@ const PAGE_CSS = `
   .submitted-file-icon { width: 3rem; height: 3rem; border-radius: 0.625rem; border: 1.5px solid #2563EB; color: #2563EB; display: flex; align-items: center; justify-content: center; }
   .submitted-file-name { font-size: 0.78rem; color: #374151; line-height: 1.35; word-break: break-word; }
 
-  /* Bottom action bar */
   .action-bar { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
   .action-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; padding: 0.95rem; border-radius: 0.875rem; border: none; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
   .action-btn.start { background: #2563EB; color: #fff; }
   .action-btn:hover { opacity: 0.92; }
   .action-hint { font-size: 0.8125rem; color: #9CA3AF; text-align: center; }
 
-  /* Modal — prefixed to avoid collisions */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1.5rem; }
   .submit-modal { width: 100%; max-width: 540px; background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 88vh; overflow-y: auto; box-sizing: border-box; }
   .submit-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
@@ -429,7 +398,6 @@ const PAGE_CSS = `
   .file-list-remove:hover { background: #FEE2E2; color: #DC2626; }
   .submit-error { font-size: 0.8438rem; color: #DC2626; background: #FEF2F2; border-radius: 0.625rem; padding: 0.625rem 0.875rem; }
 
-  /* Upload progress indicator */
   .upload-progress { font-size: 0.8438rem; color: #2563EB; background: #EFF6FF; border-radius: 0.625rem; padding: 0.625rem 0.875rem; text-align: center; }
 
   @media (max-width: 900px) {
@@ -466,7 +434,6 @@ const PAGE_CSS = `
   }
 `
 
-// ─── Submission modal ───────────────────────────────────────────────────────
 function SubmissionModal({
 assignment,
 onClose,
@@ -549,13 +516,15 @@ return ( <div className="modal-backdrop" onClick={onClose}>
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
       </div>
 
-      {/*   no more strict per-requirement enforcement */}
       <div className="criteria-list">
         {requirements.map((req) => (
           <div className="criteria-row" key={req.id}>
             <div className="criteria-label-wrap">
               <span>{req.label}{req.required ? '' : ' (optional)'}</span>
               <span className="criteria-hint">{req.allowed_file_types}</span>
+              {req.naming_hint && (
+                <span className="criteria-hint">Name your file: {req.naming_hint}</span>
+              )}
             </div>
             <span className="criteria-status">
               {files.length >= minFiles
@@ -573,7 +542,6 @@ return ( <div className="modal-backdrop" onClick={onClose}>
           <div className="file-list-item" key={`${f.name}-${i}`}>
             <FileText size={16} color="#6B7280" />
             <span className="file-list-name">{f.name}</span>
-            {/*  removed requirement index mapping */}
             <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
             <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
               <X size={14} />
@@ -604,17 +572,12 @@ return ( <div className="modal-backdrop" onClick={onClose}>
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function AssignmentDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const { user } = useAuth()
 
-  // Course/module context isn't returned by GET /assignments/{id}/ at all —
-  // it has to be forwarded via navigation state from wherever the "View
-  // assignment" link originates (see CourseLearnPage). Falls back to blank
-  // if the page was reached directly (e.g. a bookmarked/shared URL).
   const navCtx = (location.state as AssignmentNavContext) ?? {}
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null)
@@ -642,7 +605,6 @@ export default function AssignmentDetailPage() {
 
   if (!user) return null
 
-  // ── Resource download: use presigned URL endpoint ─────────────────────────
 async function handleResourceDownload(resourceId: string, resourceTitle: string) {
   if (!assignment) return
   const res = await assignmentsAPI.getResourceDownloadUrl(assignment.id, resourceId)
@@ -665,8 +627,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
   const showStartSubmission  = assignment?.status === 'not_started' || showRevisionResubmit
   const showAwaitingBanner   = assignment?.status === 'in_progress' && !assignment.feedback
 
-  // Points / grade-weight aren't returned by the backend yet (see
-  // normalizeAssignment TODOs) — hide those meta chips rather than show "0".
   const hasPoints = Boolean(assignment?.points)
   const hasWeight = Boolean(assignment?.grade_weight_percent)
 
@@ -680,7 +640,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
 
           {!loading && !error && assignment && (
             <>
-              {/* Header */}
               <div className="header-card">
                 <div className="crumb-row">
                   <button className="crumb-back" onClick={() => navigate(-1)} aria-label="Back">
@@ -728,7 +687,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               </div>
 
-              {/* Graded feedback */}
               {assignment.status === 'graded' && assignment.feedback && (
                 <div className="feedback-card graded">
                   <div className="feedback-top-row">
@@ -756,7 +714,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {/* Revision requested */}
               {showRevisionResubmit && assignment.feedback && (
                 <div className="feedback-card revision">
                   <div className="feedback-head">
@@ -770,7 +727,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {/* Awaiting grading */}
               {showAwaitingBanner && (
                 <div className="info-banner">
                   <span className="info-banner-main">Assignment is being graded, kindly check back in 48 hours</span>
@@ -778,7 +734,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {/* Instructions */}
               <div className="instructions-card">
                 <div>
                   <div className="section-label" style={{ marginBottom: '0.875rem' }}>Instructions</div>
@@ -844,7 +799,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 )}
               </div>
 
-              {/* Resources */}
               {assignment.resources.length > 0 && (
                 <div className="resources-section">
                   <div className="section-label">Resources &amp; Templates</div>
@@ -874,7 +828,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {/* Submission requirements */}
               {assignment.status === 'not_started' && (
                 <div className="resources-section">
                   <div className="section-label">Submission Requirements</div>
@@ -917,7 +870,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {/* Submitted files */}
 {assignment.submitted_files.length > 0 && (
   <div className="submitted-files-section">
     <div className="section-label">Submitted Files</div>
@@ -934,7 +886,6 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
   </div>
 )}
 
-              {/* Action bar */}
               {showStartSubmission && (
                 <div className="action-bar">
                   <button className="action-btn start" onClick={() => setModalOpen(true)}>

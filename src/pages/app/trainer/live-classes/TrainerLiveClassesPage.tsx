@@ -14,6 +14,9 @@ import {
   PlayCircle,
   Eye,
   Loader2,
+  Link as LinkIcon,
+  Ban,
+  CheckCircle2,
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { useAuth } from '../../../../hooks/useAuth'
@@ -70,6 +73,12 @@ function formatTimeLabel(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+// Very light sanity check — not trying to fully validate URLs, just catch
+// the obvious "forgot the protocol" mistake before it hits the API.
+function isLikelyUrl(value: string): boolean {
+  return /^https?:\/\/.+/i.test(value.trim())
+}
+
 const PAGE_CSS = `
   .lc-page { padding: 1rem; background: #F5F5F5; }
 
@@ -108,6 +117,20 @@ const PAGE_CSS = `
   .lc-start-btn { border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.6rem 1.1rem; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
   .lc-recording-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; font-weight: 700; border-radius: 999px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
   .lc-icon-btn { border: none; background: #F3F4F6; color: #374151; border-radius: 999px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .lc-icon-btn-wrap { position: relative; }
+
+  .lc-menu { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12); min-width: 170px; z-index: 50; overflow: hidden; }
+  .lc-menu-item { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; border: none; background: none; padding: 0.65rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #111827; cursor: pointer; }
+  .lc-menu-item:hover { background: #F9FAFB; }
+  .lc-menu-item.danger { color: #DC2626; }
+
+  .lc-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; border-radius: 999px; padding: 0.15rem 0.55rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  .lc-badge.ended { background: #F3F4F6; color: #374151; }
+  .lc-badge.cancelled { background: #FEE2E2; color: #B91C1C; }
+
+  .lc-confirm-copy { color: #4B5563; font-size: 0.95rem; line-height: 1.5; margin: 0 0 1.5rem; text-align: left; }
+  .lc-btn-danger { border: none; background: #DC2626; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.65rem 1.1rem; cursor: pointer; font-size: 0.875rem; }
+  .lc-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .lc-empty { background: #fff; border-radius: 1rem; padding: 2.5rem 1.5rem; text-align: center; color: #9CA3AF; border: 1px dashed #E5E7EB; margin-top: 1rem; }
   .lc-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.85rem; padding: 0.9rem 1.1rem; margin-top: 1rem; font-size: 0.875rem; }
@@ -136,6 +159,9 @@ const PAGE_CSS = `
   .lc-field { margin-bottom: 1rem; text-align: left; }
   .lc-field label { display: block; font-weight: 700; color: #111827; font-size: 0.85rem; margin-bottom: 0.4rem; }
   .lc-field input { width: 100%; box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: 0.7rem; padding: 0.7rem 0.85rem; font-size: 0.9rem; font-family: inherit; }
+  .lc-field input.invalid { border-color: #FCA5A5; }
+  .lc-field-hint { margin: 0.35rem 0 0; font-size: 0.78rem; color: #9CA3AF; }
+  .lc-field-hint.warn { color: #B45309; }
   .lc-field-row { display: flex; gap: 0.75rem; }
   .lc-field-row .lc-field { flex: 1; }
   .lc-modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
@@ -155,9 +181,14 @@ export default function TrainerLiveClassesPage() {
   const [showSchedule, setShowSchedule] = useState(false)
   // TODO: swap for a real course dropdown once a "my courses" list endpoint is wired in
   const [courseSlug, setCourseSlug] = useState('')
-  const [form, setForm] = useState({ date: '', startTime: '', duration: 60, title: '' })
+  const [form, setForm] = useState({ date: '', startTime: '', duration: 60, title: '', joinUrl: '' })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<SessionWithExtras | null>(null)
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -244,11 +275,22 @@ export default function TrainerLiveClassesPage() {
     }
   }, [bookings, upcomingSessions, pastSessions])
 
+  function resetScheduleForm() {
+    setForm({ date: '', startTime: '', duration: 60, title: '', joinUrl: '' })
+    setSubmitError(null)
+  }
+
   async function handleCreateSlot() {
     if (!courseSlug || !form.date || !form.startTime) {
       setSubmitError('Course, date and start time are required.')
       return
     }
+    const trimmedJoinUrl = form.joinUrl.trim()
+    if (trimmedJoinUrl && !isLikelyUrl(trimmedJoinUrl)) {
+      setSubmitError('Join link should be a full URL, e.g. https://meet.google.com/abc-defg-hij')
+      return
+    }
+
     setSubmitting(true)
     setSubmitError(null)
 
@@ -268,10 +310,14 @@ export default function TrainerLiveClassesPage() {
     if (form.title.trim()) {
       // Confirmed via Swagger: publishSession expects starts_at/ends_at as
       // full ISO 8601 UTC datetimes, same shape as the slots endpoint.
+      // join_url is optional — if the trainer already has a recurring Meet
+      // link (or is using another conferencing tool), they can paste it in
+      // now; learners only see it once the session is flipped to "live".
       const sessionResult = await liveSessionsAPI.publishSession(courseSlug, {
         title: form.title.trim(),
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
+        ...(trimmedJoinUrl ? { join_url: trimmedJoinUrl } : {}),
       })
       if (!sessionResult.success) {
         setSubmitError(sessionResult.error || 'Slot created, but publishing the session failed.')
@@ -281,8 +327,25 @@ export default function TrainerLiveClassesPage() {
     }
 
     setShowSchedule(false)
-    setForm({ date: '', startTime: '', duration: 60, title: '' })
+    resetScheduleForm()
     setSubmitting(false)
+    await loadAll()
+  }
+
+  async function handleConfirmCancel() {
+    if (!cancelTarget) return
+    setCancelSubmitting(true)
+    setCancelError(null)
+
+    const res = await liveSessionsAPI.cancelSession(cancelTarget.id)
+    if (!res.success) {
+      setCancelError(res.error || 'Failed to cancel session.')
+      setCancelSubmitting(false)
+      return
+    }
+
+    setCancelSubmitting(false)
+    setCancelTarget(null)
     await loadAll()
   }
 
@@ -383,7 +446,19 @@ export default function TrainerLiveClassesPage() {
                     </button>
                   )}
                   <div className="lc-card-body">
-                    <p className="lc-card-title">{session.title}</p>
+                    <p className="lc-card-title">
+                      {session.title}
+                      {activeTab === 'past' && session.status === 'cancelled' && (
+                        <span className="lc-badge cancelled" style={{ marginLeft: '0.5rem' }}>
+                          <Ban size={11} /> Cancelled
+                        </span>
+                      )}
+                      {activeTab === 'past' && session.status === 'ended' && (
+                        <span className="lc-badge ended" style={{ marginLeft: '0.5rem' }}>
+                          <CheckCircle2 size={11} /> Ended
+                        </span>
+                      )}
+                    </p>
                     <p className="lc-card-sub">{session.course_title}</p>
                     <div className="lc-card-meta">
                       <span>
@@ -393,7 +468,7 @@ export default function TrainerLiveClassesPage() {
                         <Clock size={13} /> {formatTimeLabel(start)}
                         {session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}
                       </span>
-                      {activeTab === 'past' && (
+                      {activeTab === 'past' && session.status !== 'cancelled' && (
                         <span>
                           {/* TODO: recording_views has no backend source yet (recordings live on
                               Google Drive, view counts aren't tracked) — shows 0 until that's wired up. */}
@@ -408,10 +483,39 @@ export default function TrainerLiveClassesPage() {
                         <button className="lc-start-btn" onClick={() => setGoLiveTarget(session)}>
                           <Radio size={14} /> Start Now
                         </button>
-                        <button className="lc-icon-btn" aria-label="More options">
-                          <MoreVertical size={16} />
-                        </button>
+                        <div className="lc-icon-btn-wrap">
+                          <button
+                            className="lc-icon-btn"
+                            aria-label="More options"
+                            onClick={() => setOpenMenuId(openMenuId === session.id ? null : session.id)}
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                          {openMenuId === session.id && (
+                            <>
+                              <div
+                                style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                                onClick={() => setOpenMenuId(null)}
+                              />
+                              <div className="lc-menu">
+                                <button
+                                  className="lc-menu-item danger"
+                                  onClick={() => {
+                                    setOpenMenuId(null)
+                                    setCancelError(null)
+                                    setCancelTarget(session)
+                                  }}
+                                >
+                                  <Ban size={14} /> Cancel session
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </>
+                    ) : session.status === 'cancelled' ? (
+                      // Nothing to view or manage on a session that never ran.
+                      <span />
                     ) : (
                       <>
                         <button
@@ -460,10 +564,71 @@ export default function TrainerLiveClassesPage() {
         </div>
       )}
 
-      {showSchedule && (
-        <div className="lc-modal-overlay" onClick={() => setShowSchedule(false)}>
+      {cancelTarget && (
+        <div
+          className="lc-modal-overlay"
+          onClick={() => {
+            if (!cancelSubmitting) {
+              setCancelTarget(null)
+              setCancelError(null)
+            }
+          }}
+        >
           <div className="lc-modal left" onClick={(e) => e.stopPropagation()}>
-            <button className="lc-modal-close" onClick={() => setShowSchedule(false)} aria-label="Close">
+            <button
+              className="lc-modal-close"
+              onClick={() => {
+                setCancelTarget(null)
+                setCancelError(null)
+              }}
+              aria-label="Close"
+              disabled={cancelSubmitting}
+            >
+              <X size={18} />
+            </button>
+            <h3 className="lc-modal-title">Cancel this session?</h3>
+            <p className="lc-confirm-copy">
+              <strong>{cancelTarget.title}</strong> on {formatDateLabel(sessionDateTime(cancelTarget))} at{' '}
+              {formatTimeLabel(sessionDateTime(cancelTarget))} will be cancelled. This can't be undone — anyone who
+              booked will be notified, and the session moves to your Past list marked as cancelled.
+            </p>
+            {cancelError && <div className="lc-error">{cancelError}</div>}
+            <div className="lc-modal-actions">
+              <button
+                className="lc-btn-outline"
+                onClick={() => {
+                  setCancelTarget(null)
+                  setCancelError(null)
+                }}
+                disabled={cancelSubmitting}
+              >
+                Keep session
+              </button>
+              <button className="lc-btn-danger" onClick={handleConfirmCancel} disabled={cancelSubmitting}>
+                {cancelSubmitting ? 'Cancelling…' : 'Yes, cancel it'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSchedule && (
+        <div
+          className="lc-modal-overlay"
+          onClick={() => {
+            setShowSchedule(false)
+            resetScheduleForm()
+          }}
+        >
+          <div className="lc-modal left" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="lc-modal-close"
+              onClick={() => {
+                setShowSchedule(false)
+                resetScheduleForm()
+              }}
+              aria-label="Close"
+            >
               <X size={16} />
             </button>
             <h3 className="lc-modal-title">Schedule a live session</h3>
@@ -515,10 +680,36 @@ export default function TrainerLiveClassesPage() {
               />
             </div>
 
+            <div className="lc-field">
+              <label>
+                <LinkIcon size={13} style={{ verticalAlign: '-2px', marginRight: '0.3rem' }} />
+                Join link 
+              </label>
+              <input
+                type="url"
+                placeholder="https://meet.google.com/abc-defg-hij"
+                value={form.joinUrl}
+                className={form.joinUrl.trim() && !isLikelyUrl(form.joinUrl) ? 'invalid' : ''}
+                onChange={(e) => setForm((f) => ({ ...f, joinUrl: e.target.value }))}
+              />
+              <p className={`lc-field-hint ${form.joinUrl.trim() && !isLikelyUrl(form.joinUrl) ? 'warn' : ''}`}>
+                {form.joinUrl.trim() && !isLikelyUrl(form.joinUrl)
+                  ? 'Needs to start with http:// or https://'
+                  : "Paste your Google Meet (or other) link now, or add it later before going live. Learners only see it once you start the session."}
+              </p>
+            </div>
+
             {submitError && <div className="lc-error">{submitError}</div>}
 
             <div className="lc-modal-actions">
-              <button className="lc-btn-outline" onClick={() => setShowSchedule(false)} disabled={submitting}>
+              <button
+                className="lc-btn-outline"
+                onClick={() => {
+                  setShowSchedule(false)
+                  resetScheduleForm()
+                }}
+                disabled={submitting}
+              >
                 Cancel
               </button>
               <button className="lc-btn-primary" onClick={handleCreateSlot} disabled={submitting}>

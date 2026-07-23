@@ -1,9 +1,8 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, Check, Upload, Trash2, Plus, Globe, Eye,
-  Play, SkipBack, SkipForward, Volume2, Subtitles, Maximize, Send,
-  Layers, BookOpen, Award, CheckCircle2, Loader2,
+  Send, Layers, BookOpen, Award, CheckCircle2, Loader2,
 } from 'lucide-react'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
@@ -23,8 +22,11 @@ type Lesson = {
   id: string
   remoteId: string | null
   title: string
+  description: string
   videoFile: File | null
+  existingVideoUrl: string | null
   materialFiles: File[]
+  existingMaterialsCount: number
   videoUploaded: boolean
   materialsUploaded: boolean
 }
@@ -36,6 +38,7 @@ type CourseForm = {
   language: string
   level: CourseLevel | ''
   coverImage: File | null
+  existingCoverImageUrl: string | null
   description: string
   expectedOutcomes: string[]
   targetAudience: string
@@ -66,8 +69,11 @@ function emptyLesson(): Lesson {
     id: makeId(),
     remoteId: null,
     title: '',
+    description: '',
     videoFile: null,
+    existingVideoUrl: null,
     materialFiles: [],
+    existingMaterialsCount: 0,
     videoUploaded: false,
     materialsUploaded: false,
   }
@@ -80,6 +86,7 @@ const initialForm: CourseForm = {
   language: '',
   level: '',
   coverImage: null,
+  existingCoverImageUrl: null,
   description: '',
   expectedOutcomes: ['', ''],
   targetAudience: '',
@@ -139,6 +146,8 @@ const PAGE_CSS = `
   .ac-lesson-num { width: 26px; height: 26px; border-radius: 999px; background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ac-lesson-title-input { flex: 1; border: none; background: none; font-size: 0.95rem; color: #111; outline: none; }
   .ac-lesson-delete { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0.4rem; flex-shrink: 0; }
+  .ac-lesson-desc-wrap { padding: 0 1rem 0.85rem; }
+  .ac-lesson-desc { width: 100%; box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: 0.6rem; padding: 0.6rem 0.75rem; font-size: 0.85rem; font-family: inherit; resize: vertical; min-height: 70px; color: #111; }
   .ac-lesson-uploads { padding: 0 1rem 1rem; display: grid; gap: 0.75rem; }
   .ac-upload-chip { display: flex; align-items: center; gap: 0.75rem; border: 1px dashed #93C5FD; background: #EFF6FF; border-radius: 0.85rem; padding: 0.85rem 1rem; cursor: pointer; }
   .ac-upload-chip-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -171,7 +180,11 @@ const PAGE_CSS = `
   .ac-visibility-check { margin-left: auto; color: #2563EB; flex-shrink: 0; }
 
   .ac-preview-player { border: 1px solid #E5E7EB; border-radius: 1rem; overflow: hidden; margin-bottom: 1.25rem; }
+  .ac-preview-video-real { width: 100%; aspect-ratio: 16 / 9; display: block; background: #111; }
   .ac-preview-video { position: relative; background: #111; aspect-ratio: 16 / 9; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; color: #fff; background-image: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.45)); background-size: cover; background-position: center; }
+  .ac-preview-video-empty { justify-content: flex-start; color: #D1D5DB; }
+  .ac-preview-video-empty .ac-preview-video-title { color: #fff; }
+  .ac-preview-video-empty .ac-preview-video-sub { color: #9CA3AF; }
   .ac-preview-video-topbar { display: flex; align-items: center; gap: 0.75rem; }
   .ac-preview-video-back { background: rgba(255,255,255,0.15); border: none; border-radius: 999px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; flex-shrink: 0; }
   .ac-preview-video-title { font-weight: 700; font-size: 0.9rem; }
@@ -236,14 +249,139 @@ const PAGE_CSS = `
 
 export default function AddCoursePage() {
   const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const isEditMode = Boolean(id)
+
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<CourseForm>(initialForm)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
 
-  const [courseId, setCourseId] = useState<string | null>(null)
+  const [courseId, setCourseId] = useState<string | null>(id ?? null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [loading, setLoading] = useState(isEditMode)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Real video preview for the review step — resolves to whichever lesson
+  // has a video (a freshly picked File, or an already-uploaded one when
+  // editing), and creates/revokes an object URL for File-based previews.
+  const previewLesson = form.lessons.find((l) => l.videoFile) ?? form.lessons.find((l) => l.existingVideoUrl)
+  const [previewVideoSrc, setPreviewVideoSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (previewLesson?.videoFile) {
+      const objectUrl = URL.createObjectURL(previewLesson.videoFile)
+      setPreviewVideoSrc(objectUrl)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+    if (previewLesson?.existingVideoUrl) {
+      setPreviewVideoSrc(previewLesson.existingVideoUrl)
+      return
+    }
+    setPreviewVideoSrc(null)
+    return
+    // Only re-run when the actual video source changes, not on every keystroke elsewhere in the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewLesson?.videoFile, previewLesson?.existingVideoUrl])
+
+  // Edit mode: load the existing course + curriculum and pre-fill every step.
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      setLoadError(null)
+
+      const [draftRes, curriculumRes] = await Promise.all([
+        coursesManageAPI.getDraft(id as string),
+        coursesManageAPI.getCurriculum(id as string),
+      ])
+
+      if (cancelled) return
+
+      if (!draftRes.success) {
+        setLoadError(draftRes.error || 'Failed to load this course.')
+        setLoading(false)
+        return
+      }
+
+      const draft = draftRes.data
+
+      // NOTE: this wizard's curriculum step supports a single module.
+      // If a course has more than one module, only the first module's
+      // lessons are loaded here. Flag it if that's a real scenario for
+      // any existing courses — we'd need to extend the curriculum step
+      // to handle multiple modules.
+      const firstModule = curriculumRes.success ? curriculumRes.data[0] : undefined
+      const curriculumLessons = firstModule?.lessons ?? []
+
+      // The curriculum tree endpoint (getCurriculum) only returns lightweight
+      // per-lesson fields — id, title, order, duration_seconds,
+      // duration_display, is_preview. It never includes `video_url` or
+      // `resource_keys`, even when they exist server-side. Those only come
+      // back from the per-lesson detail endpoint, so we fetch each lesson
+      // individually (in parallel) right after the tree loads. This is what
+      // actually lets edit mode see previously-uploaded video/materials.
+      const lessonDetailResults = await Promise.all(
+        curriculumLessons.map((l) => coursesManageAPI.getLesson(l.id)),
+      )
+
+      if (cancelled) return
+
+      const prefilledLessons: Lesson[] = curriculumLessons.map((l, i) => {
+        const detailRes = lessonDetailResults[i]
+        const detail = detailRes.success ? detailRes.data : null
+
+        return {
+          id: makeId(),
+          remoteId: l.id,
+          title: l.title ?? '',
+          description: detail?.body ?? '',
+          videoFile: null,
+          existingVideoUrl: detail?.video_url ?? null,
+          materialFiles: [],
+          existingMaterialsCount: detail?.resource_keys?.length ?? 0,
+          // Existing lessons already have their media saved server-side;
+          // we only re-upload if the user picks a new file in this session.
+          videoUploaded: true,
+          materialsUploaded: true,
+        }
+      })
+
+      setForm((f) => ({
+        ...f,
+        title: draft.title ?? '',
+        subtitle: draft.subtitle ?? '',
+        category: draft.category ?? '',
+        language: draft.language ?? '',
+        level: draft.level ?? '',
+        coverImage: null,
+        existingCoverImageUrl: draft.cover_image_url ?? null,
+        description: draft.description ?? '',
+        expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes : ['', ''],
+        targetAudience: draft.target_audience?.[0] ?? '',
+        audienceDescription: draft.audience_description ?? '',
+        prerequisites: draft.prerequisites?.length ? draft.prerequisites : [''],
+        lessons: prefilledLessons.length ? prefilledLessons : [emptyLesson(), emptyLesson()],
+        isFree: draft.is_free ?? false,
+        priceNaira: draft.price_kobo ? String(draft.price_kobo / 100) : '',
+        hasCertificate: draft.has_certificate ?? true,
+        visibility: draft.status === 'published' ? 'public' : 'hidden',
+      }))
+
+      setCourseId(id as string)
+      if (firstModule) setModuleId(firstModule.id)
+      setLoading(false)
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   function update<K extends keyof CourseForm>(key: K, value: CourseForm[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -287,6 +425,16 @@ export default function AddCoursePage() {
         return
       }
     }
+
+    // NOTE: cover image is intentionally NOT uploaded here.
+    // The presign endpoint (coursesManageAPI.uploadFile) is lesson-scoped —
+    // its schema requires `lesson_id` and its 404 case is literally "Lesson
+    // not found." There is no course-level target or course_id parameter
+    // documented for it, and 'course_cover' isn't a valid `target` choice.
+    // Confirm the real endpoint for course cover uploads (likely a separate
+    // route, e.g. multipart on the course draft PATCH, or its own
+    // /cover/ endpoint) before wiring this up — guessing another target
+    // string here would just trade one 400 for another.
 
     setSaving(false)
     setStep(2)
@@ -334,7 +482,10 @@ export default function AddCoursePage() {
       if (!lesson.title.trim()) continue
 
       let remoteId = lesson.remoteId
+
       if (!remoteId) {
+        // createLesson only accepts a title — body has to be set in a
+        // follow-up patch, since there's no create-with-body endpoint.
         const lessonResult = await coursesManageAPI.createLesson(activeModuleId, lesson.title)
         if (!lessonResult.success) {
           setSaveError(lessonResult.error || `Failed to create lesson "${lesson.title}".`)
@@ -342,8 +493,27 @@ export default function AddCoursePage() {
           return
         }
         remoteId = lessonResult.data.id
+
+        if (lesson.description.trim()) {
+          const bodyResult = await coursesManageAPI.updateLesson(remoteId, {
+            body: lesson.description,
+          })
+          if (!bodyResult.success) {
+            setSaveError(bodyResult.error || `Failed to save description for "${lesson.title}".`)
+            setSaving(false)
+            return
+          }
+        }
       } else {
-        await coursesManageAPI.updateLesson(remoteId, { title: lesson.title })
+        const updateResult = await coursesManageAPI.updateLesson(remoteId, {
+          title: lesson.title,
+          body: lesson.description,
+        })
+        if (!updateResult.success) {
+          setSaveError(updateResult.error || `Failed to update lesson "${lesson.title}".`)
+          setSaving(false)
+          return
+        }
       }
 
       if (lesson.videoFile && !lesson.videoUploaded) {
@@ -474,6 +644,32 @@ export default function AddCoursePage() {
 
   const totalLessons = form.lessons.length
 
+  if (loading) {
+    return (
+      <TrainerShell>
+        <style>{PAGE_CSS}</style>
+        <div className="ac-page">
+          <div className="ac-card">
+            <p style={{ textAlign: 'center', color: '#9CA3AF', padding: '3rem 0' }}>Loading course…</p>
+          </div>
+        </div>
+      </TrainerShell>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <TrainerShell>
+        <style>{PAGE_CSS}</style>
+        <div className="ac-page">
+          <div className="ac-card">
+            <div className="ac-error" style={{ margin: '1.25rem' }}>{loadError}</div>
+          </div>
+        </div>
+      </TrainerShell>
+    )
+  }
+
   return (
     <TrainerShell>
       <style>{PAGE_CSS}</style>
@@ -483,7 +679,7 @@ export default function AddCoursePage() {
             <button className="ac-back-btn" onClick={goBack} aria-label="Back">
               <ChevronLeft size={20} />
             </button>
-            <h2 className="ac-title">Add New course</h2>
+            <h2 className="ac-title">{isEditMode ? 'Edit course' : 'Add New course'}</h2>
           </div>
 
           <div className="ac-stepper">
@@ -561,7 +757,7 @@ export default function AddCoursePage() {
 
                   <div className="ac-field full">
                     <label className="ac-label">Cover image</label>
-                    <label className="ac-upload-box">
+                    <label className="ac-upload-box" style={form.existingCoverImageUrl && !form.coverImage ? { padding: 0, minHeight: 160, overflow: 'hidden', position: 'relative', border: '1px solid #E5E7EB' } : undefined}>
                       <input
                         type="file"
                         accept="image/png,image/jpeg"
@@ -570,12 +766,33 @@ export default function AddCoursePage() {
                           setForm((f) => ({ ...f, coverImage: e.target.files?.[0] ?? null }))
                         }
                       />
-                      <Upload size={22} />
-                      <span className="ac-upload-label">
-                        {form.coverImage ? form.coverImage.name : 'Upload cover image'}
-                      </span>
+                      {form.existingCoverImageUrl && !form.coverImage ? (
+                        <>
+                          <img
+                            src={form.existingCoverImageUrl}
+                            alt="Course cover"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
+                          />
+                          <span
+                            className="ac-upload-label"
+                            style={{
+                              position: 'relative', background: 'rgba(17,24,39,0.65)', color: '#fff',
+                              padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.8rem',
+                            }}
+                          >
+                            Change cover image
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={22} />
+                          <span className="ac-upload-label">
+                            {form.coverImage ? form.coverImage.name : 'Upload cover image'}
+                          </span>
+                        </>
+                      )}
                     </label>
-                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · cover upload is coming soon — this selection isn't saved yet</p>
+                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · upload isn't wired up yet — the backend endpoint for this doesn't exist/isn't confirmed</p>
                   </div>
                 </div>
               </>
@@ -688,6 +905,16 @@ export default function AddCoursePage() {
                         <Trash2 size={16} />
                       </button>
                     </div>
+
+                    <div className="ac-lesson-desc-wrap">
+                      <textarea
+                        className="ac-lesson-desc"
+                        placeholder="What does this lesson cover? (optional)"
+                        value={lesson.description}
+                        onChange={(e) => updateLesson(lesson.id, { description: e.target.value })}
+                      />
+                    </div>
+
                     <div className="ac-lesson-uploads">
                       <label className="ac-upload-chip">
                         <input
@@ -701,7 +928,11 @@ export default function AddCoursePage() {
                         <div className="ac-upload-chip-icon"><Upload size={16} /></div>
                         <div>
                           <div className="ac-upload-chip-label">
-                            {lesson.videoFile ? lesson.videoFile.name : 'Upload video'}
+                            {lesson.videoFile
+                              ? lesson.videoFile.name
+                              : lesson.existingVideoUrl
+                                ? 'Video uploaded — tap to replace'
+                                : 'Upload video'}
                           </div>
                           <p className="ac-upload-chip-sub">MP4, MOV, or WebM · max 2 GB</p>
                         </div>
@@ -725,7 +956,9 @@ export default function AddCoursePage() {
                           <div className="ac-upload-chip-label">
                             {lesson.materialFiles.length > 0
                               ? `${lesson.materialFiles.length} file(s) selected`
-                              : 'Upload Material(s)'}
+                              : lesson.existingMaterialsCount > 0
+                                ? `${lesson.existingMaterialsCount} material(s) uploaded — tap to add more`
+                                : 'Upload Material(s)'}
                           </div>
                           <p className="ac-upload-chip-sub">Docx, Xlsx, PDF, PPTX · max 500 MB</p>
                         </div>
@@ -826,34 +1059,26 @@ export default function AddCoursePage() {
                 <p className="ac-section-sub">Check everything looks right before going live.</p>
 
                 <div className="ac-preview-player">
-                  <div className="ac-preview-video">
-                    <div className="ac-preview-video-topbar">
-                      <button className="ac-preview-video-back" aria-label="Back">
-                        <ChevronLeft size={18} />
-                      </button>
-                      <div>
-                        <div className="ac-preview-video-title">Critical Path Method</div>
-                        <div className="ac-preview-video-sub">Module 3 · {form.title || 'Untitled course'}</div>
-                      </div>
-                    </div>
-                    <div className="ac-preview-video-controls">
-                      <button className="ac-preview-ctrl-btn" aria-label="Previous"><SkipBack size={16} /></button>
-                      <button className="ac-preview-ctrl-btn primary" aria-label="Play"><Play size={20} /></button>
-                      <button className="ac-preview-ctrl-btn" aria-label="Next"><SkipForward size={16} /></button>
-                    </div>
-                    <div className="ac-preview-video-bottom">
-                      <div className="ac-preview-progress"><div className="ac-preview-progress-fill" /></div>
-                      <div className="ac-preview-video-meta">
-                        <span>6:54 / 22:14</span>
-                        <div className="ac-preview-video-icons">
-                          <Volume2 size={16} />
-                          <Subtitles size={16} />
-                          <span className="ac-preview-auto">Auto</span>
-                          <Maximize size={16} />
+                  {previewVideoSrc ? (
+                    <video
+                      key={previewVideoSrc}
+                      className="ac-preview-video-real"
+                      src={previewVideoSrc}
+                      controls
+                      preload="metadata"
+                    />
+                  ) : (
+                    <div className="ac-preview-video ac-preview-video-empty">
+                      <div className="ac-preview-video-topbar">
+                        <div>
+                          <div className="ac-preview-video-title">No video uploaded yet</div>
+                          <div className="ac-preview-video-sub">
+                            Add a video to a lesson in the Curriculum step to preview it here
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="ac-preview-info">
                     <p className="ac-preview-cat">{form.category || 'Category'}</p>

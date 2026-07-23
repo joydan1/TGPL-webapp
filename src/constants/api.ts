@@ -50,8 +50,9 @@ LEARNER_PROFILE: '/v1/users/me/learner-profile/',
   LIVE_MANAGE_COURSE_SLOTS: (courseSlug: string) => `/v1/live/manage/courses/${courseSlug}/slots/`,
   LIVE_MANAGE_SESSION: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/`,
   LIVE_MANAGE_SESSION_CANCEL: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/cancel/`,
+  LIVE_MANAGE_SESSION_END: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/end/`,
+  LIVE_MANAGE_SESSION_GO_LIVE: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/go-live/`,
   LIVE_MANAGE_SLOT: (slotId: string) => `/v1/live/manage/slots/${slotId}/`,
- 
   // Test endpoints — dev only
   ...(import.meta.env.DEV && {
     TEST_LEARNER: '/v1/auth/_test/learner-only/',

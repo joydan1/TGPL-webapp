@@ -41,6 +41,9 @@ import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
 import HelpSupportPage from './pages/app/HelpSupportPage'
 import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
+import AdminSignupPage from './pages/admin/AdminSignupPage'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminResetPasswordPage from './pages/admin/AdminResetPasswordPage.tsx'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -226,6 +229,14 @@ function App() {
   }
 />
 <Route
+  path={ROUTES.TRAINER_COURSE_EDIT}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <AddCoursePage />
+    </ProtectedRoute>
+  }
+/>
+<Route
   path={ROUTES.TRAINER_LIVE_CLASSES}
   element={
     <ProtectedRoute requiredRole="trainer">
@@ -291,6 +302,9 @@ function App() {
     </ProtectedRoute>
   }
 />
+<Route path={ROUTES.ADMIN_SIGNUP} element={<AdminSignupPage />} />
+<Route path={ROUTES.ADMIN_LOGIN} element={<AdminLoginPage />} />
+<Route path={ROUTES.ADMIN_RESET_PASSWORD} element={<AdminResetPasswordPage />} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

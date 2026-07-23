@@ -122,10 +122,10 @@ const isTrainer = user?.role === 'trainer'
   })
 
   const handleChatWithUs = () => {
-    // No support-chat/ticket endpoint exists yet.
-    // Hook this up once live chat or a ticketing endpoint is available.
-    window.open('mailto:support@tgpl.example.com', '_blank')
-  }
+  const subject = encodeURIComponent('Support request')
+  const body = encodeURIComponent(`Hi TGPL team,\n\nUser: ${user?.email ?? 'unknown'}\n\n`)
+  window.location.href = `mailto:theglobalprojectleaders@gmail.com?subject=${subject}&body=${body}`
+}
 
   return (
     <>

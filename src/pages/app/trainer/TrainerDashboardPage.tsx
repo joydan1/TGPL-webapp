@@ -373,11 +373,11 @@ export default function TrainerDashboardPage() {
                   </p>
                 </div>
                 <button
-                  className="db-course-preview-btn"
-                  onClick={() => navigate(RouteBuilder.trainerCourseManage(activeCourse.id))}
-                >
-                  Manage
-                </button>
+  className="db-course-preview-btn"
+  onClick={() => navigate(RouteBuilder.trainerCourseEdit(activeCourse.id))}
+>
+  Manage
+</button>
               </div>
             )}
           </div>

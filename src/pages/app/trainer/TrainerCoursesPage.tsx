@@ -120,8 +120,8 @@ export default function TrainerCoursesPage() {
   }
 
   function handlePreview(courseId: string) {
-    navigate(RouteBuilder.trainerCourseManage(courseId))
-  }
+  navigate(RouteBuilder.trainerCourseEdit(courseId))
+}
 
   function applyActionError(courseId: string, rawError: unknown) {
     setActionErrorId(courseId)
@@ -212,13 +212,13 @@ export default function TrainerCoursesPage() {
                     {course.module_count} module{course.module_count === 1 ? '' : 's'} · {course.lesson_count} lesson{course.lesson_count === 1 ? '' : 's'}
                   </p>
                   <p className="course-card-date">{formatUpdatedAgo(course.updated_at)}</p>
-                  <button
-                    type="button"
-                    className="course-card-preview"
-                    onClick={() => handlePreview(course.id)}
-                  >
-                    Preview
-                  </button>
+                 <button
+  type="button"
+  className="course-card-preview"
+  onClick={() => handlePreview(course.id)}
+>
+  Preview
+</button>
 
                   <div className="course-card-actions-row">
                     {course.status === 'published' ? (
