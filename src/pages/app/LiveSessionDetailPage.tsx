@@ -7,12 +7,7 @@ import { apiClient } from '../../services/api'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
 import type { LiveSessionSummary } from './LiveSessionsPage'
 
-// ── Types ──────────────────────────────────────────────────────────────────
-// GET /v1/live/sessions/{id}/ is assumed to return everything in
-// LiveSessionSummary plus a richer description/agenda/audience block for the
-// detail view. These extra fields are NOT confirmed against backend docs —
-// render defensively and hide each block if its field is missing rather than
-// showing empty placeholders.
+
 interface LiveSessionDetail extends LiveSessionSummary {
   description?: string
   agenda?: string[]

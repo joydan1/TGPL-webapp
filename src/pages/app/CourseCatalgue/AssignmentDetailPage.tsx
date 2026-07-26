@@ -134,8 +134,27 @@ function normalizeGradingCriteria(
   return []
 }
 
+// ─── Size formatting helpers ───────────────────────────────────────────────
+// toMB() gives the per-requirement figure shown in the modal (exact limit for
+// that specific upload slot). formatMaxFileSize() gives the panel-wide figure
+// shown before the learner opens the modal — a range when slots differ, so
+// nobody is told a bigger number than the slot they'll actually use allows.
+
+function toMB(bytes: number): number {
+  return Math.round(bytes / (1024 * 1024))
+}
+
+function formatMaxFileSize(reqs: AssignmentRequirement[]): string {
+  if (!reqs.length) return ''
+  const sizes = reqs.map((r) => toMB(r.max_bytes))
+  const min = Math.min(...sizes)
+  const max = Math.max(...sizes)
+  return min === max ? `${max} MB` : `${min}–${max} MB (varies by file)`
+}
+
 function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext): AssignmentDetail {
   const attempt = latestAttempt(raw)
+  const requirements = raw.requirements ?? []
 
   return {
     id: raw.id,
@@ -164,7 +183,7 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
       size_display: r.file_size ? `${(r.file_size / 1024).toFixed(0)} KB` : '',
       size_tag: undefined,
     })),
-    requirements: raw.requirements ?? [],
+    requirements,
     submitted_files: (attempt?.files ?? []).map((f) => ({
       id: f.id,
       filename: f.file_name,
@@ -173,12 +192,10 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
     })),
     feedback: deriveFeedback(attempt),
     submission_requirements: {
-      accepted_file_types: (raw.requirements ?? []).map((r) => r.allowed_file_types).join(', '),
-      max_file_size: (raw.requirements ?? []).length
-        ? `${Math.round(Math.max(...raw.requirements.map((r) => r.max_bytes)) / (1024 * 1024))} MB`
-        : '',
+      accepted_file_types: requirements.map((r) => r.allowed_file_types).join(', '),
+      max_file_size: formatMaxFileSize(requirements),
       word_count: null,
-      max_files: (raw.requirements ?? []).length,
+      max_files: requirements.length,
     },
   }
 }
@@ -521,7 +538,9 @@ return ( <div className="modal-backdrop" onClick={onClose}>
           <div className="criteria-row" key={req.id}>
             <div className="criteria-label-wrap">
               <span>{req.label}{req.required ? '' : ' (optional)'}</span>
-              <span className="criteria-hint">{req.allowed_file_types}</span>
+              <span className="criteria-hint">
+                {req.allowed_file_types} · up to {toMB(req.max_bytes)} MB
+              </span>
               {req.naming_hint && (
                 <span className="criteria-hint">Name your file: {req.naming_hint}</span>
               )}

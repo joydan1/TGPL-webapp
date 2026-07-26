@@ -7,8 +7,11 @@ import {
   X, Coffee, ChevronRight,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
-import { coursesAPI, assignmentsAPI } from '../../../services/api'
-import type { LessonDetailResponse, LessonResource, LearnModule, LearnModuleAssignmentSummary, AssignmentResource } from '../../../services/api'
+import { coursesAPI, assignmentsAPI, liveSessionsAPI } from '../../../services/api'
+import type {
+  LessonDetailResponse, LessonResource, LearnModule, LearnModuleAssignmentSummary,
+  AssignmentResource, LiveSlot, LiveSlotBooking,
+} from '../../../services/api'
 import { useAuth } from '../../../hooks/useAuth'
 import AppShell, { SHELL_CSS } from '../../../components/layout/AppShell'
 
@@ -68,7 +71,7 @@ async function triggerDownload(url: string, filename?: string, fileType?: string
     document.body.removeChild(a)
     window.URL.revokeObjectURL(blobUrl)
   } catch (err) {
-    // Fallback if fetch/CORS fails — same-tab 
+    // Fallback if fetch/CORS fails — same-tab
     const a = document.createElement('a')
     a.href = url
     a.download = filename || ''
@@ -371,6 +374,16 @@ export default function CourseLearnPage() {
   const [completeInfo, setCompleteInfo]       = useState<CompleteInfo | null>(null)
   const [countdown, setCountdown]             = useState(5)
   const countdownRef                          = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Live-session booking ──
+  const [bookingModalOpen, setBookingModalOpen] = useState(false)
+  const [slots, setSlots]                       = useState<LiveSlot[]>([])
+  const [slotsLoading, setSlotsLoading]         = useState(false)
+  const [slotsError, setSlotsError]             = useState<string | null>(null)
+  const [selectedSlotId, setSelectedSlotId]     = useState<string | null>(null)
+  const [booking, setBooking]                   = useState(false)
+  const [bookingError, setBookingError]         = useState<string | null>(null)
+  const [bookingSuccess, setBookingSuccess]     = useState<LiveSlotBooking | null>(null)
 
   // ── Load lesson ──
   useEffect(() => {
@@ -715,7 +728,7 @@ async function downloadResource(r: LessonResource) {
   }
 }
 
- 
+
   async function downloadAll(resources: LessonResource[]) {
     setResourceError(null)
     await Promise.all(resources.map((r) => downloadResource(r)))
@@ -731,6 +744,50 @@ async function downloadResource(r: LessonResource) {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
+
+  // ── Live-session booking handlers ──
+  function openBookingModal() {
+    if (!slug) return
+    setBookingModalOpen(true)
+    setSelectedSlotId(null)
+    setBookingError(null)
+    setBookingSuccess(null)
+    setSlotsLoading(true)
+    setSlotsError(null)
+    liveSessionsAPI.getCourseSlots(slug).then((res) => {
+      if (res.success) {
+        setSlots((res.data ?? []).filter((s) => s.status === 'open'))
+      } else {
+        setSlotsError(res.error || 'Could not load available times.')
+      }
+      setSlotsLoading(false)
+    })
+  }
+
+  async function confirmBooking() {
+    if (!selectedSlotId) return
+    setBooking(true)
+    setBookingError(null)
+    const res = await liveSessionsAPI.bookSlot(selectedSlotId)
+    setBooking(false)
+    if (res.success) {
+      setBookingSuccess(res.data)
+      setSlots((prev) => prev.filter((s) => s.id !== selectedSlotId))
+    } else if (res.statusCode === 409) {
+      setBookingError('That slot was just taken — pick another time.')
+      setSlots((prev) => prev.filter((s) => s.id !== selectedSlotId))
+      setSelectedSlotId(null)
+    } else {
+      setBookingError(res.error || 'Could not book that slot.')
+    }
+  }
+
+  // Group slots by date (server sends starts_at/ends_at as ISO, no separate date field)
+  const slotsByDate = slots.reduce<Record<string, LiveSlot[]>>((acc, s) => {
+    const day = new Date(s.starts_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+    ;(acc[day] ||= []).push(s)
+    return acc
+  }, {})
 
   const hasVideo   = Boolean(lesson?.video_url)
   const prevLesson = lesson?.previous_lesson ?? null
@@ -1111,7 +1168,7 @@ async function downloadResource(r: LessonResource) {
                     <div className="ask-help-popover">
                       <div className="ask-help-popover-title">Get help from a tutor</div>
                       <div className="ask-help-popover-sub">Book a 1-on-1 session with Amara Osei or a course assistant.</div>
-                      <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); navigate(ROUTES.TUTOR_BOOKING) }}>
+                      <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); openBookingModal() }}>
                         Book a session
                       </button>
                       <button className="ask-help-item secondary" onClick={() => setAskHelpOpen(false)}>
@@ -1175,6 +1232,69 @@ async function downloadResource(r: LessonResource) {
             <button className="modal-break-link" onClick={() => navigate(ROUTES.DASHBOARD)}>
               <Coffee size={14} />Take a break — go to dashboard
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Book a live session modal ── */}
+      {bookingModalOpen && (
+        <div className="modal-backdrop" onClick={() => setBookingModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setBookingModalOpen(false)}><X size={16} /></button>
+
+            {!bookingSuccess ? (
+              <>
+                <div className="modal-title">Book a 1-on-1 session</div>
+                {slotsLoading && <div className="state-screen">Loading available times…</div>}
+                {slotsError && <div className="error-banner">{slotsError}</div>}
+                {!slotsLoading && !slotsError && slots.length === 0 && (
+                  <div className="resources-empty">No open slots right now — check back soon.</div>
+                )}
+                {!slotsLoading && Object.entries(slotsByDate).map(([day, daySlots]) => (
+                  <div key={day} style={{ width: '100%' }}>
+                    <div className="qp-section-label" style={{ padding: '0.5rem 0' }}>{day}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {daySlots.map((s) => {
+                        const active = selectedSlotId === s.id
+                        const time = new Date(s.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => setSelectedSlotId(s.id)}
+                            style={{
+                              padding: '0.5rem 0.875rem', borderRadius: 999,
+                              border: active ? '1.5px solid #2563EB' : '1px solid #E5E7EB',
+                              background: active ? '#EFF6FF' : '#fff',
+                              color: active ? '#2563EB' : '#374151',
+                              fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
+                            }}
+                          >
+                            {time}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {bookingError && <div className="error-banner">{bookingError}</div>}
+                <div className="modal-actions">
+                  <button className="modal-cancel" onClick={() => setBookingModalOpen(false)}>Cancel</button>
+                  <button className="modal-start-now" onClick={confirmBooking} disabled={!selectedSlotId || booking}>
+                    {booking ? 'Requesting…' : 'Request this time'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-check"><CheckCircle size={28} color="#fff" /></div>
+                <div className="modal-title">Request sent</div>
+                <div className="modal-sub">
+                  {new Date(bookingSuccess.slot_starts_at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  <br />Your trainer needs to confirm it — you'll get notified once they do.
+                </div>
+                <button className="modal-start-now" onClick={() => setBookingModalOpen(false)}>Done</button>
+              </>
+            )}
           </div>
         </div>
       )}

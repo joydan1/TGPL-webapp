@@ -277,6 +277,38 @@ function parseApiError(error: unknown, fallback: string): { message: string; sta
   return { message, statusCode, code }
 }
 
+function simplifyFileError(message: string, statusCode?: number): string {
+  const lower = message.toLowerCase()
+
+  if (statusCode === 413 || lower.includes('too large') || lower.includes('exceed') || lower.includes('size limit')) {
+    return 'File is too large.'
+  }
+  if (
+    lower.includes('extension') ||
+    lower.includes('content-type') ||
+    lower.includes('content type') ||
+    lower.includes('mismatch') ||
+    lower.includes('not allowed') ||
+    lower.includes('file type')
+  ) {
+    return 'File type not allowed.'
+  }
+  if (statusCode === 401 || statusCode === 403) {
+    return 'Upload link expired.'
+  }
+  if (statusCode && statusCode >= 500) {
+    return 'Upload failed — please try again.'
+  }
+  return 'Upload failed.'
+}
+
+function humanizeStorageUploadError(status: number): string {
+  if (status === 403) return 'Upload link expired.'
+  if (status === 413) return 'File is too large.'
+  if (status >= 500) return 'Upload failed — please try again.'
+  return 'Upload failed.'
+}
+
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const authAPI = {
@@ -662,6 +694,24 @@ export interface CourseLearnViewResponse {
   modules: LearnModule[]
 }
 
+
+// ─── Course Detail (public) ────────────────────────────────────────────────
+
+export interface CoursePublicTrainer {
+  id: string
+  name: string
+  credential: string | null
+}
+
+export interface CourseDetailResponse {
+  id: string
+  slug: string
+  title: string
+  trainer: CoursePublicTrainer
+  
+}
+
+
 // ─── Courses API ──────────────────────────────────────────────────────────────
 
 export const coursesAPI = {
@@ -673,6 +723,16 @@ export const coursesAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to check enrollment status')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  getCourseDetail: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.get<CourseDetailResponse>(`/v1/courses/${courseSlug}/`)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load course')
       return { success: false as const, error: message, statusCode }
     }
   },
@@ -859,7 +919,6 @@ export interface LiveSlot {
 export interface LiveSession {
   id: string
   title: string
-  // Confirmed via Swagger (POST .../sessions/ response):
   course_id?: string
   topic?: string
   starts_at?: string
@@ -884,7 +943,18 @@ export interface LiveManageBooking {
   session?: LiveSession | null
   created_at: string
 }
- 
+
+
+export interface LiveSlotBooking {
+  id: string
+  slot_id: string
+  course_id: string
+  status: LiveBookingStatus
+  slot_starts_at: string
+  slot_ends_at: string
+  recording_url: string | null
+  created_at: string
+}
 export interface CreateSlotPayload {
   starts_at: string
   ends_at: string
@@ -1045,6 +1115,54 @@ export const liveSessionsAPI = {
         error,
         'Failed to go live. The session may have already ended or been cancelled.',
       )
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+  
+  /** GET /v1/live/courses/{slug}/slots/ — OPEN slots for an enrolled course */
+  getCourseSlots: async (courseSlug: string) => {
+    try {
+      const response = await apiClient.get<LiveSlot[]>(
+        API_ENDPOINTS.LIVE_COURSE_SLOTS(courseSlug),
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load available times')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/live/slots/{slot_id}/book/ — request an open slot */
+  bookSlot: async (slotId: string) => {
+    try {
+      const response = await apiClient.post<LiveSlotBooking>(
+        API_ENDPOINTS.LIVE_SLOT_BOOK(slotId),
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to book that slot')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/live/bookings/ — the caller's own bookings */
+  getMyBookings: async () => {
+    try {
+      const response = await apiClient.get<LiveSlotBooking[]>(API_ENDPOINTS.LIVE_BOOKINGS)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load your bookings')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/live/bookings/{id}/cancel/ — cancel the caller's own booking */
+  cancelBooking: async (bookingId: string) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.LIVE_BOOKING_CANCEL(bookingId))
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to cancel booking')
       return { success: false as const, error: message, statusCode }
     }
   },
@@ -1670,7 +1788,9 @@ export interface AssignmentRequirement {
   max_bytes: number
   required: boolean
   order: number
-  naming_hint?: string
+  // Display guidance only — the backend never validates filenames against
+  // this. Type/content-type and size are the only enforced rules.
+  naming_hint: string
 }
 
 export interface SubmittedFile {
@@ -1819,7 +1939,9 @@ export const assignmentsAPI = {
           )
           const { upload_url, method, headers, object_key } = presignRes.data
 
-          // 2b. upload directly to storage, using the method/headers the backend returned
+          // 2b. upload directly to storage, using the method/headers the backend returned.
+          // A failure here is a raw fetch() failure (not an Axios/API error), so it's
+          // translated through humanizeStorageUploadError() rather than parseApiError().
           const uploadRes = await fetch(upload_url, {
             method: method || 'PUT',
             body: file,
@@ -1829,12 +1951,11 @@ export const assignmentsAPI = {
                 : { 'Content-Type': file.type || 'application/octet-stream' },
           })
           if (!uploadRes.ok) {
-            throw new Error(`Upload failed (HTTP ${uploadRes.status})`)
+            console.error(`Storage upload failed for "${file.name}": HTTP ${uploadRes.status}`)
+            throw new Error(humanizeStorageUploadError(uploadRes.status))
           }
 
-          // 2c. confirm — validation was tightened here server-side: mismatched
-          // extension/content-type, wrong file type, or over the slot's size
-          // limit now comes back as a 400 naming what failed.
+
           await apiClient.post(
             `/v1/assignments/submissions/${submissionId}/files/confirm/`,
             {
@@ -1846,13 +1967,16 @@ export const assignmentsAPI = {
             },
           )
         } catch (fileError) {
-          // Surface which file failed and why, rather than a generic
-          // "Submission failed" that leaves the learner guessing.
+  
           if (fileError instanceof Error && !(fileError as { response?: unknown }).response) {
             return { success: false as const, error: `"${file.name}": ${fileError.message}` }
           }
-          const { message, statusCode } = parseApiError(fileError, `"${file.name}" was rejected`)
-          return { success: false as const, error: `"${file.name}": ${message}`, statusCode }
+          const { message, statusCode } = parseApiError(fileError, 'Upload failed.')
+          return {
+            success: false as const,
+            error: `"${file.name}": ${simplifyFileError(message, statusCode)}`,
+            statusCode,
+          }
         }
       }
       
