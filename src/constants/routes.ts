@@ -83,8 +83,10 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   // ===========================
   ADMIN_LOGIN: '/admin/login',
   ADMIN_SIGNUP: '/admin/signup',
-  ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_DASHBOARD: '/admin/dashboard',  
  ADMIN_RESET_PASSWORD: '/admin/reset-password',
+ ADMIN_FORGOT_PASSWORD: '/admin/forgot-password',
+
 
   // ===========================
   // ERROR PAGES
@@ -233,7 +235,13 @@ export const ROUTE_METADATA: Record<
     requiredRole: 'trainer',
     showInNav: true,
   },
-
+[ROUTES.TRAINER_BOOKINGS]: {
+  title: 'Bookings',
+  description: 'Manage session bookings from learners',
+  requiresAuth: true,
+  requiredRole: 'trainer',
+  showInNav: true,
+},
   // Admin routes
   [ROUTES.ADMIN_DASHBOARD]: {
     title: 'Admin Dashboard',

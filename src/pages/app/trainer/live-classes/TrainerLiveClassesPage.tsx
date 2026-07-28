@@ -19,22 +19,29 @@ type SessionCard = {
   confirmedCount: number
   bookingsCount: number
 }
-
-function buildBookingCounts(bookings: LiveManageBooking[]): Map<string, { confirmed: number; total: number }> {
+function buildBookingCounts(
+  bookings: LiveManageBooking[]
+): Map<string, { confirmed: number; total: number }> {
   const map = new Map<string, { confirmed: number; total: number }>()
+
   for (const b of bookings) {
-    if (!b.session) continue
-    const existing = map.get(b.session.id)
+    if (!b.slot_id) continue
+
+    const existing = map.get(b.slot_id)
+
     if (existing) {
       existing.total += 1
       if (b.status === 'confirmed') existing.confirmed += 1
     } else {
-      map.set(b.session.id, { total: 1, confirmed: b.status === 'confirmed' ? 1 : 0 })
+      map.set(b.slot_id, {
+        total: 1,
+        confirmed: b.status === 'confirmed' ? 1 : 0,
+      })
     }
   }
+
   return map
 }
-
 function sessionDateTime(session: TrainerSession): Date {
   return new Date(session.starts_at)
 }
@@ -254,15 +261,31 @@ export default function TrainerLiveClassesPage() {
   )
 
   const stats = useMemo(() => {
-    const confirmed = bookings.filter((b) => b.status === 'confirmed')
-    const uniqueLearners = new Set(confirmed.map((b) => b.learner.id))
-    const totalSessions = upcomingSessions.length + liveSessions.length + pastSessions.length
-    const uniqueBookedSessions = new Set(bookings.map((b) => b.session?.id).filter(Boolean))
-    const avgAttendance = uniqueBookedSessions.size
-      ? Math.round(confirmed.length / uniqueBookedSessions.size)
-      : 0
-    return { totalSessions, studentsReached: uniqueLearners.size, avgAttendance }
-  }, [bookings, upcomingSessions, liveSessions, pastSessions])
+  const confirmed = bookings.filter((b) => b.status === 'confirmed')
+
+  const uniqueLearners = new Set(
+    confirmed
+      .map((b) => b.learner_name?.trim().toLowerCase())
+      .filter(Boolean)
+  )
+
+  const totalSessions =
+    upcomingSessions.length + liveSessions.length + pastSessions.length
+
+  const uniqueBookedSessions = new Set(
+    bookings.map((b) => b.slot_id).filter(Boolean)
+  )
+
+  const avgAttendance = uniqueBookedSessions.size
+    ? Math.round(confirmed.length / uniqueBookedSessions.size)
+    : 0
+
+  return {
+    totalSessions,
+    studentsReached: uniqueLearners.size,
+    avgAttendance,
+  }
+}, [bookings, upcomingSessions, liveSessions, pastSessions])
 
   function resetScheduleForm() {
     setForm({ date: '', startTime: '', duration: 60, title: '', joinUrl: '' })

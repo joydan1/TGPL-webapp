@@ -229,7 +229,9 @@ export default function AdminLoginPage() {
               <div>
                 <div className="password-label-row">
                   <label htmlFor="password">Password</label>
-                  <Link to={ROUTES.FORGOT_PASSWORD} className="forgot-link">Forgot password?</Link>
+                    <Link to={ROUTES.ADMIN_FORGOT_PASSWORD} className="forgot-link">
+                      Forgot password?
+                    </Link>
                 </div>
                 <div className="password-wrapper">
                   <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={formData.password} onChange={handleInputChange} error={formErrors.password} disabled={unverifiedEmail !== null} />

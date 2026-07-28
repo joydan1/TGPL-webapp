@@ -935,13 +935,16 @@ export interface LiveSession {
   recording_views?: number
 }
  
-export interface LiveManageBooking {
+export type LiveManageBooking = {
   id: string
-  status: LiveBookingStatus
-  learner: LiveLearnerRef
-  slot: LiveSlot
-  session?: LiveSession | null
+  slot_id: string
+  course_id: string
+  status: 'requested' | 'confirmed' | 'rejected' | string
+  slot_starts_at: string
+  slot_ends_at: string
+  recording_url?: string | null
   created_at: string
+  learner_name: string
 }
 
 

@@ -32,6 +32,7 @@ import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
 import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
 import TrainerProfilePage from './pages/app/trainer/TrainerProfilePage'
+import TrainerBookingsPage from './pages/app/trainer/bookings/TrainerBookingsPage'
 import TrainerCourseManagePage from './pages/app/trainer/courses/TrainerCourseManagePage'
 import TrainerLiveClassesPage from './pages/app/trainer/live-classes/TrainerLiveClassesPage'
 import AddCoursePage from './pages/app/trainer/courses/AddCoursePage'
@@ -44,7 +45,8 @@ import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
 import AdminSignupPage from './pages/admin/AdminSignupPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminResetPasswordPage from './pages/admin/AdminResetPasswordPage.tsx'
-
+import AdminForgotPasswordPage from './pages/admin/Adminforgotpasswordpage.tsx'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage.tsx'
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredRole?: 'learner' | 'trainer' | 'admin'
@@ -236,6 +238,7 @@ function App() {
     </ProtectedRoute>
   }
 />
+<Route path={ROUTES.TRAINER_BOOKINGS} element={<TrainerBookingsPage />} />
 <Route
   path={ROUTES.TRAINER_LIVE_CLASSES}
   element={
@@ -302,9 +305,12 @@ function App() {
     </ProtectedRoute>
   }
 />
+{/* Admin routes */}
 <Route path={ROUTES.ADMIN_SIGNUP} element={<AdminSignupPage />} />
 <Route path={ROUTES.ADMIN_LOGIN} element={<AdminLoginPage />} />
 <Route path={ROUTES.ADMIN_RESET_PASSWORD} element={<AdminResetPasswordPage />} />
+<Route path={ROUTES.ADMIN_FORGOT_PASSWORD} element={<AdminForgotPasswordPage />} />
+<Route path={ROUTES.ADMIN_DASHBOARD} element={<AdminDashboardPage />} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
