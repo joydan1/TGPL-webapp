@@ -1,7 +1,23 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '../../constants/routes'
 
+const BACK_ROUTES: Record<string, string> = {
+  learner: ROUTES.SIGNUP,
+  admin: ROUTES.ADMIN_SIGNUP,
+}
+
+const BACK_LABELS: Record<string, string> = {
+  learner: 'Sign Up',
+  trainer: 'Trainer Sign Up',
+  admin: 'Admin Sign Up',
+}
+
 export default function PrivacyPage() {
+  const [searchParams] = useSearchParams()
+  const from = searchParams.get('from') || 'learner'
+  const backTo = BACK_ROUTES[from] || ROUTES.SIGNUP
+  const backLabel = BACK_LABELS[from] || 'Sign Up'
+
   return (
     <>
       <style>{`
@@ -188,7 +204,7 @@ export default function PrivacyPage() {
           </div>
 
           <div className="legal-back">
-           <Link to={ROUTES.SIGNUP}>← Back to Sign Up</Link>
+            <Link to={backTo}>← Back to {backLabel}</Link>
           </div>
         </div>
       </div>

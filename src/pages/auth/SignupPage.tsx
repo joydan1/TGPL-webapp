@@ -399,9 +399,9 @@ export default function SignupPage() {
                   />
                   <label htmlFor="terms" className="terms-label">
                     I agree to the{' '}
-                    <a href={ROUTES.TERMS} target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                    <a href={`${ROUTES.TERMS}?from=${role}`} target="_blank" rel="noopener noreferrer">Terms of Service</a>
                     {' '}and{' '}
-                    <a href={ROUTES.PRIVACY} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                    <a href={`${ROUTES.PRIVACY}?from=${role}`} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
                   </label>
                 </div>
                 {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}

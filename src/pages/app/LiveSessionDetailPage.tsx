@@ -39,74 +39,107 @@ function initials(name: string): string {
   return name.split(' ').map((p) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
 }
 
+// ── Small components ───────────────────────────────────────────────────────
+function StarRow({ rating }: { rating: number }) {
+  const rounded = Math.round(rating)
+  return (
+    <span className="lsd-star-row">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          size={10}
+          color={i < rounded ? '#FBBF24' : '#E5E7EB'}
+          fill={i < rounded ? '#FBBF24' : '#E5E7EB'}
+        />
+      ))}
+    </span>
+  )
+}
+
 // ── Page CSS ───────────────────────────────────────────────────────────────
 const PAGE_CSS = `
-  .lsd-content { padding: 2rem 2.5rem 6.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 900px; }
-  .lsd-top { display: flex; align-items: center; justify-content: space-between; }
-  .lsd-back { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; font-size: 0.9375rem; font-weight: 700; color: #111; cursor: pointer; padding: 0; }
-  .lsd-back:hover { opacity: 0.75; }
-  .lsd-live-pill { display: inline-flex; align-items: center; gap: 0.3rem; background: #EF4444; color: #fff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; padding: 0.3rem 0.7rem; border-radius: 2rem; }
+  /* Header */
+  .lsd-header { height: 61px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(1rem, 4vw, 3rem); border-bottom: 1px solid #F3F4F6; background: #fff; box-sizing: border-box; }
+  .lsd-header-left { display: flex; align-items: center; gap: 0.625rem; }
+  .lsd-back-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #E5E7EB; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; }
+  .lsd-back-circle:hover { background: #F9FAFB; }
+  .lsd-header-label { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 14px; color: #2B3942; }
+  .lsd-live-pill { display: inline-flex; align-items: center; gap: 0.3rem; background: #FB2C36; color: #fff; font-family: 'Sora', sans-serif; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; padding: 0.3rem 0.7rem; border-radius: 2rem; }
 
-  .lsd-title { font-size: 1.5rem; font-weight: 700; color: #111; }
-  .lsd-status-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; color: #EF4444; font-weight: 600; margin-top: 0.375rem; }
-  .lsd-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #EF4444; animation: lsd-pulse 1.4s ease-in-out infinite; }
-  @keyframes lsd-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .lsd-status-row.upcoming { color: #6B7280; }
-  .lsd-status-row.upcoming .lsd-status-dot { background: #9CA3AF; animation: none; }
+  .lsd-content { padding: 16px clamp(1rem, 4vw, 3rem) 100px; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
 
-  .lsd-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1.25rem 1.5rem; }
+  /* Title / status */
+  .lsd-title { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 16px; line-height: 22px; color: #2B3942; }
+  .lsd-status-row { display: flex; align-items: center; gap: 6px; padding-top: 4px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11px; line-height: 16px; color: #FB2C36; }
+  .lsd-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #FB2C36; opacity: 0.54; animation: lsd-pulse 1.4s ease-in-out infinite; }
+  @keyframes lsd-pulse { 0%,100% { opacity: 0.54; } 50% { opacity: 0.2; } }
+  .lsd-status-row.upcoming { color: #6A7282; }
+  .lsd-status-row.upcoming .lsd-status-dot { background: #99A1AF; opacity: 1; animation: none; }
 
-  .lsd-trainer-row { display: flex; align-items: center; gap: 0.875rem; }
-  .lsd-avatar-img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-  .lsd-avatar-fallback { width: 52px; height: 52px; border-radius: 50%; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.125rem; flex-shrink: 0; }
-  .lsd-trainer-name { font-size: 1rem; font-weight: 700; color: #111; }
-  .lsd-trainer-title { font-size: 0.8125rem; color: #6B7280; margin-top: 0.1rem; }
-  .lsd-trainer-rating { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.3rem; font-size: 0.8125rem; color: #6B7280; }
+  .lsd-section-margin { padding-top: 16px; }
 
-  .lsd-info-list { display: flex; flex-direction: column; }
-  .lsd-info-row { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 0; }
+  /* Trainer card */
+  .lsd-trainer-card { box-sizing: border-box; display: flex; align-items: center; padding: 16px; gap: 16px; background: #fff; border: 1px solid #F3F4F6; box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1); border-radius: 16px; }
+  .lsd-avatar-img { width: 56px; height: 56px; border-radius: 16px; object-fit: cover; flex-shrink: 0; }
+  .lsd-avatar-fallback { width: 56px; height: 56px; border-radius: 16px; background: #DBEAFE; color: #2492EB; display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+  .lsd-trainer-name { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px; line-height: 20px; color: #2B3942; }
+  .lsd-trainer-title { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 11px; line-height: 16px; color: #6A7282; padding-top: 2px; }
+  .lsd-trainer-rating { display: flex; align-items: center; gap: 4px; padding-top: 4px; font-family: 'Sora', sans-serif; font-weight: 400; font-size: 10px; line-height: 15px; color: #99A1AF; }
+  .lsd-star-row { display: inline-flex; align-items: center; gap: 1px; }
+
+  /* Info card (date/time/duration) */
+  .lsd-info-card { box-sizing: border-box; display: flex; flex-direction: column; background: #fff; border: 1px solid #F3F4F6; box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1); border-radius: 16px; overflow: hidden; }
+  .lsd-info-row { box-sizing: border-box; display: flex; align-items: center; padding: 12px 16px; gap: 12px; }
   .lsd-info-row + .lsd-info-row { border-top: 1px solid #F3F4F6; }
-  .lsd-info-icon { width: 36px; height: 36px; border-radius: 0.6rem; background: #EFF6FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .lsd-info-label { font-size: 0.75rem; color: #9CA3AF; }
-  .lsd-info-value { font-size: 0.9375rem; font-weight: 700; color: #111; margin-top: 0.1rem; }
+  .lsd-info-icon { width: 28px; height: 28px; border-radius: 8px; background: #EFF6FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lsd-info-label { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 10px; line-height: 15px; color: #99A1AF; }
+  .lsd-info-value { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; line-height: 18px; color: #2B3942; margin-top: 1px; }
 
-  .lsd-linked-course { background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 1rem; padding: 1.125rem 1.5rem; display: flex; align-items: center; gap: 0.875rem; cursor: pointer; }
-  .lsd-linked-course:hover { background: #E4F0FE; }
-  .lsd-linked-icon { width: 40px; height: 40px; border-radius: 0.6rem; background: #DBEAFE; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .lsd-linked-eyebrow { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #2563EB; }
-  .lsd-linked-title { font-size: 0.9375rem; font-weight: 700; color: #111; margin-top: 0.1rem; }
-  .lsd-linked-module { font-size: 0.8125rem; color: #6B7280; margin-top: 0.1rem; }
+  /* Linked course */
+  .lsd-linked-course { box-sizing: border-box; display: flex; align-items: center; padding: 12px 16px; gap: 12px; background: rgba(239,246,255,0.6); border: 1px solid #DBEAFE; border-radius: 16px; cursor: pointer; }
+  .lsd-linked-course:hover { background: rgba(239,246,255,0.9); }
+  .lsd-linked-icon { width: 32px; height: 32px; border-radius: 12px; background: rgba(36,146,235,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lsd-linked-eyebrow { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 10px; line-height: 15px; letter-spacing: 0.25px; text-transform: uppercase; color: #2492EB; }
+  .lsd-linked-title { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; line-height: 18px; color: #2B3942; }
+  .lsd-linked-module { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 10px; line-height: 15px; color: #6A7282; }
 
-  .lsd-section-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.625rem; }
-  .lsd-desc { font-size: 0.9375rem; color: #374151; line-height: 1.6; }
+  /* Section labels */
+  .lsd-section-label { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 11px; line-height: 16px; letter-spacing: 1.1px; text-transform: uppercase; color: #99A1AF; }
+  .lsd-desc { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 12.5px; line-height: 21px; color: #364153; padding-top: 8px; }
 
-  .lsd-agenda-item { display: flex; align-items: center; gap: 0.625rem; font-size: 0.9375rem; color: #374151; padding: 0.5rem 0; }
+  /* Agenda */
+  .lsd-agenda-list { padding-top: 8px; display: flex; flex-direction: column; }
+  .lsd-agenda-item { display: flex; align-items: flex-start; gap: 10px; padding-top: 8px; }
+  .lsd-agenda-item:first-child { padding-top: 0; }
+  .lsd-agenda-icon { width: 20px; height: 20px; border-radius: 50%; background: rgba(36,146,235,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .lsd-agenda-text { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 12px; line-height: 16px; color: #364153; padding-top: 2px; }
 
-  .lsd-audience-card { background: #F9FAFB; border-left: 3px solid #E5E7EB; border-radius: 0.5rem; padding: 1rem 1.25rem; }
-  .lsd-audience-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.3rem; }
-  .lsd-audience-text { font-size: 0.875rem; color: #374151; line-height: 1.55; }
+  /* Audience card */
+  .lsd-audience-card { box-sizing: border-box; padding: 12px 16px; background: #F9FAFB; border: 1px solid #F3F4F6; border-radius: 12px; }
+  .lsd-audience-label { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 10px; line-height: 15px; letter-spacing: 1px; text-transform: uppercase; color: #99A1AF; }
+  .lsd-audience-text { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 12px; line-height: 20px; color: #4A5565; padding-top: 4px; }
 
-  .lsd-sticky-bar { position: fixed; left: 260px; right: 0; bottom: 0; padding: 1.25rem 2.5rem; background: linear-gradient(0deg, #fff 60%, rgba(255,255,255,0)); z-index: 5; }
-  .lsd-sticky-inner { max-width: 900px; margin: 0 auto; }
-  .lsd-join-btn { width: 100%; border: none; border-radius: 0.875rem; padding: 1.1rem; background: #EF4444; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 6px 20px rgba(239,68,68,0.35); }
-  .lsd-join-btn:hover { background: #DC2626; }
+  /* Sticky footer */
+  .lsd-sticky-bar { position: fixed; left: 260px; right: 0; bottom: 0; padding: 1rem clamp(1rem, 4vw, 3rem); background: linear-gradient(0deg, #fff 65%, rgba(255,255,255,0)); z-index: 5; display: flex; box-sizing: border-box; }
+  .lsd-sticky-inner { width: 100%; display: flex; }
+  .lsd-join-btn { width: 245px; height: 48px; border: none; border-radius: 0.75rem; background: #FB2C36; color: #fff; font-family: 'Sora', sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 8px 20px #FFC9C9; }
+  .lsd-join-btn:hover { background: #E0212E; }
   .lsd-join-btn:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
-  .lsd-remind-btn { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.875rem; padding: 1.05rem; background: #fff; color: #374151; font-size: 0.9375rem; font-weight: 700; cursor: pointer; }
+  .lsd-remind-btn { width: 245px; height: 48px; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; background: #fff; color: #374151; font-family: 'Sora', sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .lsd-remind-btn:hover { background: #F9FAFB; }
 
   @media (max-width: 900px) {
     .lsd-sticky-bar { left: 0; }
   }
   @media (max-width: 640px) {
-    .lsd-content { padding: 1.25rem 1rem 6.5rem; }
-    .lsd-sticky-bar { padding: 1rem; }
+    .lsd-join-btn, .lsd-remind-btn { width: 100%; }
   }
 `
 
 export default function LiveSessionDetailPage() {
   const navigate = useNavigate()
-  const { sessionId } = useParams<{ sessionId: string }>()
-  const { user, isAuthenticated } = useAuth()
+  const { id: sessionId } = useParams<{ id: string }>()
+  const { isAuthenticated } = useAuth()
   const [activeNav, setActiveNav] = useState('live')
   const [session, setSession] = useState<LiveSessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -119,7 +152,11 @@ export default function LiveSessionDetailPage() {
 
   useEffect(() => {
     const fetchSession = async () => {
-      if (!sessionId) return
+      if (!sessionId) {
+        setError('No session ID in URL')
+        setLoading(false)
+        return
+      }
       try {
         setLoading(true)
         setError(null)
@@ -132,14 +169,23 @@ export default function LiveSessionDetailPage() {
         setLoading(false)
       }
     }
-    if (user) fetchSession()
-  }, [user, sessionId])
+    if (!isAuthenticated) return
+    fetchSession()
+  }, [isAuthenticated, sessionId])
 
   if (loading) {
     return (
       <>
         <style>{SHELL_CSS + PAGE_CSS}</style>
         <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
+          <div className="lsd-header">
+            <div className="lsd-header-left">
+              <button className="lsd-back-circle" onClick={() => navigate(RouteBuilder.liveSessions())}>
+                <ChevronLeft size={14} color="#2B3942" />
+              </button>
+              <span className="lsd-header-label">Session details</span>
+            </div>
+          </div>
           <div className="lsd-content"><div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>Loading session...</div></div>
         </AppShell>
       </>
@@ -151,8 +197,15 @@ export default function LiveSessionDetailPage() {
       <>
         <style>{SHELL_CSS + PAGE_CSS}</style>
         <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
+          <div className="lsd-header">
+            <div className="lsd-header-left">
+              <button className="lsd-back-circle" onClick={() => navigate(RouteBuilder.liveSessions())}>
+                <ChevronLeft size={14} color="#2B3942" />
+              </button>
+              <span className="lsd-header-label">Session details</span>
+            </div>
+          </div>
           <div className="lsd-content">
-            <button className="lsd-back" onClick={() => navigate(RouteBuilder.liveSessions())}><ChevronLeft size={18} /> Session details</button>
             <div style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>{error || 'Session not found'}</div>
           </div>
         </AppShell>
@@ -167,12 +220,17 @@ export default function LiveSessionDetailPage() {
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
       <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
-        <div className="lsd-content">
-          <div className="lsd-top">
-            <button className="lsd-back" onClick={() => navigate(RouteBuilder.liveSessions())}><ChevronLeft size={18} /> Session details</button>
-            {isLive && <span className="lsd-live-pill"><Radio size={10} /> Live</span>}
+        <div className="lsd-header">
+          <div className="lsd-header-left">
+            <button className="lsd-back-circle" onClick={() => navigate(RouteBuilder.liveSessions())}>
+              <ChevronLeft size={14} color="#2B3942" />
+            </button>
+            <span className="lsd-header-label">Session details</span>
           </div>
+          {isLive && <span className="lsd-live-pill"><Radio size={9} /> Live</span>}
+        </div>
 
+        <div className="lsd-content">
           <div>
             <div className="lsd-title">{session.title}</div>
             <div className={`lsd-status-row${isLive ? '' : ' upcoming'}`}>
@@ -181,8 +239,8 @@ export default function LiveSessionDetailPage() {
             </div>
           </div>
 
-          <div className="lsd-card">
-            <div className="lsd-trainer-row">
+          <div className="lsd-section-margin">
+            <div className="lsd-trainer-card">
               {session.trainer_avatar_url ? (
                 <img src={session.trainer_avatar_url} alt={session.trainer_name} className="lsd-avatar-img" />
               ) : (
@@ -192,69 +250,83 @@ export default function LiveSessionDetailPage() {
                 <div className="lsd-trainer-name">{session.trainer_name}</div>
                 {session.trainer_title && <div className="lsd-trainer-title">{session.trainer_title}</div>}
                 {typeof session.trainer_rating === 'number' && (
-                  <div className="lsd-trainer-rating"><Star size={13} color="#F59E0B" fill="#F59E0B" /> {session.trainer_rating.toFixed(1)}</div>
+                  <div className="lsd-trainer-rating">
+                    <StarRow rating={session.trainer_rating} />
+                    {session.trainer_rating.toFixed(1)}
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="lsd-card lsd-info-list">
-            <div className="lsd-info-row">
-              <div className="lsd-info-icon"><Calendar size={16} color="#2563EB" /></div>
-              <div>
-                <div className="lsd-info-label">Date</div>
-                <div className="lsd-info-value">{fmtFullDate(session.starts_at)}</div>
-              </div>
-            </div>
-            <div className="lsd-info-row">
-              <div className="lsd-info-icon"><Clock size={16} color="#2563EB" /></div>
-              <div>
-                <div className="lsd-info-label">Time</div>
-                <div className="lsd-info-value">{fmtTimeWithZone(session.starts_at)}</div>
-              </div>
-            </div>
-            {mins !== null && (
+          <div className="lsd-section-margin">
+            <div className="lsd-info-card">
               <div className="lsd-info-row">
-                <div className="lsd-info-icon"><Clock size={16} color="#2563EB" /></div>
+                <div className="lsd-info-icon"><Calendar size={13} color="#2492EB" /></div>
                 <div>
-                  <div className="lsd-info-label">Duration</div>
-                  <div className="lsd-info-value">{mins} min</div>
+                  <div className="lsd-info-label">Date</div>
+                  <div className="lsd-info-value">{fmtFullDate(session.starts_at)}</div>
                 </div>
               </div>
-            )}
+              <div className="lsd-info-row">
+                <div className="lsd-info-icon"><Clock size={13} color="#2492EB" /></div>
+                <div>
+                  <div className="lsd-info-label">Time</div>
+                  <div className="lsd-info-value">{fmtTimeWithZone(session.starts_at)}</div>
+                </div>
+              </div>
+              {mins !== null && (
+                <div className="lsd-info-row">
+                  <div className="lsd-info-icon"><Clock size={13} color="#2492EB" /></div>
+                  <div>
+                    <div className="lsd-info-label">Duration</div>
+                    <div className="lsd-info-value">{mins} min</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {session.course_title && (
-            <div className="lsd-linked-course" onClick={() => navigate(RouteBuilder.course(session.course_id))}>
-              <div className="lsd-linked-icon"><BookOpen size={18} color="#2563EB" /></div>
-              <div>
-                <div className="lsd-linked-eyebrow">Linked course</div>
-                <div className="lsd-linked-title">{session.course_title}</div>
-                {session.module_title && <div className="lsd-linked-module">{session.module_title}</div>}
+            <div className="lsd-section-margin">
+              <div className="lsd-linked-course" onClick={() => navigate(RouteBuilder.course(session.course_id))}>
+                <div className="lsd-linked-icon"><BookOpen size={15} color="#2492EB" /></div>
+                <div>
+                  <div className="lsd-linked-eyebrow">Linked course</div>
+                  <div className="lsd-linked-title">{session.course_title}</div>
+                  {session.module_title && <div className="lsd-linked-module">{session.module_title}</div>}
+                </div>
               </div>
             </div>
           )}
 
           {session.description && (
-            <div>
+            <div className="lsd-section-margin">
               <div className="lsd-section-label">About this session</div>
               <div className="lsd-desc">{session.description}</div>
             </div>
           )}
 
           {session.agenda && session.agenda.length > 0 && (
-            <div>
+            <div className="lsd-section-margin">
               <div className="lsd-section-label">What's covered</div>
-              {session.agenda.map((item, i) => (
-                <div key={i} className="lsd-agenda-item"><CheckCircle2 size={16} color="#2563EB" /> {item}</div>
-              ))}
+              <div className="lsd-agenda-list">
+                {session.agenda.map((item, i) => (
+                  <div key={i} className="lsd-agenda-item">
+                    <div className="lsd-agenda-icon"><CheckCircle2 size={11} color="#2492EB" /></div>
+                    <div className="lsd-agenda-text">{item}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {session.audience_note && (
-            <div className="lsd-audience-card">
-              <div className="lsd-audience-label">Who this is for</div>
-              <div className="lsd-audience-text">{session.audience_note}</div>
+            <div className="lsd-section-margin">
+              <div className="lsd-audience-card">
+                <div className="lsd-audience-label">Who this is for</div>
+                <div className="lsd-audience-text">{session.audience_note}</div>
+              </div>
             </div>
           )}
         </div>

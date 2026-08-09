@@ -149,9 +149,9 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   const navItems = [
     { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
     { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
-     { key: 'bookings', label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,    Icon: Calendar },
     { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star,   badge: pendingReviewsCount || undefined },
     { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
+     { key: 'bookings', label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,    Icon: Calendar },
     { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
   ]
 

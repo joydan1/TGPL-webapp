@@ -212,19 +212,21 @@ function fmtShortDate(iso: string): string {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
-
 function resourceIcon(fileType: string) {
   const t = (fileType || '').toLowerCase()
-  if (t.includes('xls') || t.includes('sheet')) return <FileSpreadsheet size={20} color="#16A34A" />
-  if (t.includes('ppt') || t.includes('slide')) return <Presentation size={20} color="#EA580C" />
-  return <FileText size={20} color="#7C3AED" />
+  if (t.includes('xls') || t.includes('sheet')) return <FileSpreadsheet size={16} color="#00A63E" />
+  if (t.includes('ppt') || t.includes('slide')) return <Presentation size={16} color="#EA580C" />
+  if (t.includes('doc')) return <FileText size={16} color="#2B7FFF" />
+  if (t.includes('pdf')) return <FileText size={16} color="#FB2C36" />
+  return <FileText size={16} color="#FB2C36" />
 }
 
 function resourceIconBg(fileType: string) {
   const t = (fileType || '').toLowerCase()
-  if (t.includes('xls') || t.includes('sheet')) return '#ECFDF3'
+  if (t.includes('xls') || t.includes('sheet')) return 'rgba(0, 201, 80, 0.1)'
   if (t.includes('ppt') || t.includes('slide')) return '#FFF4ED'
-  return '#F5F0FF'
+  if (t.includes('doc')) return 'rgba(43, 127, 255, 0.1)'
+  return 'rgba(251, 44, 54, 0.1)'
 }
 
 function sortedRequirements(reqs: AssignmentRequirement[]): AssignmentRequirement[] {
@@ -276,29 +278,29 @@ async function triggerDownload(url: string, filename?: string, fileType?: string
 }
 
 const PAGE_CSS = `
-  .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .adp-header { background: #fff; border-bottom: 1px solid #F3F4F6; padding: 1rem clamp(1rem, 4vw, 2.5rem) 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; box-sizing: border-box; }
+  .content { padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 3rem; display: flex; flex-direction: column; gap: 1.5rem; width: 100%; box-sizing: border-box; }
 
   .state-screen { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #9CA3AF; font-size: 0.9375rem; }
   .state-screen.error { color: #EF4444; }
 
-  .header-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem 1.75rem; display: flex; flex-direction: column; gap: 0.625rem; }
-  .crumb-row { display: flex; align-items: center; gap: 0.625rem; }
-  .crumb-back { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: none; background: none; color: #6B7280; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .crumb-row { display: flex; align-items: center; gap: 0.5rem; }
+  .crumb-back { width: 2rem; height: 2rem; border-radius: 50%; border: none; background: none; color: #2B3942; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .crumb-back:hover { background: #F3F4F6; }
-  .crumb { font-size: 0.875rem; color: #9CA3AF; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; row-gap: 0.25rem; min-width: 0; }
-  .crumb .crumb-link { color: #9CA3AF; cursor: pointer; }
-  .crumb .crumb-link:hover { color: #2563EB; }
-  .crumb .crumb-current { color: #2563EB; font-weight: 600; }
-  .header-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .header-title { font-size: 1.5rem; font-weight: 700; color: #111; word-break: break-word; }
-  .header-sub { font-size: 0.9375rem; color: #6B7280; margin-top: 0.125rem; }
-  .status-pill { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 0.8125rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
-  .status-pill.not_started { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
-  .status-pill.in_progress { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+  .crumb { font-size: 0.6875rem; color: #99A1AF; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; row-gap: 0.25rem; min-width: 0; }
+  .crumb .crumb-link { color: #99A1AF; cursor: pointer; }
+  .crumb .crumb-link:hover { color: #2492EB; }
+  .crumb .crumb-current { color: #2492EB; font-weight: 600; }
+  .header-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding-left: 0.25rem; }
+  .header-title { font-size: 1.0625rem; font-weight: 700; color: #2B3942; word-break: break-word; }
+  .header-sub { font-size: 0.6875rem; color: #99A1AF; margin-top: 0.125rem; }
+  .status-pill { display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 2rem; font-size: 0.6875rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .status-pill.not_started { background: #F3F4F6; color: #6A7282; border: 1px solid #E5E7EB; }
+  .status-pill.in_progress { background: #EFF6FF; color: #2492EB; border: 1px solid #BFDBFE; }
   .status-pill.graded { background: #ECFDF3; color: #16A34A; border: 1px solid #BBF7D0; }
-  .meta-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; font-size: 0.875rem; color: #6B7280; }
-  .meta-item { display: flex; align-items: center; gap: 0.4rem; }
-  .meta-pts { font-weight: 700; color: #111; }
+  .meta-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.6875rem; color: #6A7282; padding-left: 0.25rem; }
+  .meta-item { display: flex; align-items: center; gap: 0.35rem; }
+  .meta-pts { font-weight: 600; color: #2B3942; }
 
   .feedback-card { border-radius: 1rem; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.625rem; }
   .feedback-card.graded { background: #ECFDF3; }
@@ -328,62 +330,63 @@ const PAGE_CSS = `
   .info-banner-main { font-size: 0.9375rem; font-weight: 600; color: #92400E; }
   .info-banner-sub { font-size: 0.8125rem; color: #B45309; opacity: 0.85; }
 
-  .instructions-card { background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.5rem; }
-  .section-label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; color: #6B7280; text-transform: uppercase; }
-  .intro-text { font-size: 0.9375rem; line-height: 1.7; color: #374151; white-space: pre-wrap; }
+  .instructions-card { box-sizing: border-box; background: #fff; border: 1px solid #F3F4F6; border-radius: 1rem; padding: 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .section-label { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.04em; color: #2B3942; text-transform: uppercase; }
+  .intro-text { font-size: 0.875rem; line-height: 1.65; color: #364153; white-space: pre-wrap; }
   .intro-text b { color: #111; }
-  .example-fig { display: flex; flex-direction: column; gap: 0.5rem; }
-  .example-img { width: 100%; border-radius: 0.875rem; aspect-ratio: 1025.333251953125/329; object-fit: cover; display: block; background: linear-gradient(135deg,#c8c8c8,#a0a0a0); }
-  .example-caption { text-align: center; font-size: 0.8125rem; color: #9CA3AF; }
+  .example-fig { display: flex; flex-direction: column; gap: 0.5rem; background: #F9FAFB; border: 1px solid #F3F4F6; border-radius: 0.75rem; overflow: hidden; }
+  .example-img { width: 100%; border-radius: 0; aspect-ratio: 1025.333251953125/329; object-fit: cover; display: block; background: linear-gradient(135deg,#c8c8c8,#a0a0a0); }
+  .example-caption { text-align: center; font-size: 0.625rem; color: #99A1AF; padding: 0.5rem 0.75rem; }
 
   .subsection { display: flex; flex-direction: column; gap: 0.75rem; }
-  .subsection h3 { font-size: 1.0625rem; font-weight: 700; color: #111; }
+  .subsection h3 { font-size: 0.875rem; font-weight: 600; color: #2B3942; }
   .bullet-list, .numbered-list { display: flex; flex-direction: column; gap: 0.625rem; }
-  .bullet-row { display: flex; align-items: flex-start; gap: 0.625rem; font-size: 0.9375rem; color: #374151; line-height: 1.55; }
-  .bullet-dot { width: 6px; height: 6px; border-radius: 50%; background: #2563EB; flex-shrink: 0; margin-top: 0.55rem; }
-  .numbered-row { display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.9375rem; color: #374151; line-height: 1.55; }
-  .num-badge { width: 1.5rem; height: 1.5rem; border-radius: 50%; background: #F3F4F6; color: #6B7280; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 0.05rem; }
-  .num-badge.blue { background: #DBEAFE; color: #2563EB; }
+  .bullet-row { display: flex; align-items: flex-start; gap: 0.625rem; font-size: 0.875rem; color: #364153; line-height: 1.55; }
+  .bullet-dot { width: 6px; height: 6px; border-radius: 50%; background: #2492EB; flex-shrink: 0; margin-top: 0.55rem; }
+  .numbered-row { display: flex; align-items: flex-start; gap: 0.625rem; font-size: 0.8125rem; color: #364153; line-height: 1.55; }
+  .num-badge { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: #F3F4F6; color: #6A7282; font-size: 0.625rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 0.05rem; }
+  .num-badge.blue { background: rgba(36,146,235,0.15); color: #2492EB; }
 
-  .scenario-box { background: #EFF6FF; border-radius: 0.875rem; padding: 1.125rem 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; }
-  .scenario-box h3 { font-size: 0.9375rem; font-weight: 700; color: #111; }
+  .scenario-box { background: rgba(239,246,255,0.6); border: 1px solid #DBEAFE; border-radius: 0.75rem; padding: 0.875rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .scenario-box h3 { font-size: 0.8125rem; font-weight: 600; color: #2B3942; }
 
-  .grading-table { display: flex; flex-direction: column; gap: 0.625rem; border-top: 1px solid #F3F4F6; padding-top: 1rem; }
-  .grading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; }
-  .grading-row span:first-child { color: #374151; }
-  .grading-row span:last-child { font-weight: 700; color: #111; white-space: nowrap; }
+  .grading-table { display: flex; flex-direction: column; gap: 0.375rem; border-top: 1px solid #F3F4F6; padding-top: 0.75rem; }
+  .grading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.75rem; }
+  .grading-row span:first-child { color: #4A5565; }
+  .grading-row span:last-child { font-weight: 600; color: #2B3942; white-space: nowrap; }
 
-  .resources-section { display: flex; flex-direction: column; gap: 0.875rem; }
-  .resources-list { display: flex; flex-direction: column; gap: 0.625rem; }
-  .resource-row { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; }
-  .resource-icon-wrap { width: 2.5rem; height: 2.5rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .resources-section { display: flex; flex-direction: column; gap: 0.75rem; }
+  .resources-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .resource-row { box-sizing: border-box; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #fff; }
+  .resource-icon-wrap { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .resource-info { flex: 1; min-width: 0; }
-  .resource-title { font-size: 0.9375rem; font-weight: 700; color: #111; word-break: break-word; }
-  .resource-meta { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.125rem; }
+  .resource-title { font-size: 0.8125rem; font-weight: 600; color: #2B3942; word-break: break-word; }
+  .resource-meta { font-size: 0.625rem; letter-spacing: 0.02em; text-transform: uppercase; color: #99A1AF; margin-top: 0.125rem; }
   .resource-meta .size-tag { color: #16A34A; font-weight: 700; }
-  .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
-  .resource-download:hover { background: #DBEAFE; }
+  .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: rgba(36,146,235,0.1); border: none; color: #2492EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+  .resource-download:hover { background: rgba(36,146,235,0.2); }
 
-  .req-list { display: flex; flex-direction: column; gap: 0.625rem; }
-  .req-row { display: flex; align-items: flex-start; gap: 0.875rem; padding: 0.875rem 1.125rem; border-radius: 0.875rem; background: #fff; flex-wrap: wrap; }
-  .req-icon-wrap { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #F5F0FF; }
+  .req-card { box-sizing: border-box; background: #fff; border: 1px solid #F3F4F6; border-radius: 1rem; overflow: hidden; }
+  .req-row { box-sizing: border-box; display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.875rem 1rem; flex-wrap: wrap; }
+  .req-row + .req-row { border-top: 1px solid #F3F4F6; }
+  .req-icon-wrap { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #F3F4F6; margin-top: 0.1rem; }
   .req-info { flex: 1; min-width: 140px; }
-  .req-label { font-size: 0.9375rem; font-weight: 700; color: #111; }
-  .req-sub { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.125rem; }
-  .req-value { font-size: 0.9375rem; font-weight: 700; color: #111; text-align: right; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
+  .req-label { font-size: 0.75rem; font-weight: 400; color: #6A7282; }
+  .req-sub { font-size: 0.6875rem; color: #99A1AF; margin-top: 0.125rem; }
+  .req-value { font-size: 0.75rem; font-weight: 700; color: #2B3942; text-align: right; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 
   .submitted-files-section { display: flex; flex-direction: column; gap: 0.875rem; }
   .submitted-files-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem; }
   .submitted-files-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
   .submitted-file-item { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 96px; text-align: center; }
-  .submitted-file-icon { width: 3rem; height: 3rem; border-radius: 0.625rem; border: 1.5px solid #2563EB; color: #2563EB; display: flex; align-items: center; justify-content: center; }
+  .submitted-file-icon { width: 3rem; height: 3rem; border-radius: 0.625rem; border: 1.5px solid #2492EB; color: #2492EB; display: flex; align-items: center; justify-content: center; }
   .submitted-file-name { font-size: 0.78rem; color: #374151; line-height: 1.35; word-break: break-word; }
 
-  .action-bar { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-  .action-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; padding: 0.95rem; border-radius: 0.875rem; border: none; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
-  .action-btn.start { background: #2563EB; color: #fff; }
+  .action-bar { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #F3F4F6; }
+  .action-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; padding: 0.85rem; border-radius: 0.75rem; border: none; font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+  .action-btn.start { background: #2492EB; color: #fff; }
   .action-btn:hover { opacity: 0.92; }
-  .action-hint { font-size: 0.8125rem; color: #9CA3AF; text-align: center; }
+  .action-hint { font-size: 0.625rem; color: #99A1AF; text-align: center; }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1.5rem; }
   .submit-modal { width: 100%; max-width: 540px; background: #fff; border-radius: 1.25rem; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 88vh; overflow-y: auto; box-sizing: border-box; }
@@ -393,12 +396,12 @@ const PAGE_CSS = `
   .submit-modal-close:hover { background: #E5E7EB; }
   .asgn-modal-progress-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
   .asgn-modal-progress-label { font-size: 0.9375rem; color: #6B7280; }
-  .asgn-modal-progress-count { font-size: 0.9375rem; font-weight: 700; color: #2563EB; }
+  .asgn-modal-progress-count { font-size: 0.9375rem; font-weight: 700; color: #2492EB; }
   .modal-body-row { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
   .dropzone { flex: 1; min-width: 200px; border: 2px dashed #93C5FD; border-radius: 0.875rem; padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: #fff; text-align: center; }
-  .dropzone:hover, .dropzone.dragover { background: #EFF6FF; border-color: #2563EB; }
+  .dropzone:hover, .dropzone.dragover { background: #EFF6FF; border-color: #2492EB; }
   .dropzone.disabled { opacity: 0.5; cursor: not-allowed; }
-  .dropzone-icon { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; }
+  .dropzone-icon { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; color: #2492EB; display: flex; align-items: center; justify-content: center; }
   .dropzone-text { font-size: 0.9375rem; font-weight: 600; color: #374151; }
   .dropzone-sub { font-size: 0.78rem; color: #9CA3AF; }
   .criteria-list { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.25rem; }
@@ -411,34 +414,31 @@ const PAGE_CSS = `
   .file-list-name { flex: 1; min-width: 80px; font-size: 0.875rem; color: #111; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .file-list-req { font-size: 0.72rem; color: #6B7280; flex-shrink: 0; }
   .file-list-size { font-size: 0.78rem; color: #9CA3AF; flex-shrink: 0; }
-  .file-list-remove { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: none; background: none; color: #9CA3AF; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .file-list-remove:hover { background: #FEE2E2; color: #DC2626; }
   .submit-error { font-size: 0.8438rem; color: #DC2626; background: #FEF2F2; border-radius: 0.625rem; padding: 0.625rem 0.875rem; }
 
-  .upload-progress { font-size: 0.8438rem; color: #2563EB; background: #EFF6FF; border-radius: 0.625rem; padding: 0.625rem 0.875rem; text-align: center; }
+  .upload-progress { font-size: 0.8438rem; color: #2492EB; background: #EFF6FF; border-radius: 0.625rem; padding: 0.625rem 0.875rem; text-align: center; }
 
   @media (max-width: 900px) {
-    .content { padding: 1.5rem 1.25rem 2rem; }
     .modal-body-row { flex-direction: column; }
     .dropzone, .criteria-list { min-width: 0; width: 100%; }
   }
   @media (max-width: 640px) {
     .content { padding: 1.25rem 1rem 5rem; gap: 1.125rem; }
-    .header-card, .instructions-card { padding: 1.25rem; }
-    .header-title { font-size: 1.25rem; }
+    .instructions-card { padding: 1rem; }
+    .header-title { font-size: 1rem; }
     .header-title-row { flex-direction: column; align-items: flex-start; gap: 0.625rem; }
     .status-pill { align-self: flex-start; }
-    .crumb { font-size: 0.8125rem; }
-    .meta-row { gap: 0.625rem 1rem; }
+    .meta-row { gap: 0.5rem 0.875rem; }
 
     .feedback-card { padding: 1rem 1.25rem; }
     .feedback-top-row { flex-direction: column; align-items: flex-start; gap: 0.625rem; }
     .feedback-score { text-align: left; }
 
     .grading-row { flex-wrap: wrap; }
-    .req-row { padding: 0.875rem; }
+    .req-row { padding: 0.75rem; }
     .req-value { margin-left: 0; text-align: left; }
-    .resource-row { padding: 0.75rem 0.875rem; }
+    .resource-row { padding: 0.625rem 0.75rem; }
 
     .submit-modal { padding: 1.25rem; border-radius: 1rem; max-height: 92vh; }
     .submitted-files-grid { gap: 0.875rem; }
@@ -653,59 +653,67 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
       <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
-        <div className="content">
-          {loading && <div className="state-screen">Loading assignment…</div>}
-          {error && !loading && <div className="state-screen error">{error}</div>}
+        {loading && (
+          <div className="content">
+            <div className="state-screen">Loading assignment…</div>
+          </div>
+        )}
+        {error && !loading && (
+          <div className="content">
+            <div className="state-screen error">{error}</div>
+          </div>
+        )}
 
-          {!loading && !error && assignment && (
-            <>
-              <div className="header-card">
-                <div className="crumb-row">
-                  <button className="crumb-back" onClick={() => navigate(-1)} aria-label="Back">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6" /></svg>
-                  </button>
-                  <div className="crumb">
-                    <BookOpen size={14} />
-                    {assignment.course_title && (
-                      <>
-                        <span
-                          className="crumb-link"
-                          onClick={() => assignment.course_slug && navigate(RouteBuilder.course(assignment.course_slug))}
-                        >
-                          {assignment.course_title}
-                        </span>
-                        <span>›</span>
-                      </>
-                    )}
-                    {assignment.module_title && (
-                      <>
-                        <span className="crumb-link">{assignment.module_title.split('—')[0].trim()}</span>
-                        <span>›</span>
-                      </>
-                    )}
-                    <span className="crumb-current">Assignment</span>
-                  </div>
-                </div>
-
-                <div className="header-title-row">
-                  <div>
-                    <div className="header-title">{assignment.title}</div>
-                    {assignment.module_title && <div className="header-sub">{assignment.module_title}</div>}
-                  </div>
-                  <div className={`status-pill ${assignment.status}`}>
-                    {assignment.status === 'not_started' && <><span style={{ width: 7, height: 7, borderRadius: '50%', border: '1.5px solid #9CA3AF', display: 'inline-block' }} />Not started</>}
-                    {assignment.status === 'in_progress' && <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 11-3-6.7" /><polyline points="21,3 21,9 15,9" /></svg>In progress</>}
-                    {assignment.status === 'graded' && <><CheckCircle2 size={14} />Graded</>}
-                  </div>
-                </div>
-
-                <div className="meta-row">
-                  <span className="meta-item"><Calendar size={14} />{fmtDueDate(assignment.due_at)}</span>
-                  {hasPoints && <span className="meta-item meta-pts">{assignment.points} pts</span>}
-                  {hasWeight && <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>}
+        {!loading && !error && assignment && (
+          <>
+            <div className="adp-header">
+              <div className="crumb-row">
+                <button className="crumb-back" onClick={() => navigate(-1)} aria-label="Back">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6" /></svg>
+                </button>
+                <div className="crumb">
+                  <BookOpen size={11} />
+                  {assignment.course_title && (
+                    <>
+                      <span
+                        className="crumb-link"
+                        onClick={() => assignment.course_slug && navigate(RouteBuilder.course(assignment.course_slug))}
+                      >
+                        {assignment.course_title}
+                      </span>
+                      <span>›</span>
+                    </>
+                  )}
+                  {assignment.module_title && (
+                    <>
+                      <span className="crumb-link">{assignment.module_title.split('—')[0].trim()}</span>
+                      <span>›</span>
+                    </>
+                  )}
+                  <span className="crumb-current">Assignment</span>
                 </div>
               </div>
 
+              <div className="header-title-row">
+                <div>
+                  <div className="header-title">{assignment.title}</div>
+                  {assignment.module_title && <div className="header-sub">{assignment.module_title}</div>}
+                </div>
+                <div className={`status-pill ${assignment.status}`}>
+                  {assignment.status === 'not_started' && <><span style={{ width: 6, height: 6, borderRadius: '50%', border: '1.5px solid #9CA3AF', display: 'inline-block' }} />Not started</>}
+                  {assignment.status === 'in_progress' && <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 11-3-6.7" /><polyline points="21,3 21,9 15,9" /></svg>In progress</>}
+                  {assignment.status === 'graded' && <><CheckCircle2 size={12} />Graded</>}
+                </div>
+              </div>
+
+              <div className="meta-row">
+                <span className="meta-item"><Calendar size={12} />{fmtDueDate(assignment.due_at)}</span>
+                {hasPoints && <span className="meta-item meta-pts">{assignment.points} pts</span>}
+                {hasWeight && <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>}
+              </div>
+            </div>
+
+            <div className="content">
               {assignment.status === 'graded' && assignment.feedback && (
                 <div className="feedback-card graded">
                   <div className="feedback-top-row">
@@ -753,69 +761,69 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              <div className="instructions-card">
-                <div>
-                  <div className="section-label" style={{ marginBottom: '0.875rem' }}>Instructions</div>
+              <div>
+                <div className="section-label" style={{ marginBottom: '0.75rem' }}>Instructions</div>
+                <div className="instructions-card">
                   <div className="intro-text">{assignment.instructions.intro}</div>
-                </div>
 
-                {assignment.instructions.example_image_url && (
-                  <div className="example-fig">
-                    <img className="example-img" src={assignment.instructions.example_image_url} alt={assignment.instructions.example_image_caption || ''} />
-                    {assignment.instructions.example_image_caption && (
-                      <div className="example-caption">{assignment.instructions.example_image_caption}</div>
-                    )}
-                  </div>
-                )}
-
-                {assignment.instructions.what_youll_do.length > 0 && (
-                  <div className="subsection">
-                    <h3>What you&apos;ll do</h3>
-                    <div className="bullet-list">
-                      {assignment.instructions.what_youll_do.map((item, i) => (
-                        <div className="bullet-row" key={i}><span className="bullet-dot" />{item}</div>
-                      ))}
+                  {assignment.instructions.example_image_url && (
+                    <div className="example-fig">
+                      <img className="example-img" src={assignment.instructions.example_image_url} alt={assignment.instructions.example_image_caption || ''} />
+                      {assignment.instructions.example_image_caption && (
+                        <div className="example-caption">{assignment.instructions.example_image_caption}</div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {assignment.instructions.scenarios.length > 0 && (
-                  <div className="scenario-box">
-                    <h3>Choose one project scenario</h3>
-                    {assignment.instructions.scenarios.map((s) => (
-                      <div className="numbered-row" key={s.id}>
-                        <span className="num-badge blue">{s.order}</span>{s.text}
+                  {assignment.instructions.what_youll_do.length > 0 && (
+                    <div className="subsection">
+                      <h3>What you&apos;ll do</h3>
+                      <div className="bullet-list">
+                        {assignment.instructions.what_youll_do.map((item, i) => (
+                          <div className="bullet-row" key={i}><span className="bullet-dot" />{item}</div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {assignment.instructions.deliverables.length > 0 && (
-                  <div className="subsection">
-                    <h3>Deliverables</h3>
-                    <div className="numbered-list">
-                      {assignment.instructions.deliverables.map((d) => (
-                        <div className="numbered-row" key={d.id}>
-                          <span className="num-badge">{d.order}</span>{d.text}
+                  {assignment.instructions.scenarios.length > 0 && (
+                    <div className="scenario-box">
+                      <h3>Choose one project scenario</h3>
+                      {assignment.instructions.scenarios.map((s) => (
+                        <div className="numbered-row" key={s.id}>
+                          <span className="num-badge blue">{s.order}</span>{s.text}
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {assignment.instructions.grading_criteria.length > 0 && (
-                  <div>
-                    <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#111', marginBottom: '0.75rem' }}>Grading criteria</h3>
-                    <div className="grading-table">
-                      {assignment.instructions.grading_criteria.map((g) => (
-                        <div className="grading-row" key={g.id}>
-                          <span>{g.label}</span>
-                          <span>{g.points} pts</span>
-                        </div>
-                      ))}
+                  {assignment.instructions.deliverables.length > 0 && (
+                    <div className="subsection">
+                      <h3>Deliverables</h3>
+                      <div className="numbered-list">
+                        {assignment.instructions.deliverables.map((d) => (
+                          <div className="numbered-row" key={d.id}>
+                            <span className="num-badge">{d.order}</span>{d.text}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {assignment.instructions.grading_criteria.length > 0 && (
+                    <div>
+                      <h3 style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#2B3942', marginBottom: '0.5rem' }}>Grading criteria</h3>
+                      <div className="grading-table">
+                        {assignment.instructions.grading_criteria.map((g) => (
+                          <div className="grading-row" key={g.id}>
+                            <span>{g.label}</span>
+                            <span>{g.points} pts</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {assignment.resources.length > 0 && (
@@ -839,7 +847,7 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                           onClick={() => handleResourceDownload(r.id, r.title)}
                           aria-label={`Download ${r.title}`}
                         >
-                          <Download size={16} />
+                          <Download size={15} />
                         </button>
                       </div>
                     ))}
@@ -850,9 +858,9 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
               {assignment.status === 'not_started' && (
                 <div className="resources-section">
                   <div className="section-label">Submission Requirements</div>
-                  <div className="req-list">
+                  <div className="req-card">
                     <div className="req-row">
-                      <div className="req-icon-wrap"><FileCheck2 size={16} color="#7C3AED" /></div>
+                      <div className="req-icon-wrap"><FileCheck2 size={14} color="#2492EB" /></div>
                       <div className="req-info">
                         <div className="req-label">Accepted file types</div>
                         <div className="req-sub">All deliverables in one upload or separate files</div>
@@ -860,7 +868,7 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                       <div className="req-value">{assignment.submission_requirements.accepted_file_types || '—'}</div>
                     </div>
                     <div className="req-row">
-                      <div className="req-icon-wrap"><Info size={16} color="#7C3AED" /></div>
+                      <div className="req-icon-wrap"><Info size={14} color="#AD46FF" /></div>
                       <div className="req-info">
                         <div className="req-label">Max file size</div>
                         <div className="req-sub">Compress images before uploading if needed</div>
@@ -869,7 +877,7 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                     </div>
                     {assignment.submission_requirements.word_count && (
                       <div className="req-row">
-                        <div className="req-icon-wrap"><BookMarked size={16} color="#7C3AED" /></div>
+                        <div className="req-icon-wrap"><BookMarked size={14} color="#FE9A00" /></div>
                         <div className="req-info">
                           <div className="req-label">Word count</div>
                           <div className="req-sub">Communication plan section only; map and register are template-based</div>
@@ -878,7 +886,7 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                       </div>
                     )}
                     <div className="req-row">
-                      <div className="req-icon-wrap"><FileText size={16} color="#7C3AED" /></div>
+                      <div className="req-icon-wrap"><FileText size={14} color="#00C950" /></div>
                       <div className="req-info">
                         <div className="req-label">Max files</div>
                         <div className="req-sub">One per deliverable, or combine into a single PDF</div>
@@ -889,33 +897,33 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-{assignment.submitted_files.length > 0 && (
-  <div className="submitted-files-section">
-    <div className="section-label">Submitted Files</div>
-    <div className="submitted-files-card">
-      <div className="submitted-files-grid">
-        {assignment.submitted_files.map((f) => (
-          <a className="submitted-file-item" key={f.id} href={f.file_url} target="_blank" rel="noreferrer">
-            <div className="submitted-file-icon"><FileText size={22} /></div>
-            <span className="submitted-file-name">{f.filename}</span>
-          </a>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
+              {assignment.submitted_files.length > 0 && (
+                <div className="submitted-files-section">
+                  <div className="section-label">Submitted Files</div>
+                  <div className="submitted-files-card">
+                    <div className="submitted-files-grid">
+                      {assignment.submitted_files.map((f) => (
+                        <a className="submitted-file-item" key={f.id} href={f.file_url} target="_blank" rel="noreferrer">
+                          <div className="submitted-file-icon"><FileText size={22} /></div>
+                          <span className="submitted-file-name">{f.filename}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {showStartSubmission && (
                 <div className="action-bar">
                   <button className="action-btn start" onClick={() => setModalOpen(true)}>
-                    <Upload size={18} />{showRevisionResubmit ? 'Revise and resubmit' : 'Start submission'}
+                    <Upload size={16} />{showRevisionResubmit ? 'Revise and resubmit' : 'Start submission'}
                   </button>
                   <span className="action-hint">Your progress is saved automatically — come back any time.</span>
                 </div>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </AppShell>
 
       {modalOpen && assignment && (

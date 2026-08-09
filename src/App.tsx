@@ -19,6 +19,7 @@ import PrivacyPage from './pages/auth/PrivacyPage'
 import OnboardingPage from './pages/app/OnboardingPage'
 import EmailVerificationPage from './pages/auth/EmailVerificationPage'
 import DashboardPage from './pages/app/DashboardPage'
+import CertificatesPage from './pages/app/CertificatesPage'
 import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
@@ -29,6 +30,7 @@ import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
 import NotificationsPage from './pages/NotificationsPage'
 import LiveSessionsPage from './pages/app/LiveSessionsPage'
 import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
+import LiveBookingsPage from './pages/app/CourseCatalgue/LiveBookingsPage'
 import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
 import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
 import TrainerProfilePage from './pages/app/trainer/TrainerProfilePage'
@@ -42,11 +44,7 @@ import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
 import HelpSupportPage from './pages/app/HelpSupportPage'
 import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
-import AdminSignupPage from './pages/admin/AdminSignupPage'
-import AdminLoginPage from './pages/admin/AdminLoginPage'
-import AdminResetPasswordPage from './pages/admin/AdminResetPasswordPage.tsx'
-import AdminForgotPasswordPage from './pages/admin/Adminforgotpasswordpage.tsx'
-import AdminDashboardPage from './pages/admin/AdminDashboardPage.tsx'
+
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredRole?: 'learner' | 'trainer' | 'admin'
@@ -66,8 +64,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   return <>{children}</>
 }
 
-// Forces DashboardPage to remount on every navigation to /dashboard so its
-// useEffect fetch always runs and course/progress data is never stale.
 function DashboardPageWrapper() {
   const location = useLocation()
   return <DashboardPage key={location.key} />
@@ -265,6 +261,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path={ROUTES.CERTIFICATES} element={<CertificatesPage />} />
         <Route
           path="/courses/:slug/preview"
           element={
@@ -297,20 +294,22 @@ function App() {
     </ProtectedRoute>
   }
 />
-<Route
-  path={ROUTES.LIVE_SESSION_DETAIL}
-  element={
-    <ProtectedRoute requiredRole="learner">
-      <LiveSessionDetailPage />
-    </ProtectedRoute>
-  }
-/>
-{/* Admin routes */}
-<Route path={ROUTES.ADMIN_SIGNUP} element={<AdminSignupPage />} />
-<Route path={ROUTES.ADMIN_LOGIN} element={<AdminLoginPage />} />
-<Route path={ROUTES.ADMIN_RESET_PASSWORD} element={<AdminResetPasswordPage />} />
-<Route path={ROUTES.ADMIN_FORGOT_PASSWORD} element={<AdminForgotPasswordPage />} />
-<Route path={ROUTES.ADMIN_DASHBOARD} element={<AdminDashboardPage />} />
+        <Route
+          path={ROUTES.TUTOR_BOOKING}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <LiveBookingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.LIVE_SESSION_DETAIL}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <LiveSessionDetailPage />
+            </ProtectedRoute>
+          }
+        />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

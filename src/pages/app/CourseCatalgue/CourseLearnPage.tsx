@@ -4,7 +4,7 @@ import {
   Play, Pause, CheckCircle, Lock,
   Volume2, VolumeX, Captions, Settings2, Maximize, SkipBack, SkipForward,
   FileText, FileSpreadsheet, Presentation, Download, Headphones,
-  X, Coffee, ChevronRight,
+  X, Coffee, ChevronRight, ChevronLeft, ChevronDown,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI, assignmentsAPI, liveSessionsAPI } from '../../../services/api'
@@ -86,6 +86,49 @@ const QUALITY_OPTIONS = [
   { label: '480p', sub: 'Standard quality',       kbps: '~1000 kbps' },
   { label: '240p', sub: 'Low data usage',         kbps: '~300 kbps'  },
 ]
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`
+}
+
+function dateKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function monthKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+}
+
+function ordinal(n: number): string {
+  const v = n % 100
+  if (v >= 11 && v <= 13) return `${n}th`
+  switch (n % 10) {
+    case 1: return `${n}st`
+    case 2: return `${n}nd`
+    case 3: return `${n}rd`
+    default: return `${n}th`
+  }
+}
+
+// Padded, e.g. "03:00 PM" — used in the time-picker list.
+function fmtTime12Padded(d: Date): string {
+  let h = d.getHours()
+  const m = d.getMinutes()
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  h = h % 12
+  if (h === 0) h = 12
+  return `${pad2(h)}:${pad2(m)} ${ampm}`
+}
+
+// Unpadded hour, e.g. "3:00 PM" — used in the selected-appointment summary.
+function fmtTime12(d: Date): string {
+  let h = d.getHours()
+  const m = d.getMinutes()
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  h = h % 12
+  if (h === 0) h = 12
+  return `${h}:${pad2(m)} ${ampm}`
+}
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const PAGE_CSS = `
@@ -281,6 +324,41 @@ const PAGE_CSS = `
   .modal-start-now { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .modal-break-link { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8438rem; color: #6B7280; text-decoration: underline; cursor: pointer; background: none; border: none; }
 
+  /* ── Booking calendar modal ── */
+  .booking-modal-card { max-width: 400px; align-items: stretch; }
+  .booking-title { font-size: 1.25rem; font-weight: 700; color: #2563EB; text-align: center; }
+  .booking-sub { font-size: 0.875rem; color: #6B7280; text-align: center; margin-top: -0.75rem; }
+  .booking-cal-box { width: 100%; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1.25rem; }
+  .booking-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .booking-cal-nav-btn { background: none; border: none; cursor: pointer; color: #374151; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; }
+  .booking-cal-nav-btn:hover:not(:disabled) { background: #F3F4F6; }
+  .booking-cal-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .booking-cal-month { font-size: 1rem; font-weight: 700; color: #111; }
+  .booking-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.375rem; }
+  .booking-cal-dow { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.03em; color: #9CA3AF; text-align: center; text-transform: uppercase; padding-bottom: 0.375rem; }
+  .booking-cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+  .booking-cal-day { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.875rem; color: #D1D5DB; background: none; border: 2px solid transparent; }
+  .booking-cal-day.has-slots { color: #111; font-weight: 600; cursor: pointer; }
+  .booking-cal-day.has-slots:hover { background: #F3F4F6; }
+  .booking-cal-day.selected { border: 2px dashed #2563EB; color: #2563EB; font-weight: 700; background: none; }
+  .booking-time-row { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 1.25rem; }
+  .booking-time-label { font-size: 0.9375rem; font-weight: 700; color: #2563EB; }
+  .booking-time-trigger-wrap { position: relative; }
+  .booking-time-trigger { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; border-bottom: 1.5px solid #E5E7EB; padding: 0 0 0.3rem; font-size: 0.9375rem; font-weight: 600; color: #111; cursor: pointer; }
+  .booking-time-trigger:disabled { color: #D1D5DB; cursor: not-allowed; }
+  .booking-time-popover { position: absolute; top: calc(100% + 0.5rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.14); min-width: 150px; z-index: 20; overflow: hidden; }
+  .booking-time-option { padding: 0.75rem 1rem; font-size: 0.9375rem; color: #374151; cursor: pointer; white-space: nowrap; }
+  .booking-time-option:hover { background: #F3F4F6; }
+  .booking-time-option.active { background: #EFF6FF; color: #2563EB; font-weight: 700; }
+  .booking-summary { width: 100%; background: #EFF6FF; border-radius: 0.875rem; padding: 0.875rem 1rem; text-align: center; margin-top: 1.25rem; }
+  .booking-summary-label { font-size: 0.8125rem; font-weight: 700; color: #2563EB; }
+  .booking-summary-value { font-size: 0.875rem; font-style: italic; color: #2563EB; margin-top: 0.2rem; }
+  .booking-btn-primary { width: 100%; padding: 0.875rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 1.25rem; }
+  .booking-btn-primary:hover:not(:disabled) { opacity: 0.9; }
+  .booking-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .booking-btn-cancel { width: 100%; padding: 0.875rem; border-radius: 2rem; border: 1.5px solid #2563EB; background: #fff; color: #2563EB; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 0.75rem; }
+  .booking-btn-cancel:hover { background: #EFF6FF; }
+
   @media (max-width: 900px) {
     .content { padding: 1.5rem 1.25rem 2rem; }
     .resources-grid { grid-template-columns: 1fr; }
@@ -327,12 +405,6 @@ export default function CourseLearnPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState('courses')
-
-  // ── Module-scoped assignments ──
-  // Assignments are NOT part of the lesson-detail response — the backend only
-  // returns them per-module from GET /courses/{slug}/learn/. We fetch that
-  // once per course (keyed on slug) and look up the current lesson's module
-  // assignments from it whenever the lesson changes.
   const [moduleAssignments, setModuleAssignments] = useState<LearnModuleAssignmentSummary[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [assignmentResources, setAssignmentResources] = useState<Record<string, AssignmentResource[]>>({})
@@ -355,10 +427,6 @@ export default function CourseLearnPage() {
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  // ── Notes / tabs ──
-  // 'overview' shows the lesson description the trainer adds when creating
-  // the lesson (saved server-side as the lesson's `body`). It's the default
-  // active tab since it's the first thing a learner should see.
   const [activeTab, setActiveTab]             = useState<'overview' | 'notes' | 'resources' | 'discussion'>('overview')
   const [notes, setNotes]                     = useState('')
   const [savingNotes, setSavingNotes]         = useState(false)
@@ -384,6 +452,9 @@ export default function CourseLearnPage() {
   const [booking, setBooking]                   = useState(false)
   const [bookingError, setBookingError]         = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess]     = useState<LiveSlotBooking | null>(null)
+  const [monthIndex, setMonthIndex]             = useState(0)
+  const [selectedDateKey, setSelectedDateKey]   = useState<string | null>(null)
+  const [timeDropdownOpen, setTimeDropdownOpen] = useState(false)
 
   // ── Load lesson ──
   useEffect(() => {
@@ -752,6 +823,9 @@ async function downloadResource(r: LessonResource) {
     setSelectedSlotId(null)
     setBookingError(null)
     setBookingSuccess(null)
+    setMonthIndex(0)
+    setSelectedDateKey(null)
+    setTimeDropdownOpen(false)
     setSlotsLoading(true)
     setSlotsError(null)
     liveSessionsAPI.getCourseSlots(slug).then((res) => {
@@ -782,12 +856,62 @@ async function downloadResource(r: LessonResource) {
     }
   }
 
-  // Group slots by date (server sends starts_at/ends_at as ISO, no separate date field)
-  const slotsByDate = slots.reduce<Record<string, LiveSlot[]>>((acc, s) => {
-    const day = new Date(s.starts_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-    ;(acc[day] ||= []).push(s)
-    return acc
-  }, {})
+  function changeMonth(delta: number) {
+    setMonthIndex((i) => Math.max(0, Math.min(availableMonthKeys.length - 1, i + delta)))
+    setSelectedDateKey(null)
+    setSelectedSlotId(null)
+    setTimeDropdownOpen(false)
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedDateKey(dateKey)
+    setSelectedSlotId(null)
+    setTimeDropdownOpen(false)
+  }
+
+  const slotsByDay: Record<string, LiveSlot[]> = {}
+  slots.forEach((s) => {
+    const key = dateKeyOf(new Date(s.starts_at))
+    ;(slotsByDay[key] ||= []).push(s)
+  })
+  const availableMonthKeys = Array.from(
+    new Set(slots.map((s) => monthKeyOf(new Date(s.starts_at)))),
+  ).sort()
+
+  const currentMonthKey = availableMonthKeys[monthIndex] ?? null
+  let calendarCells: { dateKey: string; day: number }[] = []
+  let calendarLeadingBlanks = 0
+  let monthLabel = ''
+  if (currentMonthKey) {
+    const [yearStr, monthStr] = currentMonthKey.split('-')
+    const year = Number(yearStr)
+    const monthNum = Number(monthStr) - 1
+    const firstOfMonth = new Date(year, monthNum, 1)
+    const daysInMonth = new Date(year, monthNum + 1, 0).getDate()
+    calendarLeadingBlanks = firstOfMonth.getDay()
+    monthLabel = firstOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    calendarCells = Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1
+      return { dateKey: `${yearStr}-${monthStr}-${pad2(day)}`, day }
+    })
+  }
+
+  const selectedDaySlots = (selectedDateKey && slotsByDay[selectedDateKey]
+    ? [...slotsByDay[selectedDateKey]].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+    : [])
+  const selectedSlot = selectedSlotId ? slots.find((s) => s.id === selectedSlotId) ?? null : null
+
+  let summaryText = ''
+  if (selectedSlot) {
+    const d = new Date(selectedSlot.starts_at)
+    summaryText = `${ordinal(d.getDate())} ${d.toLocaleDateString('en-GB', { month: 'long' })}, ${d.getFullYear()} - ${fmtTime12(d)}`
+  }
+
+  const bookingTrainerName = bookingSuccess?.trainer_name || 'your trainer'
+  const bookingCourseTitle = bookingSuccess?.course_title || courseTitle || lesson?.course?.title
+  const bookingSuccessCopy = bookingCourseTitle
+    ? `Prepare your points to meet with ${bookingTrainerName} for ${bookingCourseTitle} on the set date.`
+    : `Prepare your points to meet with ${bookingTrainerName} on the set date.`
 
   const hasVideo   = Boolean(lesson?.video_url)
   const prevLesson = lesson?.previous_lesson ?? null
@@ -1239,60 +1363,118 @@ async function downloadResource(r: LessonResource) {
       {/* ── Book a live session modal ── */}
       {bookingModalOpen && (
         <div className="modal-backdrop" onClick={() => setBookingModalOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card booking-modal-card" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setBookingModalOpen(false)}><X size={16} /></button>
 
             {!bookingSuccess ? (
               <>
-                <div className="modal-title">Book a 1-on-1 session</div>
+                <div className="booking-title">Select a date</div>
+                <div className="booking-sub">Pick a date from your tutor's schedule.</div>
+
                 {slotsLoading && <div className="state-screen">Loading available times…</div>}
                 {slotsError && <div className="error-banner">{slotsError}</div>}
                 {!slotsLoading && !slotsError && slots.length === 0 && (
                   <div className="resources-empty">No open slots right now — check back soon.</div>
                 )}
-                {!slotsLoading && Object.entries(slotsByDate).map(([day, daySlots]) => (
-                  <div key={day} style={{ width: '100%' }}>
-                    <div className="qp-section-label" style={{ padding: '0.5rem 0' }}>{day}</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {daySlots.map((s) => {
-                        const active = selectedSlotId === s.id
-                        const time = new Date(s.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => setSelectedSlotId(s.id)}
-                            style={{
-                              padding: '0.5rem 0.875rem', borderRadius: 999,
-                              border: active ? '1.5px solid #2563EB' : '1px solid #E5E7EB',
-                              background: active ? '#EFF6FF' : '#fff',
-                              color: active ? '#2563EB' : '#374151',
-                              fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
-                            }}
-                          >
-                            {time}
-                          </button>
-                        )
-                      })}
+
+                {!slotsLoading && !slotsError && slots.length > 0 && currentMonthKey && (
+                  <>
+                    <div className="booking-cal-box">
+                      <div className="booking-cal-header">
+                        <button
+                          className="booking-cal-nav-btn"
+                          onClick={() => changeMonth(-1)}
+                          disabled={monthIndex === 0}
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <div className="booking-cal-month">{monthLabel}</div>
+                        <button
+                          className="booking-cal-nav-btn"
+                          onClick={() => changeMonth(1)}
+                          disabled={monthIndex >= availableMonthKeys.length - 1}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                      <div className="booking-cal-grid">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                          <div className="booking-cal-dow" key={d}>{d}</div>
+                        ))}
+                        {Array.from({ length: calendarLeadingBlanks }).map((_, i) => (
+                          <div className="booking-cal-cell" key={`blank-${i}`} />
+                        ))}
+                        {calendarCells.map(({ dateKey, day }) => {
+                          const hasSlots = Boolean(slotsByDay[dateKey]?.length)
+                          const isSelected = selectedDateKey === dateKey
+                          return (
+                            <div className="booking-cal-cell" key={dateKey}>
+                              <button
+                                className={`booking-cal-day${hasSlots ? ' has-slots' : ''}${isSelected ? ' selected' : ''}`}
+                                onClick={() => hasSlots && selectDate(dateKey)}
+                                disabled={!hasSlots}
+                              >
+                                {day}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {bookingError && <div className="error-banner">{bookingError}</div>}
-                <div className="modal-actions">
-                  <button className="modal-cancel" onClick={() => setBookingModalOpen(false)}>Cancel</button>
-                  <button className="modal-start-now" onClick={confirmBooking} disabled={!selectedSlotId || booking}>
-                    {booking ? 'Requesting…' : 'Request this time'}
-                  </button>
-                </div>
+
+                    <div className="booking-time-row">
+                      <span className="booking-time-label">Select Time:</span>
+                      <div className="booking-time-trigger-wrap">
+                        <button
+                          className="booking-time-trigger"
+                          onClick={() => setTimeDropdownOpen((o) => !o)}
+                          disabled={!selectedDateKey || selectedDaySlots.length === 0}
+                        >
+                          {selectedSlot ? fmtTime12Padded(new Date(selectedSlot.starts_at)) : 'Select a time'}
+                          <ChevronDown size={14} />
+                        </button>
+                        {timeDropdownOpen && selectedDaySlots.length > 0 && (
+                          <div className="booking-time-popover">
+                            {selectedDaySlots.map((s) => (
+                              <div
+                                key={s.id}
+                                className={`booking-time-option${selectedSlotId === s.id ? ' active' : ''}`}
+                                onClick={() => { setSelectedSlotId(s.id); setTimeDropdownOpen(false) }}
+                              >
+                                {fmtTime12Padded(new Date(s.starts_at))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {selectedSlot && (
+                      <div className="booking-summary">
+                        <div className="booking-summary-label">Selected Appointment Time</div>
+                        <div className="booking-summary-value">{summaryText}</div>
+                      </div>
+                    )}
+
+                    {bookingError && <div className="error-banner" style={{ marginTop: '1rem', width: '100%' }}>{bookingError}</div>}
+
+                    <button className="booking-btn-primary" onClick={confirmBooking} disabled={!selectedSlotId || booking}>
+                      {booking ? 'Requesting…' : 'Book a session'}
+                    </button>
+                    <button className="booking-btn-cancel" onClick={() => setBookingModalOpen(false)}>
+                      Cancel
+                    </button>
+                  </>
+                )}
               </>
             ) : (
               <>
                 <div className="modal-check"><CheckCircle size={28} color="#fff" /></div>
-                <div className="modal-title">Request sent</div>
-                <div className="modal-sub">
-                  {new Date(bookingSuccess.slot_starts_at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  <br />Your trainer needs to confirm it — you'll get notified once they do.
+                <div className="modal-title">Booking Request Sent</div>
+                <div className="modal-sub" style={{ textAlign: 'center' }}>
+                  {bookingSuccessCopy}
                 </div>
-                <button className="modal-start-now" onClick={() => setBookingModalOpen(false)}>Done</button>
+                <button className="booking-btn-primary" onClick={() => setBookingModalOpen(false)}>Close</button>
               </>
             )}
           </div>

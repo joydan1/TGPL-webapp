@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings,
-  Search, Bell, ChevronDown, ChevronLeft,
+  Search, Bell, ChevronDown,Calendar, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
   LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
@@ -14,12 +14,12 @@ import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from './LogoutConfirmModal'
 export const NAV_ITEMS = [
   { key: 'home',      label: 'Home',         Icon: Home          },
   { key: 'courses',   label: 'Courses',      Icon: BookOpen      },
+  { key: 'bookings',  label: 'Bookings',     Icon: Calendar      },
   { key: 'live',      label: 'Live Classes', Icon: Radio         },
   { key: 'settings',  label: 'Settings',     Icon: Settings      },
 ]
 
-// Sub-items shown when the Settings row is expanded. `route` is used for
-// navigation; `danger` is a red destructive-style row (Log out).
+
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
   { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS_SECURITY }, 
@@ -151,7 +151,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
     }
     onNavChange?.(key)
     if (key === 'home')     navigate(ROUTES.DASHBOARD)
-
+    if (key === 'bookings') navigate(RouteBuilder.tutorBooking())
     if (key === 'myCourse') navigate(ROUTES.COURSES)
     if (key === 'courses')  navigate(ROUTES.COURSES)
     if (key === 'live')     navigate(ROUTES.LIVE_SESSIONS)

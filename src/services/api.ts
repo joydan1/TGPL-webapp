@@ -20,7 +20,12 @@ export interface UserResponse {
   is_active: boolean
   is_email_verified: boolean
   created_at: string
-  learner_profile?: LearnerProfile | null
+  learner_profile: LearnerProfile | null
+  trainer_profile: TrainerProfile | null
+  phone: string | null
+  country: string | null
+  bio: string | null
+  avatar_url: string | null
 }
 
 export interface LearnerProfile {
@@ -77,6 +82,13 @@ export interface LearnerProfilePayload {
   preferred_learning_hours?: string
 }
 
+export interface UpdateSettingsProfilePayload {
+  first_name?: string
+  last_name?: string
+  phone?: string
+  country?: string
+  bio?: string
+}
 // ─── Payment Types ────────────────────────────────────────────────────────────
 
 export interface CheckoutResponse {
@@ -462,6 +474,7 @@ export const authAPI = {
       } catch { return { success: false, error: 'Admin test failed' } }
     },
   }),
+  
 }
 
 // ─── Payment API ──────────────────────────────────────────────────────────────
@@ -513,7 +526,15 @@ export const learnerProfileAPI = {
       return { success: false as const, error: message }
     }
   },
-
+  updateSettingsProfile: async (payload: UpdateSettingsProfilePayload) => {
+    try {
+      const response = await apiClient.patch<UserResponse>('/v1/auth/me/', payload)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update profile')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
   updateLearnerProfile: async (payload: LearnerProfilePayload) => {
     try {
       const response = await apiClient.patch<LearnerProfile>(
@@ -894,7 +915,7 @@ export const trainerSessionsAPI = {
 // ─── Live Session Types ────────────────────────────────────────────────────
  
 export type LiveBookingStatus = 'requested' | 'confirmed' | 'rejected' | 'cancelled'
-export type LiveSlotStatus = 'open' | 'booked' | 'closed'
+export type LiveSlotStatus = 'open' | 'booked' | 'unavailable'
  
 export interface LiveCourseRef {
   slug: string
@@ -946,7 +967,36 @@ export type LiveManageBooking = {
   created_at: string
   learner_name: string
 }
+ export interface EnrolledCourseOption {
+  course_id: string
+  course_slug: string
+  title: string
+  category: string
+  thumbnail_url: string
+  trainer_name: string
+  module_count: number
+  completion_percentage: number
+  last_accessed_at: string | null
+  enrolled_at: string
+  source: string
+  resume_url: string
+}
 
+export interface LearnerLiveSession {
+  id: string
+  course_id: string
+  title: string
+  topic: string
+  starts_at: string
+  ends_at: string
+  status: 'upcoming' | 'live' | 'ended' | 'cancelled'
+  join_url: string
+  trainer_name: string
+}
+ 
+export interface JoinSessionResponse {
+  join_url: string
+}
 
 export interface LiveSlotBooking {
   id: string
@@ -957,6 +1007,8 @@ export interface LiveSlotBooking {
   slot_ends_at: string
   recording_url: string | null
   created_at: string
+  course_title?: string
+  trainer_name?: string
 }
 export interface CreateSlotPayload {
   starts_at: string
@@ -1007,7 +1059,19 @@ export const liveSessionsAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
- 
+ /** PATCH /v1/live/manage/bookings/{id}/recording/ — set recording link on a 1:1 booking (owner) */
+  setBookingRecording: async (bookingId: string, recordingUrl: string) => {
+    try {
+      const response = await apiClient.patch<LiveManageBooking>(
+        API_ENDPOINTS.LIVE_MANAGE_BOOKING_RECORDING(bookingId),
+        { recording_url: recordingUrl },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to save recording link')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
   /** GET /v1/live/manage/courses/{slug}/slots/ — owner's availability slots */
   getManageCourseSlots: async (courseSlug: string) => {
     try {
@@ -1021,7 +1085,17 @@ export const liveSessionsAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
- 
+  getEnrolledCoursesForBooking: async () => {
+    try {
+      const response = await apiClient.get<{ enrolled_courses: EnrolledCourseOption[] }>(
+        '/v1/me/dashboard/',
+      )
+      return { success: true as const, data: response.data.enrolled_courses ?? [] }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load your courses')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
   /** POST /v1/live/manage/courses/{slug}/slots/ — create an availability slot */
   createManageCourseSlot: async (courseSlug: string, payload: CreateSlotPayload) => {
     try {
@@ -1155,6 +1229,17 @@ export const liveSessionsAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to load your bookings')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/live/sessions/ — learner-facing discover sessions */
+  getDiscoverSessions: async () => {
+    try {
+      const response = await apiClient.get<LearnerLiveSession[]>(API_ENDPOINTS.LIVE_SESSIONS)
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load live sessions')
       return { success: false as const, error: message, statusCode }
     }
   },

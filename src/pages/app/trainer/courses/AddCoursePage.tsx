@@ -1,12 +1,15 @@
+// pages/app/trainer/AddCoursePage.tsx (or wherever this lives — path unchanged)
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, Check, Upload, Trash2, Plus, Globe, Eye,
   Send, Layers, BookOpen, Award, CheckCircle2, Loader2,
 } from 'lucide-react'
+import AdminShell from '../../../../layouts/AdminShell'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
 import { coursesManageAPI, type CourseLevel } from '../../../../services/api'
+import AssignmentCreatorModal, { type AssignmentDraft } from '../../../../components/AssignmentCreationModal'
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -29,6 +32,9 @@ type Lesson = {
   existingMaterialsCount: number
   videoUploaded: boolean
   materialsUploaded: boolean
+  // Local-only until a backend assignment endpoint exists (see
+  // AssignmentCreatorModal.tsx header note). Not sent anywhere yet.
+  assignment: AssignmentDraft | null
 }
 
 type CourseForm = {
@@ -76,6 +82,7 @@ function emptyLesson(): Lesson {
     existingMaterialsCount: 0,
     videoUploaded: false,
     materialsUploaded: false,
+    assignment: null,
   }
 }
 
@@ -153,6 +160,13 @@ const PAGE_CSS = `
   .ac-upload-chip-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ac-upload-chip-label { font-weight: 700; color: #2563EB; font-size: 0.875rem; }
   .ac-upload-chip-sub { margin: 0.1rem 0 0; color: #6B7280; font-size: 0.75rem; }
+
+  .ac-insert-assignment-btn { border: none; background: #2492EB; color: #FFFFFF; font-family: 'Sora', inherit; font-weight: 600; font-size: 12px; line-height: 18px; padding: 6px 16px; border-radius: 8px; cursor: pointer; justify-self: start; align-self: flex-start; white-space: nowrap; width: fit-content; }
+  .ac-insert-assignment-btn:hover { opacity: 0.92; }
+  .ac-assignment-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ac-assignment-added { display: flex; align-items: center; gap: 4px; color: #616873; font-family: 'Sora', inherit; font-weight: 500; font-size: 12px; line-height: 18px; }
+  .ac-assignment-added svg { color: #616873; }
+  .ac-assignment-preview-link { border: none; background: none; color: #2492EB; font-family: 'Sora', inherit; font-weight: 500; font-size: 12px; line-height: 18px; text-decoration: underline; cursor: pointer; padding: 0; }
 
   .ac-add-lesson-btn { width: 100%; border: 2px dashed #D1D5DB; border-radius: 1rem; padding: 1rem; background: none; color: #6B7280; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 
@@ -249,8 +263,20 @@ const PAGE_CSS = `
 
 export default function AddCoursePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const isEditMode = Boolean(id)
+
+  // This wizard is shared between the trainer flow and the admin flow —
+  // same form, same steps, same API calls. Only the shell chrome and the
+  // "where do Back / Save draft / Publish success send you" routes differ,
+  // and both are derived from the URL prefix rather than a prop, so the
+  // same <AddCoursePage/> component can be mounted at both
+  // /trainer/courses/(add|:id/edit) and /admin/courses/(new|:id/edit).
+  const isAdmin = location.pathname.startsWith('/admin')
+  const Shell = isAdmin ? AdminShell : TrainerShell
+  const coursesListRoute = isAdmin ? '/admin/courses' : ROUTES.TRAINER_COURSES
+  const dashboardRoute = isAdmin ? ROUTES.ADMIN_DASHBOARD : ROUTES.TRAINER_DASHBOARD
 
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<CourseForm>(initialForm)
@@ -263,6 +289,9 @@ export default function AddCoursePage() {
 
   const [loading, setLoading] = useState(isEditMode)
   const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Which lesson's assignment modal is open (null = closed).
+  const [assignmentModalLessonId, setAssignmentModalLessonId] = useState<string | null>(null)
 
   // Real video preview for the review step — resolves to whichever lesson
   // has a video (a freshly picked File, or an already-uploaded one when
@@ -348,6 +377,10 @@ export default function AddCoursePage() {
           // we only re-upload if the user picks a new file in this session.
           videoUploaded: true,
           materialsUploaded: true,
+          // No backend endpoint yet to fetch an existing assignment for a
+          // lesson — see AssignmentCreatorModal.tsx header note. Existing
+          // assignments (if any) won't show here until that lands.
+          assignment: null,
         }
       })
 
@@ -389,7 +422,7 @@ export default function AddCoursePage() {
 
   function goBack() {
     if (step === 1) {
-      navigate(ROUTES.TRAINER_COURSES)
+      navigate(coursesListRoute)
       return
     }
     setStep((s) => (s - 1) as Step)
@@ -540,6 +573,11 @@ export default function AddCoursePage() {
         }
       }
 
+      // NOTE: lesson.assignment is intentionally not sent anywhere here —
+      // there is no backend endpoint to save it against yet. See
+      // AssignmentCreatorModal.tsx header note. Once an endpoint exists,
+      // this is the place to add the save call (after remoteId is known).
+
       updateLesson(lesson.id, {
         remoteId,
         videoUploaded: lesson.videoFile ? true : lesson.videoUploaded,
@@ -598,12 +636,12 @@ export default function AddCoursePage() {
   }
 
   function handleSaveDraft() {
-    navigate(ROUTES.TRAINER_COURSES)
+    navigate(coursesListRoute)
   }
 
   function handleBackToDashboard() {
     setShowSuccessModal(false)
-    navigate(ROUTES.TRAINER_DASHBOARD)
+    navigate(dashboardRoute)
   }
 
   function updateListItem(field: 'expectedOutcomes' | 'prerequisites', index: number, value: string) {
@@ -642,36 +680,48 @@ export default function AddCoursePage() {
     }
   }
 
+  function openAssignmentModal(lessonId: string) {
+    setAssignmentModalLessonId(lessonId)
+  }
+  function closeAssignmentModal() {
+    setAssignmentModalLessonId(null)
+  }
+  function saveAssignmentDraft(lessonId: string, draft: AssignmentDraft) {
+    updateLesson(lessonId, { assignment: draft })
+    setAssignmentModalLessonId(null)
+  }
+
   const totalLessons = form.lessons.length
+  const assignmentModalLesson = form.lessons.find((l) => l.id === assignmentModalLessonId) ?? null
 
   if (loading) {
     return (
-      <TrainerShell>
+      <Shell>
         <style>{PAGE_CSS}</style>
         <div className="ac-page">
           <div className="ac-card">
             <p style={{ textAlign: 'center', color: '#9CA3AF', padding: '3rem 0' }}>Loading course…</p>
           </div>
         </div>
-      </TrainerShell>
+      </Shell>
     )
   }
 
   if (loadError) {
     return (
-      <TrainerShell>
+      <Shell>
         <style>{PAGE_CSS}</style>
         <div className="ac-page">
           <div className="ac-card">
             <div className="ac-error" style={{ margin: '1.25rem' }}>{loadError}</div>
           </div>
         </div>
-      </TrainerShell>
+      </Shell>
     )
   }
 
   return (
-    <TrainerShell>
+    <Shell>
       <style>{PAGE_CSS}</style>
       <div className="ac-page">
         <div className="ac-card">
@@ -963,6 +1013,29 @@ export default function AddCoursePage() {
                           <p className="ac-upload-chip-sub">Docx, Xlsx, PDF, PPTX · max 500 MB</p>
                         </div>
                       </label>
+
+                      {lesson.assignment ? (
+                        <div className="ac-assignment-status">
+                          <span className="ac-assignment-added">
+                            Added <Check size={14} />
+                          </span>
+                          <button
+                            type="button"
+                            className="ac-assignment-preview-link"
+                            onClick={() => openAssignmentModal(lesson.id)}
+                          >
+                            Preview
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ac-insert-assignment-btn"
+                          onClick={() => openAssignmentModal(lesson.id)}
+                        >
+                          Insert assignment(s)
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1192,6 +1265,16 @@ export default function AddCoursePage() {
           </div>
         </div>
       )}
-    </TrainerShell>
+
+      {assignmentModalLesson && (
+        <AssignmentCreatorModal
+          courseTitle={form.title || 'Untitled course'}
+          moduleTitle="Module 1"
+          initialData={assignmentModalLesson.assignment}
+          onClose={closeAssignmentModal}
+          onSave={(draft: AssignmentDraft) => saveAssignmentDraft(assignmentModalLesson.id, draft)}
+        />
+      )}
+    </Shell>
   )
 }

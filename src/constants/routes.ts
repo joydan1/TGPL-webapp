@@ -27,7 +27,6 @@ export const ROUTES = {
   VERIFY_EMAIL: '/verify-email',
   DASHBOARD: '/dashboard',
   COURSES: '/courses',
-
   COURSE_DETAIL: '/courses/:slug',
   CHECKOUT: '/checkout',
   COURSE_LEARN: '/courses/:slug/learn/:lessonId',
@@ -86,7 +85,7 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   ADMIN_DASHBOARD: '/admin/dashboard',  
  ADMIN_RESET_PASSWORD: '/admin/reset-password',
  ADMIN_FORGOT_PASSWORD: '/admin/forgot-password',
-
+ADMIN_USERS: 'admin/users',
 
   // ===========================
   // ERROR PAGES

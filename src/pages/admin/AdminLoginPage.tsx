@@ -65,16 +65,6 @@ export default function AdminLoginPage() {
     if (result.success) {
       const user = useAuthStore.getState().user
 
-      // Gate: this route is admin-only. If the authenticated account isn't
-      // an admin, reject here even though login succeeded — log them out
-      // and don't let a learner/trainer account slip through to an admin
-      // destination.
-      //
-      // NOTE: this is a client-side check only. The real enforcement needs
-      // to live on the backend too (e.g. reject non-admin logins on this
-      // endpoint/context with a 403), since a client-only check can be
-      // bypassed by calling the API directly. Confirm with backend whether
-      // that's already in place.
       if (user?.role !== 'admin') {
         useAuthStore.getState().logout()
         setFormErrors({ submit: 'This login is for admin accounts only.' })

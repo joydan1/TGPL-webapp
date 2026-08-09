@@ -9,7 +9,6 @@ import {
 } from 'recharts'
 import AdminShell from '../../layouts/AdminShell'
 
-// ─── Mock data — shaped like a real API response so swapping is a one-line change ──
 
 interface AdminDashboardSummary {
   total_users: number

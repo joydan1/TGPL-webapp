@@ -25,25 +25,32 @@ interface EnrolledCourse {
   resume_url: string
 }
 
-interface CertRequirement {
-  label: string
+interface CertChecklistItem {
+  requirement: string
   satisfied: boolean
-  current: number
-  target: number
+  implemented?: boolean
+  reason?: string
+  details?: string | Record<string, string>
 }
 
-interface CertificationProgress {
+interface CertificationApiResponse {
+  eligible: boolean
+  checklist: CertChecklistItem[]
+  completion_percentage: number
+  next_incomplete: string | null
+}
+
+interface CourseCertProgress {
   course_id: string
   course_slug: string
   course_title: string
+  eligible: boolean
   completion_percentage: number
-  requirements: CertRequirement[]
+  next_incomplete: string | null
+  checklist: CertChecklistItem[]
 }
 
-// Matches GET /v1/live/sessions/ — "LIVE + UPCOMING for the caller's
-// enrolled courses". This is a real, working endpoint (unlike the
-// dashboard's own `live_sessions` field, which is still scaffolded as []
-// until M2 ships), so we fetch it separately.
+
 interface LiveSessionSummary {
   id: string
   course_id: string
@@ -56,14 +63,6 @@ interface LiveSessionSummary {
   trainer_name: string
 }
 
-// Assignments shown on the dashboard. NOTE: the dashboard endpoint's own
-// `assignments.active` / `assignments.upcoming` fields are still scaffolded
-// as [] on the backend (same situation `live_sessions` was in before it
-// shipped). The only endpoint that reliably returns assignment data today is
-// GET /courses/{slug}/learn/, where assignments are nested per-module — same
-// discovery that fixed CourseLearnPage. So we fetch each enrolled course's
-// learn view and aggregate their module assignments client-side instead of
-// trusting the dashboard's assignments field.
 interface AssignmentItem {
   id: string
   title: string
@@ -110,6 +109,20 @@ function fmtDueDate(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return 'No due date'
   return `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+}
+
+const REQUIREMENT_LABELS: Record<string, string> = {
+  modules_complete: 'Complete all modules',
+  project_complete: 'Submit final project',
+  live_session_attended: 'Attend a live session',
+  quiz_passing: 'Pass all quizzes',
+  final_assessment: 'Pass final assessment',
+}
+
+function labelForRequirement(requirement: string): string {
+  return REQUIREMENT_LABELS[requirement] ?? requirement
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
@@ -223,6 +236,7 @@ const PAGE_CSS = `
   .cert-name { font-size: 1rem; font-weight: 700; color: #111; margin-bottom: 0.625rem; }
   .cert-desc { font-size: 0.8375rem; color: #6B7280; margin-bottom: 1rem; line-height: 1.55; }
   .cert-desc strong { color: #2563EB; }
+  .cert-config-note { font-size: 0.8125rem; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.5rem; padding: 0.625rem 0.75rem; margin-bottom: 0.875rem; line-height: 1.5; }
   .cert-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8375rem; color: #374151; padding: 0.3rem 0; }
   .cert-item.done { color: #6B7280; }
   .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
@@ -256,10 +270,6 @@ const PAGE_CSS = `
   }
 `
 
-// Backend interface for the raw dashboard response. `assignments` is kept
-// here only for typing purposes — it is currently always { active: [],
-// upcoming: [] } and is intentionally NOT used to populate assignment state
-// (see the getCourseLearnView aggregation effect below instead).
 interface DashboardResponse {
   user: {
     id: string
@@ -273,7 +283,7 @@ interface DashboardResponse {
   assignments: { active: unknown[]; upcoming: unknown[] }
   live_sessions: { live_now: unknown[]; upcoming: unknown[] }
   enrolled_courses: EnrolledCourse[]
-  certification_progress: CertificationProgress[]
+  certification_progress: unknown[]
 }
 
 export default function DashboardPage() {
@@ -281,7 +291,8 @@ export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth()
   const [activeNav, setActiveNav] = useState('home')
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
-  const [certProgress, setCertProgress] = useState<CertificationProgress[]>([])
+  const [certProgress, setCertProgress] = useState<CourseCertProgress[]>([])
+  const [certProgressLoaded, setCertProgressLoaded] = useState(false)
   const [assignmentsActive, setAssignmentsActive] = useState<AssignmentItem[]>([])
   const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<AssignmentItem[]>([])
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
@@ -302,11 +313,8 @@ export default function DashboardPage() {
         setLoading(true)
         setError(null)
         const response = await apiClient.get<DashboardResponse>('/v1/me/dashboard/')
-        setCertProgress(response.data.certification_progress || [])
         setEnrolledCourses(response.data.enrolled_courses || [])
-        // NOTE: response.data.assignments is intentionally ignored — it's a
-        // backend stub that's always empty. Real assignment data is fetched
-        // below via getCourseLearnView() once enrolledCourses is populated.
+        
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
         setError('Failed to load courses')
@@ -317,9 +325,6 @@ export default function DashboardPage() {
     if (user) fetchDashboardData()
   }, [user])
 
-  // Aggregate assignments across all enrolled courses via the learn-view
-  // endpoint (same one CourseLearnPage uses), since the dashboard's own
-  // assignments field is still scaffolded as [] on the backend.
   useEffect(() => {
     const fetchAssignments = async () => {
       if (enrolledCourses.length === 0) {
@@ -349,8 +354,7 @@ export default function DashboardPage() {
           })
         })
 
-        // Exclude anything already graded — nothing actionable left to show.
-        // Active = you've started it (in_progress). Upcoming = not started yet.
+
         const byDueDate = (a: AssignmentItem, b: AssignmentItem) => {
           if (!a.due_at) return 1
           if (!b.due_at) return -1
@@ -373,6 +377,47 @@ const upcoming = all
       }
     }
     if (user && !loading) fetchAssignments()
+  }, [user, loading, enrolledCourses])
+
+  
+  useEffect(() => {
+    const fetchCertProgress = async () => {
+      if (enrolledCourses.length === 0) {
+        setCertProgressLoaded(true)
+        return
+      }
+      try {
+        const results = await Promise.allSettled(
+          enrolledCourses.map((c) =>
+            apiClient.get<CertificationApiResponse>(`/v1/learner/courses/${c.course_slug}/certification/`),
+          ),
+        )
+
+        const all: CourseCertProgress[] = []
+        results.forEach((res, i) => {
+          if (res.status !== 'fulfilled') return
+          const course = enrolledCourses[i]
+          const data = res.value.data
+          all.push({
+            course_id: course.course_id,
+            course_slug: course.course_slug,
+            course_title: course.title,
+            eligible: data.eligible,
+            completion_percentage: data.completion_percentage ?? 0,
+            next_incomplete: data.next_incomplete ?? null,
+            
+            checklist: (data.checklist || []).filter((item) => item.implemented !== false),
+          })
+        })
+
+        setCertProgress(all)
+      } catch (err) {
+        console.error('Failed to fetch certification progress:', err)
+      } finally {
+        setCertProgressLoaded(true)
+      }
+    }
+    if (user && !loading) fetchCertProgress()
   }, [user, loading, enrolledCourses])
 
   useEffect(() => {
@@ -427,7 +472,14 @@ const upcoming = all
       })[0]
     : null
 
-  const activeCert  = certProgress.length > 0 ? certProgress[0] : null
+
+  const activeCert = certProgress.length > 0
+    ? (certProgress.find((c) => c.course_slug === resumeCourse?.course_slug)
+        ?? certProgress.find((c) => !c.eligible)
+        ?? certProgress[0])
+    : null
+
+  const configMissingNote = activeCert?.checklist.find((c) => c.reason === 'config_missing')
 
   function goToCourse(slug: string) {
     if (!slug) return
@@ -439,7 +491,9 @@ const upcoming = all
       state: { courseSlug: a.course_slug, courseTitle: a.course_title },
     })
   }
-
+function goToCertification() {
+  navigate(ROUTES.CERTIFICATES)
+}
   return (
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
@@ -676,8 +730,8 @@ const upcoming = all
             )}
           </div>
 
-          {/* Certificate tracker */}
-          {showCourseDependentSections && activeCert && (
+          {/* Certificate tracker — GET /learner/courses/{slug}/certification/ */}
+          {showCourseDependentSections && certProgressLoaded && activeCert && (
             <div className="cert-section">
               <div className="cert-left">
                 <div className="cert-badge">
@@ -685,23 +739,32 @@ const upcoming = all
                   <span className="cert-badge-label">Certificate</span>
                 </div>
                 <div className="cert-name">{activeCert.course_title}</div>
-                <div className="cert-desc">
-                  You're <strong>{activeCert.completion_percentage}%</strong> to your {activeCert.course_title} certificate — keep going!
-                </div>
-                {activeCert.requirements.map((req, i) => (
-                  <div key={i} className={`cert-item${req.satisfied ? ' done' : ''}`}>
-                    {req.satisfied
+
+                {configMissingNote ? (
+                  <div className="cert-config-note">
+                    This course doesn't have a final assignment configured yet — that's on the course admin, not something you can complete from your side.
+                  </div>
+                ) : activeCert.eligible ? (
+                  <div className="cert-desc">
+                    You've met all the requirements — your certificate is being generated and will show up under My Certificates shortly.
+                  </div>
+                ) : (
+                  <div className="cert-desc">
+                    You're <strong>{activeCert.completion_percentage}%</strong> to your {activeCert.course_title} certificate — keep going!
+                  </div>
+                )}
+
+                {activeCert.checklist.map((item, i) => (
+                  <div key={i} className={`cert-item${item.satisfied ? ' done' : ''}`}>
+                    {item.satisfied
                       ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
                       : <Circle size={16} color="#D1D5DB" />}
-                    {req.label}
-                    {req.target > 1 && (
-                      <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#9CA3AF' }}>
-                        {req.current}/{req.target}
-                      </span>
-                    )}
+                    <span>{labelForRequirement(item.requirement)}</span>
                   </div>
                 ))}
-                <button className="cert-view">View all requirements <ChevronRight size={14} /></button>
+                <button className="cert-view" onClick={goToCertification}>
+  View all requirements <ChevronRight size={14} />
+</button>
               </div>
               <div className="cert-right">
                 <Ring pct={activeCert.completion_percentage} size={110} stroke={10} color="#2563EB" />
@@ -709,7 +772,7 @@ const upcoming = all
             </div>
           )}
 
-          {showCourseDependentSections && !activeCert && (
+          {showCourseDependentSections && certProgressLoaded && !activeCert && (
             <div className="cert-empty">
               <div className="cert-empty-top">
                 <div className="cert-empty-icon"><Trophy size={24} color="#F59E0B" /></div>
@@ -723,7 +786,7 @@ const upcoming = all
                 <span>Certificate progress</span><span>0%</span>
               </div>
               <div className="cert-empty-bar"><div className="cert-empty-fill" /></div>
-              <div className="cert-empty-hint">Complete all 8 modules, quizzes, and submit your project to earn your certificate.</div>
+              <div className="cert-empty-hint">Complete all modules, quizzes, and submit your project to earn your certificate.</div>
               <button className="cert-empty-cta" onClick={() => navigate(RouteBuilder.courseCatalogPage())}>
                 Let's get started <ChevronRight size={16} />
               </button>

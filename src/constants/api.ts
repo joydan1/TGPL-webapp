@@ -53,7 +53,7 @@ LEARNER_PROFILE: '/v1/users/me/learner-profile/',
   LIVE_MANAGE_SESSION_END: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/end/`,
   LIVE_MANAGE_SESSION_GO_LIVE: (sessionId: string) => `/v1/live/manage/sessions/${sessionId}/go-live/`,
   LIVE_MANAGE_SLOT: (slotId: string) => `/v1/live/manage/slots/${slotId}/`,
-
+LIVE_MANAGE_BOOKING_RECORDING: (bookingId: string) => `/v1/live/manage/bookings/${bookingId}/recording/`,
   // Test endpoints — dev only
   ...(import.meta.env.DEV && {
     TEST_LEARNER: '/v1/auth/_test/learner-only/',

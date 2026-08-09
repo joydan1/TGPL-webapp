@@ -2,59 +2,208 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TrainerShell from '../../../layouts/TrainerShell'
-import { Plus } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesManageAPI, type TrainerCourseListItem } from '../../../services/api'
 import ConfirmDialog from '../../../components/ConfirmDialog'
 import { useConfirm } from '../../../hooks/useConfirm'
 
 const PAGE_CSS = `
-  .courses-page { padding: 1rem; background: #F5F5F5; }
-  .courses-title { margin: 0 0 1rem; font-size: 1.15rem; font-weight: 700; color: #111827; }
+  .courses-page { padding: 24px; background: #F7F7F7; box-sizing: border-box; }
 
-  .courses-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-
-  .courses-empty { background: #fff; border-radius: 1rem; padding: 3rem 1.5rem; text-align: center; color: #6B7280; border: 1px solid rgba(148, 163, 184, 0.12); grid-column: 1 / -1; }
-  .courses-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 1rem; padding: 1rem; grid-column: 1 / -1; }
-  .courses-loading { padding: 2rem; text-align: center; color: #9CA3AF; grid-column: 1 / -1; }
-
-  .course-card { background: #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); display: flex; flex-direction: column; }
-  .course-card-img { width: 100%; height: 176px; object-fit: cover; background: #E2E8F0; display: block; }
-  .course-card-body { padding: 1.1rem; display: grid; gap: 0.4rem; }
-  .course-card-status-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-  .course-card-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
-  .course-status-badge { font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; text-transform: capitalize; white-space: nowrap; }
-  .course-status-badge.draft { background: #FEF3C7; color: #D97706; }
-  .course-status-badge.published { background: #DCFCE7; color: #16A34A; }
-  .course-status-badge.archived { background: #F3F4F6; color: #6B7280; }
-  .course-card-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: #111827; }
-  .course-card-meta { margin: 0; color: #6B7280; font-size: 0.8rem; }
-  .course-card-date { margin: 0; color: #9CA3AF; font-size: 0.78rem; }
-  .course-card-preview { margin-top: 0.5rem; border: none; background: none; padding: 0; color: #2563EB; font-weight: 700; cursor: pointer; text-align: left; font-size: 0.9rem; }
-  .course-card-preview:disabled { color: #9CA3AF; cursor: default; }
-
-  .course-card-actions-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
-  .course-action-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; font-weight: 700; font-size: 0.8rem; padding: 0.5rem 0.85rem; border-radius: 0.7rem; cursor: pointer; }
-  .course-action-btn:hover { background: #F9FAFB; }
-  .course-action-btn:disabled { opacity: 0.5; cursor: default; }
-  .course-action-btn.unpublish { color: #D97706; border-color: #FDE68A; }
-  .course-action-btn.publish { color: #16A34A; border-color: #BBF7D0; }
-  .course-delete-note { margin-top: 0.35rem; color: #9CA3AF; font-size: 0.72rem; font-style: italic; }
-
-  .course-action-errors { margin: 0.35rem 0 0; padding-left: 1.1rem; color: #EF4444; font-size: 0.78rem; }
-  .course-action-errors li { margin: 0.1rem 0; }
-
-  .add-course-card { border: 2px dashed #93C5FD; background: #EFF6FF; border-radius: 1rem; min-height: 260px; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-  .add-course-btn { appearance: none; border: none; border-radius: 999px; padding: 0.9rem 1.25rem; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; white-space: nowrap; }
-
-  @media (min-width: 640px) {
-    .courses-page { padding: 1.5rem; }
-    .courses-grid { grid-template-columns: repeat(2, minmax(0, 340px)); }
+  .courses-section { margin-bottom: 32px; display: flex; flex-direction: column; gap: 8px; }
+  .courses-section-title {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 20px;
+    color: #2B3942;
   }
 
-  @media (min-width: 1024px) {
-    .courses-page { padding: 1.5rem 2rem 2rem; }
-    .courses-grid { grid-template-columns: repeat(auto-fill, 340px); }
+  .courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(249px, 249px));
+    gap: 20px;
+  }
+
+  .courses-empty { background: #fff; border-radius: 16px; padding: 2.5rem 1.5rem; text-align: center; color: #99A1AF; border: 1px solid #F3F4F6; font-size: 13px; grid-column: 1 / -1; }
+  .courses-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 16px; padding: 1rem; grid-column: 1 / -1; }
+  .courses-loading { padding: 2rem; text-align: center; color: #9CA3AF; grid-column: 1 / -1; }
+
+  /* ── Course card ── */
+  .course-card {
+    box-sizing: border-box;
+    width: 249px;
+    background: #FFFFFF;
+    border: 1px solid #F3F4F6;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .course-card-img-wrap { position: relative; width: 100%; aspect-ratio: 247 / 215.72; background: #E2E8F0; }
+  .course-card-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .course-card-img-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%);
+  }
+
+  .course-card-body { padding: 10px; display: flex; flex-direction: column; }
+
+  .course-card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .course-card-cat {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 15px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #2492EB;
+  }
+  .course-status-badge {
+    font-family: 'Sora', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: capitalize;
+    white-space: nowrap;
+    background: #F3F4F6;
+    color: #6A7282;
+  }
+
+  .course-card-name {
+    margin: 2px 0 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 16px;
+    color: #2B3942;
+  }
+  .course-card-meta {
+    margin: 4px 0 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 400;
+    font-size: 9px;
+    line-height: 14px;
+    color: #99A1AF;
+  }
+  .course-card-date {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 400;
+    font-size: 9px;
+    line-height: 14px;
+    color: #99A1AF;
+  }
+
+  .course-card-action-row {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .course-card-preview {
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 15px;
+    letter-spacing: 0.5px;
+    color: #2492EB;
+    cursor: pointer;
+    text-align: center;
+  }
+  .course-card-preview:disabled { color: #99A1AF; cursor: default; }
+
+  .continue-edit-btn {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 140px;
+    height: 31px;
+    padding: 8px 24px;
+    border: 1px solid #2492EB;
+    border-radius: 12px;
+    background: #fff;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 15px;
+    letter-spacing: 0.5px;
+    color: #2492EB;
+    cursor: pointer;
+  }
+  .continue-edit-btn:hover { background: #EFF6FF; }
+
+  .course-status-action {
+    border: none;
+    background: none;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 15px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .course-status-action.unpublish { color: #D97706; }
+  .course-status-action.publish { color: #16A34A; }
+  .course-status-action:disabled { opacity: 0.5; cursor: default; }
+
+  .course-action-errors { margin: 6px 0 0; padding-left: 1rem; color: #EF4444; font-size: 10px; line-height: 14px; }
+  .course-action-errors li { margin: 2px 0; }
+  .course-action-error-msg { color: #EF4444; font-size: 10px; line-height: 14px; margin: 6px 0 0; text-align: center; }
+
+  /* ── Add-course card ── */
+  .add-course-card {
+    box-sizing: border-box;
+    width: 249px;
+    aspect-ratio: 251 / 347.72;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #E9F5FF;
+    border: 1px dashed #2492EB;
+    border-radius: 16px;
+  }
+  .add-course-btn {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 24px;
+    background: #2492EB;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 16px;
+    color: #FFFFFF;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .add-course-btn:hover { opacity: 0.92; }
+
+  /* ── Responsive: fluid grid below the point where fixed 249px columns stop fitting ── */
+  @media (max-width: 640px) {
+    .courses-page { padding: 16px; }
+    .courses-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .course-card, .add-course-card { width: 100%; }
+  }
+
+  @media (max-width: 380px) {
+    .courses-grid { grid-template-columns: 1fr; }
   }
 `
 
@@ -84,11 +233,11 @@ function formatUpdatedAgo(iso: string): string {
   const date = new Date(iso)
   const diffMs = Date.now() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays < 1) return 'Updated today'
-  if (diffDays === 1) return 'Updated yesterday'
-  if (diffDays < 30) return `Updated ${diffDays} days ago`
+  if (diffDays < 1) return 'Uploaded today'
+  if (diffDays === 1) return 'Uploaded yesterday'
+  if (diffDays < 30) return `Uploaded ${diffDays} days ago`
   const diffMonths = Math.floor(diffDays / 30)
-  return `Updated ${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`
+  return `Uploaded ${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`
 }
 
 export default function TrainerCoursesPage() {
@@ -120,8 +269,8 @@ export default function TrainerCoursesPage() {
   }
 
   function handlePreview(courseId: string) {
-  navigate(RouteBuilder.trainerCourseEdit(courseId))
-}
+    navigate(RouteBuilder.trainerCourseEdit(courseId))
+  }
 
   function applyActionError(courseId: string, rawError: unknown) {
     setActionErrorId(courseId)
@@ -181,95 +330,154 @@ export default function TrainerCoursesPage() {
     setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'published' } : c)))
   }
 
+  function renderActionErrors(courseId: string) {
+    if (actionErrorId !== courseId) return null
+    return (
+      <>
+        {actionFieldErrors && (
+          <ul className="course-action-errors">
+            {actionFieldErrors.map((e, i) => (
+              <li key={i}>{e.message}</li>
+            ))}
+          </ul>
+        )}
+        {actionError && <p className="course-action-error-msg">{actionError}</p>}
+      </>
+    )
+  }
+
+  function CourseCard({ course }: { course: TrainerCourseListItem }) {
+    const isPublished = course.status === 'published'
+    const isDraft = course.status === 'draft'
+    const isPending = pendingActionId === course.id
+
+    return (
+      <div className="course-card">
+        <div className="course-card-img-wrap">
+          <img
+            src={course.thumbnail_url || '/image1.png'}
+            alt={course.title}
+            className="course-card-img"
+            onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
+          />
+          <div className="course-card-img-gradient" />
+        </div>
+
+        <div className="course-card-body">
+          <div className="course-card-top-row">
+            <p className="course-card-cat">{course.subtitle || 'Course'}</p>
+            {course.status === 'archived' && <span className="course-status-badge">Archived</span>}
+          </div>
+          <h4 className="course-card-name">{course.title}</h4>
+          <p className="course-card-meta">
+            {course.module_count} module{course.module_count === 1 ? '' : 's'} · {course.lesson_count} lesson{course.lesson_count === 1 ? '' : 's'}
+          </p>
+          <p className="course-card-date">{formatUpdatedAgo(course.updated_at)}</p>
+
+          <div className="course-card-action-row">
+            {isDraft ? (
+              <button type="button" className="continue-edit-btn" onClick={() => handlePreview(course.id)}>
+                Continue to edit
+              </button>
+            ) : (
+              <button type="button" className="course-card-preview" onClick={() => handlePreview(course.id)}>
+                Preview
+              </button>
+            )}
+
+            {isPublished && (
+              <button
+                type="button"
+                className="course-status-action unpublish"
+                onClick={() => handleUnpublish(course.id, course.title)}
+                disabled={isPending}
+              >
+                {isPending ? 'Unpublishing…' : 'Unpublish'}
+              </button>
+            )}
+            {isDraft && (
+              <button
+                type="button"
+                className="course-status-action publish"
+                onClick={() => handlePublish(course.id, course.title)}
+                disabled={isPending}
+              >
+                {isPending ? 'Publishing…' : 'Publish'}
+              </button>
+            )}
+
+            {renderActionErrors(course.id)}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const publishedCourses = courses.filter((c) => c.status === 'published')
+  const draftCourses = courses.filter((c) => c.status === 'draft')
+  const archivedCourses = courses.filter((c) => c.status === 'archived')
+
   return (
     <TrainerShell>
       <style>{PAGE_CSS}</style>
       <div className="courses-page">
-        <h3 className="courses-title">My Courses</h3>
-        <div className="courses-grid">
-          {loading ? (
-            <div className="courses-loading">Loading your courses…</div>
-          ) : error ? (
-            <div className="courses-error">{error}</div>
-          ) : courses.length === 0 ? (
-            <div className="courses-empty">You haven't created any courses yet. Start your first one below.</div>
-          ) : (
-            courses.map((course) => (
-              <div key={course.id} className="course-card">
-                <img
-                  src={course.thumbnail_url || '/image1.png'}
-                  alt={course.title}
-                  className="course-card-img"
-                  onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
-                />
-                <div className="course-card-body">
-                  <div className="course-card-status-row">
-                    <p className="course-card-cat">{course.subtitle || 'Course'}</p>
-                    <span className={`course-status-badge ${course.status}`}>{course.status}</span>
-                  </div>
-                  <h4 className="course-card-name">{course.title}</h4>
-                  <p className="course-card-meta">
-                    {course.module_count} module{course.module_count === 1 ? '' : 's'} · {course.lesson_count} lesson{course.lesson_count === 1 ? '' : 's'}
-                  </p>
-                  <p className="course-card-date">{formatUpdatedAgo(course.updated_at)}</p>
-                 <button
-  type="button"
-  className="course-card-preview"
-  onClick={() => handlePreview(course.id)}
->
-  Preview
-</button>
-
-                  <div className="course-card-actions-row">
-                    {course.status === 'published' ? (
-                      <button
-                        type="button"
-                        className="course-action-btn unpublish"
-                        onClick={() => handleUnpublish(course.id, course.title)}
-                        disabled={pendingActionId === course.id}
-                      >
-                        {pendingActionId === course.id ? 'Unpublishing…' : 'Unpublish'}
-                      </button>
-                    ) : course.status === 'draft' ? (
-                      <button
-                        type="button"
-                        className="course-action-btn publish"
-                        onClick={() => handlePublish(course.id, course.title)}
-                        disabled={pendingActionId === course.id}
-                      >
-                        {pendingActionId === course.id ? 'Publishing…' : 'Publish'}
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {actionErrorId === course.id && actionFieldErrors && (
-                    <ul className="course-action-errors">
-                      {actionFieldErrors.map((e, i) => (
-                        <li key={i}>{e.message}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {actionErrorId === course.id && actionError && (
-                    <p style={{ color: '#EF4444', fontSize: '0.78rem', margin: '0.35rem 0 0' }}>{actionError}</p>
-                  )}
-
-                  <p className="course-delete-note">Deleting courses isn't supported yet — ask an admin if this needs to be removed permanently.</p>
+        {loading ? (
+          <div className="courses-loading">Loading your courses…</div>
+        ) : error ? (
+          <div className="courses-error">{error}</div>
+        ) : courses.length === 0 ? (
+          <div className="courses-section">
+            <h3 className="courses-section-title">My Courses</h3>
+            <div className="courses-grid">
+              <div className="courses-empty">You haven't created any courses yet. Start your first one below.</div>
+              <div className="add-course-card">
+                <button type="button" className="add-course-btn" onClick={() => navigate(ROUTES.TRAINER_COURSE_ADD)}>
+                  <BookOpen size={15} />
+                  Add new course
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="courses-section">
+              <h3 className="courses-section-title">Active Course</h3>
+              <div className="courses-grid">
+                {publishedCourses.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
+                <div className="add-course-card">
+                  <button type="button" className="add-course-btn" onClick={() => navigate(ROUTES.TRAINER_COURSE_ADD)}>
+                    <BookOpen size={15} />
+                    Add new course
+                  </button>
                 </div>
               </div>
-            ))
-          )}
+            </div>
 
-          <div className="add-course-card">
-            <button
-              type="button"
-              className="add-course-btn"
-              onClick={() => navigate(ROUTES.TRAINER_COURSE_ADD)}
-            >
-              <Plus size={18} />
-              Add Course
-            </button>
-          </div>
-        </div>
+            {draftCourses.length > 0 && (
+              <div className="courses-section">
+                <h3 className="courses-section-title">Draft(s)</h3>
+                <div className="courses-grid">
+                  {draftCourses.map((course) => (
+                    <CourseCard key={course.id} course={course} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {archivedCourses.length > 0 && (
+              <div className="courses-section">
+                <h3 className="courses-section-title">Archived</h3>
+                <div className="courses-grid">
+                  {archivedCourses.map((course) => (
+                    <CourseCard key={course.id} course={course} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
       <ConfirmDialog
         open={confirmState.open}

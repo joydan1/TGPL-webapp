@@ -466,10 +466,6 @@ function PublicCourseOverview({
     })
   }
 
-  // Free courses self-enrol via POST /enroll/ 
-  // Paid courses still go through the existing checkout flow. If the
-  // backend disagrees that the course is free (402), we fall back to
-  // checkout rather than leaving the learner stuck.
   const handleEnroll = async () => {
     if (!isAuthenticated) {
       navigate(ROUTES.LOGIN, { state: { redirectTo: `/courses/${course.slug}` } })
