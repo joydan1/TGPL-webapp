@@ -6,17 +6,6 @@ import { ROUTES } from '../../../constants/routes'
 import { trainerProfileAPI, type TrainerProfile } from '../../../services/api'
 import SettingsLayout from '../../../components/layout/SettingsLayout'
 
-/* ────────────────────────────────────────────────────────────────────────
- * GET /v1/users/me/trainer-profile/ auto-creates an empty profile on first
- * access (completion_status: 'incomplete') — it never 404s, so we can
- * always render the form and just show a "complete your profile" banner
- * when completion_status !== 'complete'.
- *
- * Note: this `bio` is a SEPARATE field from the general account bio on
- * /v1/auth/me/ (edited on the main Profile settings page). This one is
- * the trainer bio shown to learners — labeled distinctly below to avoid
- * confusion between the two.
- * ------------------------------------------------------------------------ */
 
 const BIO_MAX_LEN = 400
 
@@ -44,13 +33,13 @@ const PAGE_CSS = `
   .char-count { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.4rem; text-align: right; }
 
   .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
-  .tag-chip { display: flex; align-items: center; gap: 0.4rem; background: #EFF6FF; color: #2563EB; font-weight: 600; font-size: 0.85rem; padding: 0.4rem 0.7rem 0.4rem 0.85rem; border-radius: 999px; max-width: 100%; }
+  .tag-chip { display: flex; align-items: center; gap: 0.4rem; background: #EFF6FF; color: #2492EB; font-weight: 600; font-size: 0.85rem; padding: 0.4rem 0.7rem 0.4rem 0.85rem; border-radius: 999px; max-width: 100%; }
   .tag-chip span, .tag-chip { word-break: break-word; }
-  .tag-chip-remove { background: none; border: none; color: #2563EB; cursor: pointer; padding: 0; display: flex; opacity: 0.7; flex-shrink: 0; }
+  .tag-chip-remove { background: none; border: none; color: #2492EB; cursor: pointer; padding: 0; display: flex; opacity: 0.7; flex-shrink: 0; }
   .tag-chip-remove:hover { opacity: 1; }
   .tag-input-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
   .tag-input-row .field-input { flex: 1; min-width: 140px; }
-  .tag-add-btn { display: flex; align-items: center; justify-content: center; gap: 0.35rem; border: 1px solid #2563EB; background: #fff; color: #2563EB; font-weight: 700; font-size: 0.85rem; border-radius: 0.75rem; padding: 0 1rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .tag-add-btn { display: flex; align-items: center; justify-content: center; gap: 0.35rem; border: 1px solid #2492EB; background: #fff; color: #2492EB; font-weight: 700; font-size: 0.85rem; border-radius: 0.75rem; padding: 0 1rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .tag-add-btn:disabled { opacity: 0.5; cursor: default; }
 
   .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -62,12 +51,12 @@ const PAGE_CSS = `
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle .track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; transition: background 0.15s; cursor: pointer; }
   .toggle .track::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.15s; }
-  .toggle input:checked + .track { background: #2563EB; }
+  .toggle input:checked + .track { background: #2492EB; }
   .toggle input:checked + .track::before { transform: translateX(18px); }
 
   .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 1rem 2.5rem; display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 0.75rem; z-index: 20; }
   .save-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; border-radius: 0.75rem; padding: 0.9rem 1.5rem; font-weight: 700; font-size: 0.9375rem; cursor: pointer; width: 100%; max-width: 220px; }
-  .save-btn.primary { background: #2563EB; color: #fff; }
+  .save-btn.primary { background: #2492EB; color: #fff; }
   .save-btn.primary:disabled { background: #E5E7EB; color: #9CA3AF; cursor: default; }
   .save-btn.secondary { background: #fff; color: #6B7280; border: 1px solid #E5E7EB; }
   .save-btn.secondary:disabled { color: #C4C9D1; cursor: default; }

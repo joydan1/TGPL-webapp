@@ -41,12 +41,12 @@ const PAGE_CSS = `
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle .track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; transition: background 0.15s; cursor: pointer; }
   .toggle .track::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.15s; }
-  .toggle input:checked + .track { background: #2563EB; }
+  .toggle input:checked + .track { background: #2492EB; }
   .toggle input:checked + .track::before { transform: translateX(18px); }
   .toggle input:disabled + .track { opacity: 0.5; cursor: not-allowed; }
   .actions { display:flex; flex-direction: column; gap:0.75rem; margin-top: 1.5rem; max-width: 720px; margin-left: auto; margin-right: auto; }
   .btn { width:100%; padding: 0.85rem 1rem; border-radius: 0.75rem; font-weight:700; cursor:pointer; border: none; }
-  .btn.primary { background: #2563EB; color:#fff; }
+  .btn.primary { background: #2492EB; color:#fff; }
   .btn.secondary { background:#fff; color:#6B7280; border:1px solid #E5E7EB }
   .saved-msg { color: #059669; font-weight: 600; font-size: 0.875rem; text-align: center; margin-top: 0.75rem; }
   @media (max-width:640px){

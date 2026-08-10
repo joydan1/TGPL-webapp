@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+﻿import React, { useRef, useState } from 'react'
 import { ROUTES } from '../../constants/routes'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -169,6 +169,7 @@ const navigate = useNavigate()
 {/* Hero */}
 <section id="home" style={{ position: 'relative', minHeight: '85vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', backgroundColor: '#2890E4', paddingTop: '5rem' }}>
   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,#D9D9D9, #90C3EB, #D9D9D9)', zIndex: 0 }} />
+  
 
   {/* Image */}
   <motion.div
@@ -224,11 +225,12 @@ const navigate = useNavigate()
     <div><div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Certified Excellence</div><div style={{ fontSize: '0.73rem', opacity: 0.7 }}>Industry-recognized training</div></div>
   </motion.div>
 
+  
   {/* Text */}
-  <div style={{ position: 'relative', zIndex: 5, textAlign: 'center', padding: '0 2rem', maxWidth: '780px', margin: '0 auto' }}>
+  <div style={{ position: 'relative', zIndex: 5, textAlign: 'center', padding: '0 2rem', maxWidth: '984px', margin: '0 auto' }}>
     <motion.h1
       initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-      style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 700, color: '#2C3C45', margin: '0 0 1.25rem 0', lineHeight: 1.2 }}
+      style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 700, color: '#2B3942', margin: '0 0 1.25rem 0', lineHeight: 1.2 }}
     >
       Building Africa's Next Generation of Project Leaders
     </motion.h1>
@@ -312,7 +314,7 @@ const navigate = useNavigate()
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', marginBottom: '1.5rem' }}>The Global Project Leaders (TGPL) is a project management agency that helps individuals and organisations plan, structure, and deliver sucessful projects through training, consulting, project delivery, and community-led capacity building. Founded in August 2024 and registered with the Corporate Affairs Commission (CAC), Nigeria.</p>
               <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#4a4a4a', margin: 0 }}>TGPL was created to close the project management gap in Africa by empowering organizations, young professionals, and women with the skills and structure required to deliver successful and sustainable projects.</p>
             </motion.div>
-            <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={vp} className="about-image-wrap">
+<motion.div initial={{ opacity: 1 }} animate={{ opacity: 1 }} className="about-image-wrap">
               <div className="about-image-blue" />
               <div className="about-image-frame">
                 <img
@@ -321,7 +323,7 @@ const navigate = useNavigate()
                   alt="TGPL Team"
                   width={327}
                   height={384}
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
                 />
               </div>

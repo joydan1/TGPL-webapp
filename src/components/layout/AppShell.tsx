@@ -128,6 +128,24 @@ interface AppShellProps {
   pageHeader?: { title: string; subtitle?: string; onBack: () => void }
 }
 
+/** Renders the user's avatar image when present, falling back to initials. */
+function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; initials: string; className: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  if (avatarUrl && !imgFailed) {
+    return (
+      <div className={className}>
+        <img
+          src={avatarUrl}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    )
+  }
+  return <div className={className}>{initials}</div>
+}
+
 export default function AppShell({ children, activeNav = 'home', onNavChange, pageHeader }: AppShellProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -142,6 +160,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
+  const avatarUrl = user.avatar_url ?? null
 
   function handleNav(key: string) {
     if (key === 'settings') {
@@ -257,13 +276,13 @@ function requestLogout() {
                     aria-expanded={profileOpen}
                     aria-label="Open profile menu"
                   >
-                    <div className="topbar-avatar">{initials}</div>
+                    <Avatar avatarUrl={avatarUrl} initials={initials} className="topbar-avatar" />
                     <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
                   </button>
                   {profileOpen && (
                     <div className="profile-dropdown" role="menu">
                       <div className="profile-dropdown-header">
-                        <div className="user-avatar">{initials}</div>
+                        <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
                         <div style={{ overflow: 'hidden' }}>
                           <div className="profile-dropdown-name">{user.name || user.email}</div>
                           <div className="profile-dropdown-email">{user.email}</div>
@@ -326,7 +345,7 @@ function requestLogout() {
               ))}
             </nav>
             <div className="sidebar-user">
-              <div className="user-avatar">{initials}</div>
+              <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
               <div className="user-text">
                 <div className="user-name">{user.name || user.email}</div>
                 <div className="user-email">{user.email}</div>

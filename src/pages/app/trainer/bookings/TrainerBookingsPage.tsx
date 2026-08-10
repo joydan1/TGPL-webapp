@@ -27,8 +27,8 @@ const PAGE_CSS = `
   .bk-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
   .bk-header-title { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
   .bk-header-subtitle { margin: 0.3rem 0 0; color: #6B7280; font-size: 0.9rem; }
-  .bk-set-availability-btn { border: none; background: #2563EB; color: #fff; font-weight: 700; font-size: 0.9rem; padding: 0.75rem 1.15rem; border-radius: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25); }
-  .bk-set-availability-btn:hover { background: #1D4ED8; }
+  .bk-set-availability-btn { border: none; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.9rem; padding: 0.75rem 1.15rem; border-radius: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25); }
+  .bk-set-availability-btn:hover { background: #2462EB; }
 
   /* ── Stat cards ──────────────────────────────────────────────────────── */
   .bk-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
@@ -41,9 +41,9 @@ const PAGE_CSS = `
   .bk-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin: 1.5rem 0 1rem; }
   .bk-tab-group { display: flex; background: #fff; border-radius: 0.85rem; padding: 0.25rem; border: 1px solid rgba(148, 163, 184, 0.18); }
   .bk-tab-pill { border: none; background: none; cursor: pointer; padding: 0.55rem 1rem; border-radius: 0.65rem; font-size: 0.85rem; font-weight: 700; color: #374151; }
-  .bk-tab-pill.active { background: #2563EB; color: #fff; }
+  .bk-tab-pill.active { background: #2492EB; color: #fff; }
   .bk-tab-controls { display: flex; align-items: center; gap: 0.5rem; }
-  .bk-filter-select { padding: 0.6rem 0.85rem; border: 1px solid #E5E7EB; border-radius: 0.75rem; font-size: 0.85rem; background: #fff; color: #111827; }
+  .bk-filter-select { padding: 0.6rem 0.85rem; border: 1px solid #2492EB; border-radius: 0.75rem; font-size: 0.85rem; background: #fff; color: #616873; }
   .bk-refresh-btn { border: 1px solid #E5E7EB; background: #fff; width: 38px; height: 38px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #374151; flex-shrink: 0; }
   .bk-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .bk-refresh-btn.spinning svg { animation: bk-spin 0.8s linear infinite; }
@@ -105,7 +105,7 @@ const PAGE_CSS = `
   .bk-modal-footer { padding: 1rem 1.4rem 1.4rem; display: flex; gap: 0.7rem; border-top: 1px solid #F3F4F6; }
   .bk-modal-btn { flex: 1; border-radius: 0.85rem; padding: 0.8rem; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .bk-modal-btn.secondary { border: 1px solid #E5E7EB; background: #fff; color: #374151; }
-  .bk-modal-btn.primary { border: none; background: #2563EB; color: #fff; }
+  .bk-modal-btn.primary { border: none; background: #2492EB; color: #fff; }
   .bk-modal-btn.danger { border: 1px solid #FCA5A5; background: #fff; color: #DC2626; }
   .bk-modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -123,7 +123,7 @@ const PAGE_CSS = `
   .bk-avail-slot-row.off .bk-avail-slot-time { color: #9CA3AF; }
   .bk-avail-slot-booked-note { font-size: 0.72rem; color: #D97706; font-weight: 600; margin-left: 0.5rem; }
   .bk-avail-toggle { position: relative; width: 44px; height: 26px; border-radius: 999px; border: none; cursor: pointer; background: #D1D5DB; flex-shrink: 0; transition: background 0.15s ease; }
-  .bk-avail-toggle.on { background: #2563EB; }
+  .bk-avail-toggle.on { background: #2492EB; }
   .bk-avail-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
   .bk-avail-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 999px; background: #fff; transition: transform 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
   .bk-avail-toggle.on .bk-avail-toggle-thumb { transform: translateX(18px); }
@@ -135,7 +135,7 @@ const PAGE_CSS = `
   .bk-confirm-icon { width: 64px; height: 64px; border-radius: 999px; background: #DCFCE7; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; color: #16A34A; }
   .bk-confirm-title { margin: 0 0 0.5rem; font-size: 1.15rem; font-weight: 800; color: #111827; }
   .bk-confirm-body { margin: 0 0 1.4rem; color: #6B7280; font-size: 0.9rem; line-height: 1.4; }
-  .bk-confirm-close { border: none; background: #2563EB; color: #fff; font-weight: 700; font-size: 0.9rem; padding: 0.8rem 1.4rem; border-radius: 0.85rem; cursor: pointer; width: 100%; }
+  .bk-confirm-close { border: none; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.9rem; padding: 0.8rem 1.4rem; border-radius: 0.85rem; cursor: pointer; width: 100%; }
 
   @media (min-width: 640px) {
     .bk-page { padding: 1.5rem; }
@@ -150,11 +150,6 @@ const PAGE_CSS = `
 type TabKey = 'upcoming' | 'history'
 type StatusFilterKey = 'all' | 'requested' | 'confirmed' | 'rejected' | 'cancelled'
 
-// The API has no recurring-availability endpoint — only dated slots per course
-// (POST/GET /live/manage/courses/{slug}/slots/, DELETE /live/manage/slots/{id}/).
-// So this weekly grid is a *template*: each row stands for "this weekday, this
-// time, for the next 14 days" and gets materialized into real dated slots for
-// the selected course when the trainer hits Save.
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const
 const AVAILABILITY_WINDOW_DAYS = 14
 

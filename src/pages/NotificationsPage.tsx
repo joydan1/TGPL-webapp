@@ -22,13 +22,13 @@ const PAGE_CSS = `
   .np-page-title-row { display: flex; align-items: center; gap: 0.625rem; }
   .np-page-title { font-size: 1.375rem; font-weight: 700; color: #111; }
   .np-new-badge {
-    background: #2563EB; color: #fff;
+    background: #2492EB; color: #fff;
     font-size: 0.7rem; font-weight: 800;
     padding: 0.2rem 0.625rem; border-radius: 2rem;
     letter-spacing: 0.04em;
   }
   .np-mark-all {
-    font-size: 0.9375rem; font-weight: 600; color: #2563EB;
+    font-size: 0.9375rem; font-weight: 600; color: #2492EB;
     background: none; border: none; cursor: pointer;
   }
   .np-mark-all:hover { opacity: 0.8; }
@@ -46,7 +46,7 @@ const PAGE_CSS = `
     cursor: pointer; white-space: nowrap; transition: all 0.12s;
   }
   .np-tab:hover { border-color: #D1D5DB; color: #374151; }
-  .np-tab.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+  .np-tab.active { background: #2492EB; border-color: #2492EB; color: #fff; }
   .np-tab-count { font-size: 0.75rem; font-weight: 700; }
 
   /* ── Section label ── */
@@ -85,7 +85,7 @@ const PAGE_CSS = `
   .np-item-sub { font-size: 0.875rem; color: #6B7280; line-height: 1.5; }
   .np-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; flex-shrink: 0; }
   .np-time { font-size: 0.8rem; color: #9CA3AF; white-space: nowrap; }
-  .np-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563EB; }
+  .np-dot { width: 8px; height: 8px; border-radius: 50%; background: #2492EB; }
 
   /* ── Empty state ── */
   .np-empty {
@@ -111,7 +111,7 @@ function NotifIcon({ category, bg }: { category: Notification['category']; bg: s
     feedback:    <MessageSquare {...p} color="#16A34A" />,
     live:        <Radio         {...p} color="#EF4444" />,
     deadlines:   <ClipboardList {...p} color="#EF4444" />,
-    bookings:    <CalendarCheck {...p} color="#2563EB" />,
+    bookings:    <CalendarCheck {...p} color="#2492EB" />,
     system:      <Info          {...p} color="#6B7280" />,
   }
   return (

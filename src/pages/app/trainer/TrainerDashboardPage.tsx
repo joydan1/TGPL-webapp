@@ -20,7 +20,7 @@ const PAGE_CSS = `
   .db-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .db-greeting { margin: 0; color: #6B7280; font-size: 0.9rem; }
   .db-name { margin: 0.3rem 0 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
-  .db-add-btn { appearance: none; border: none; border-radius: 999px; padding: 0.75rem 1.1rem; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; white-space: nowrap; }
+  .db-add-btn { appearance: none; border: none; border-radius: 999px; padding: 0.75rem 1.1rem; background: #2492EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; white-space: nowrap; }
 
   .db-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1.25rem; }
   .db-stat-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); min-width: 0; }
@@ -31,21 +31,19 @@ const PAGE_CSS = `
   .db-stat-label { margin: 0.5rem 0 0; font-size: 0.8rem; font-weight: 600; }
 
   .db-section-title { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 700; color: #111827; }
-
-  /* Single vertical stack: Live Session → Pending Reviews → Active Course.
-     No column split at any breakpoint — matches the Figma reference exactly. */
   .db-sections { display: flex; flex-direction: column; gap: 2rem; margin-top: 1.75rem; }
 
-  .db-live-card { border-radius: 1rem; overflow: hidden; background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%); color: #fff; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+  .db-live-card { border-radius: 1rem; overflow: hidden;  background: #2492EB; color: #fff; padding: 1.25rem;  display: flex; 
+  flex-direction: column; gap: 1rem;}
   .db-live-badge { margin: 0; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; display: flex; align-items: center; gap: 0.4rem; }
-  .db-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #4ADE80; display: inline-block; flex-shrink: 0; }
+  .db-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #05DF72; display: inline-block; flex-shrink: 0; }
   .db-live-title { margin: 0.65rem 0 0; font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
   .db-live-sub { margin: 0.65rem 0 0; color: rgba(255,255,255,0.85); font-size: 0.85rem; }
-  .db-live-btn { border: none; border-radius: 999px; padding: 0.85rem 1.1rem; background: #fff; color: #1D4ED8; font-weight: 700; cursor: pointer; white-space: nowrap; align-self: flex-start; display: flex; align-items: center; gap: 0.4rem; }
+  .db-live-btn { border: none; border-radius: 999px; padding: 0.85rem 1.1rem; background: #fff; color: #2492EB; font-weight: 700; cursor: pointer; white-space: nowrap; align-self: flex-start; display: flex; align-items: center; gap: 0.4rem; }
 
   .db-reviews-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); }
   .db-reviews-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-  .db-view-all { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  .db-view-all { border: none; background: none; color:#2492EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
   .db-review-list { margin-top: 0.85rem; display: grid; gap: 0.75rem; }
   .db-review-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem; border-radius: 1rem; background: #F8FAFF; border: 1px solid #E5E7EB; flex-wrap: wrap; }
   .db-review-person { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
@@ -54,7 +52,7 @@ const PAGE_CSS = `
   .db-review-course { margin: 0.25rem 0 0; color: #64748B; font-size: 0.8rem; }
   .db-review-meta { text-align: right; }
   .db-review-time { margin: 0; color: #6B7280; font-size: 0.75rem; }
-  .db-review-btn { margin-top: 0.5rem; border: none; border-radius: 999px; background: #2563EB; color: #fff; padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+  .db-review-btn { margin-top: 0.5rem; border: none; border-radius: 999px; background: #2492EB; color: #fff; padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
   .db-empty-note { color: #9CA3AF; font-size: 0.85rem; text-align: center; padding: 1rem 0; margin: 0; }
 
   .db-course-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); max-width: 340px; }
@@ -64,7 +62,7 @@ const PAGE_CSS = `
   .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
   .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
   .db-course-date { margin: 0; color: #6B7280; font-size: 0.8rem; }
-  .db-course-preview-btn { margin-top: 1rem; width: 100%; border: none; border-radius: 999px; padding: 0.8rem 1rem; background: #EFF6FF; color: #2563EB; font-weight: 700; cursor: pointer; }
+  .db-course-preview-btn { margin-top: 1rem; width: 100%; border: none; border-radius: 999px; padding: 0.8rem 1rem; background: #EFF6FF; color: #2492EB; font-weight: 700; cursor: pointer; }
 
   @media (min-width: 640px) {
     .db-page { padding: 1.5rem; }
@@ -276,8 +274,7 @@ export default function TrainerDashboardPage() {
           })}
         </div>
 
-        {/* Single vertical stack — Live Session, then Pending Reviews, then
-            Active Course. No column split, matching the Figma layout. */}
+        
         <section className="db-sections">
           <div>
             <h3 className="db-section-title">Upcoming Live Session(s)</h3>
@@ -300,7 +297,7 @@ export default function TrainerDashboardPage() {
                 <div>
                   <p className="db-live-sub" style={{ margin: 0, color: '#6B7280' }}>No upcoming sessions scheduled.</p>
                 </div>
-                <button className="db-live-btn" style={{ background: '#2563EB', color: '#fff' }} onClick={() => navigate(ROUTES.TRAINER_LIVE_CLASSES)}>
+                <button className="db-live-btn" style={{ background: '#2492EB', color: '#fff' }} onClick={() => navigate(ROUTES.TRAINER_LIVE_CLASSES)}>
                   Schedule a session
                 </button>
               </div>
@@ -356,13 +353,7 @@ export default function TrainerDashboardPage() {
                     alt={activeCourse.title}
                     className="db-course-img"
                   />
-                  {/*
-                    TODO: the "progress ring" in the original design showed
-                    learner-style completion percent, but TrainerCourseListItem
-                    has no such field — there is no "how built-out is my course"
-                    metric from the backend. Dropped the ring; showing
-                    module/lesson counts instead until a real metric exists.
-                  */}
+                 
                 </div>
                 <div className="db-course-body">
                   {/* TODO: TrainerCourseListItem has no `category` field — showing subtitle instead */}

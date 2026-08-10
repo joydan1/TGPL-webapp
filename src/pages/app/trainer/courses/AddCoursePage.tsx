@@ -117,12 +117,12 @@ const PAGE_CSS = `
   .ac-stepper { display: flex; align-items: center; padding: 1.25rem 1.25rem 0; overflow-x: auto; gap: 0; }
   .ac-step { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; flex-shrink: 0; min-width: 64px; }
   .ac-step-circle { width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; background: #E5E7EB; color: #6B7280; flex-shrink: 0; }
-  .ac-step-circle.active { background: #2563EB; color: #fff; }
-  .ac-step-circle.done { background: #2563EB; color: #fff; }
+  .ac-step-circle.active { background: #2492EB; color: #fff; }
+  .ac-step-circle.done { background: #2492EB; color: #fff; }
   .ac-step-label { font-size: 0.7rem; font-weight: 600; color: #9CA3AF; white-space: nowrap; }
-  .ac-step-label.active, .ac-step-label.done { color: #2563EB; }
+  .ac-step-label.active, .ac-step-label.done { color: #2492EB; }
   .ac-step-line { height: 2px; background: #E5E7EB; flex: 1; margin: 0 0.4rem; min-width: 20px; align-self: flex-start; margin-top: 16px; }
-  .ac-step-line.done { background: #2563EB; }
+  .ac-step-line.done { background: #2492EB; }
 
   .ac-body { padding: 1.25rem; }
   .ac-section-title { margin: 0; font-size: 1.15rem; font-weight: 800; color: #111827; }
@@ -143,22 +143,22 @@ const PAGE_CSS = `
   .ac-upload-label { font-weight: 700; color: #374151; }
 
   .ac-list-item { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.65rem; }
-  .ac-list-dot { width: 8px; height: 8px; border-radius: 999px; background: #2563EB; flex-shrink: 0; }
+  .ac-list-dot { width: 8px; height: 8px; border-radius: 999px; background: #2492EB; flex-shrink: 0; }
   .ac-list-input { flex: 1; }
   .ac-list-delete { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0.4rem; flex-shrink: 0; }
-  .ac-add-item-btn { background: none; border: none; color: #2563EB; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; padding: 0.25rem 0; }
+  .ac-add-item-btn { background: none; border: none; color: #2492EB; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; padding: 0.25rem 0; }
 
   .ac-lesson-card { border: 1px solid #E5E7EB; border-radius: 1rem; margin-bottom: 1rem; overflow: hidden; }
   .ac-lesson-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem; }
-  .ac-lesson-num { width: 26px; height: 26px; border-radius: 999px; background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ac-lesson-num { width: 26px; height: 26px; border-radius: 999px; background: #EFF6FF; color: #2492EB; font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ac-lesson-title-input { flex: 1; border: none; background: none; font-size: 0.95rem; color: #111; outline: none; }
   .ac-lesson-delete { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0.4rem; flex-shrink: 0; }
   .ac-lesson-desc-wrap { padding: 0 1rem 0.85rem; }
   .ac-lesson-desc { width: 100%; box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: 0.6rem; padding: 0.6rem 0.75rem; font-size: 0.85rem; font-family: inherit; resize: vertical; min-height: 70px; color: #111; }
   .ac-lesson-uploads { padding: 0 1rem 1rem; display: grid; gap: 0.75rem; }
   .ac-upload-chip { display: flex; align-items: center; gap: 0.75rem; border: 1px dashed #93C5FD; background: #EFF6FF; border-radius: 0.85rem; padding: 0.85rem 1rem; cursor: pointer; }
-  .ac-upload-chip-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .ac-upload-chip-label { font-weight: 700; color: #2563EB; font-size: 0.875rem; }
+  .ac-upload-chip-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #DBEAFE; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ac-upload-chip-label { font-weight: 700; color: #2492EB; font-size: 0.875rem; }
   .ac-upload-chip-sub { margin: 0.1rem 0 0; color: #6B7280; font-size: 0.75rem; }
 
   .ac-insert-assignment-btn { border: none; background: #2492EB; color: #FFFFFF; font-family: 'Sora', inherit; font-weight: 600; font-size: 12px; line-height: 18px; padding: 6px 16px; border-radius: 8px; cursor: pointer; justify-self: start; align-self: flex-start; white-space: nowrap; width: fit-content; }
@@ -182,16 +182,16 @@ const PAGE_CSS = `
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle .track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; transition: background 0.15s; cursor: pointer; }
   .toggle .track::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.15s; }
-  .toggle input:checked + .track { background: #2563EB; }
+  .toggle input:checked + .track { background: #2492EB; }
   .toggle input:checked + .track::before { transform: translateX(18px); }
 
   .ac-visibility-option { display: flex; align-items: center; gap: 0.85rem; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1rem 1.1rem; margin-bottom: 0.75rem; cursor: pointer; }
-  .ac-visibility-option.selected { border-color: #2563EB; background: #EFF6FF; }
+  .ac-visibility-option.selected { border-color: #2492EB; background: #EFF6FF; }
   .ac-visibility-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #F3F4F6; display: flex; align-items: center; justify-content: center; color: #6B7280; flex-shrink: 0; }
-  .ac-visibility-option.selected .ac-visibility-icon { background: #DBEAFE; color: #2563EB; }
+  .ac-visibility-option.selected .ac-visibility-icon { background: #DBEAFE; color: #2492EB; }
   .ac-visibility-title { margin: 0; font-weight: 700; color: #111827; font-size: 0.9rem; }
   .ac-visibility-sub { margin: 0.2rem 0 0; color: #6B7280; font-size: 0.8rem; }
-  .ac-visibility-check { margin-left: auto; color: #2563EB; flex-shrink: 0; }
+  .ac-visibility-check { margin-left: auto; color: #2492EB; flex-shrink: 0; }
 
   .ac-preview-player { border: 1px solid #E5E7EB; border-radius: 1rem; overflow: hidden; margin-bottom: 1.25rem; }
   .ac-preview-video-real { width: 100%; aspect-ratio: 16 / 9; display: block; background: #111; }
@@ -227,9 +227,9 @@ const PAGE_CSS = `
   .ac-review-row-value { color: #111827; font-weight: 700; font-size: 0.9rem; text-align: right; }
 
   .ac-outcomes-box { border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 1rem; padding: 1.1rem 1.25rem; }
-  .ac-outcomes-title { margin: 0 0 0.75rem; color: #2563EB; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ac-outcomes-title { margin: 0 0 0.75rem; color: #2492EB; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .ac-outcome-item { display: flex; align-items: center; gap: 0.6rem; color: #1E3A8A; font-size: 0.875rem; margin-bottom: 0.5rem; }
-  .ac-outcome-item svg { color: #2563EB; flex-shrink: 0; }
+  .ac-outcome-item svg { color: #2492EB; flex-shrink: 0; }
 
   .ac-review-actions { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
   .ac-btn.full { width: 100%; }
@@ -242,8 +242,8 @@ const PAGE_CSS = `
 
   .ac-footer { display: flex; flex-direction: column-reverse; gap: 0.75rem; padding: 1.1rem 1.25rem; border-top: 1px solid #F3F4F6; }
   .ac-btn { border-radius: 999px; padding: 0.9rem 1.4rem; font-weight: 700; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; }
-  .ac-btn.primary { background: #2563EB; color: #fff; border: none; }
-  .ac-btn.secondary { background: #fff; color: #2563EB; border: 1px solid #2563EB; }
+  .ac-btn.primary { background: #2492EB; color: #fff; border: none; }
+  .ac-btn.secondary { background: #fff; color: #2492EB; border: 1px solid #2492EB; }
   .ac-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   @media (min-width: 640px) {

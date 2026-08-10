@@ -70,8 +70,8 @@ const PAGE_CSS = `
   .lc-title { margin: 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
   .lc-subtitle { margin: 0.3rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .lc-header-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-  .lc-btn-outline { display: flex; align-items: center; gap: 0.4rem; border: 1px solid #2563EB; background: #fff; color: #2563EB; font-weight: 700; border-radius: 999px; padding: 0.65rem 1.1rem; cursor: pointer; font-size: 0.875rem; }
-  .lc-btn-primary { display: flex; align-items: center; gap: 0.4rem; border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.65rem 1.1rem; cursor: pointer; font-size: 0.875rem; }
+  .lc-btn-outline { display: flex; align-items: center; gap: 0.4rem; border: 1px solid #2492EB; background: #fff; color: #2492EB; font-weight: 700; border-radius: 999px; padding: 0.65rem 1.1rem; cursor: pointer; font-size: 0.875rem; }
+  .lc-btn-primary { display: flex; align-items: center; gap: 0.4rem; border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.65rem 1.1rem; cursor: pointer; font-size: 0.875rem; }
   .lc-btn-primary:disabled, .lc-btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .lc-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1.25rem; }
@@ -84,23 +84,23 @@ const PAGE_CSS = `
 
   .lc-tabs { display: flex; gap: 1.5rem; margin-top: 1.5rem; border-bottom: 1px solid #E5E7EB; }
   .lc-tab { border: none; background: none; padding: 0 0 0.85rem; font-weight: 700; font-size: 0.95rem; color: #9CA3AF; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .lc-tab.active { color: #111827; border-bottom-color: #2563EB; }
+  .lc-tab.active { color: #111827; border-bottom-color: #2492EB; }
 
   .lc-list { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1.25rem; }
   @media (min-width: 900px) { .lc-list.upcoming { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
   .lc-card { background: #fff; border-radius: 1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); padding: 1.1rem; display: flex; align-items: center; gap: 0.85rem; }
   .lc-card.is-live { border-color: rgba(220, 38, 38, 0.35); box-shadow: 0 16px 46px rgba(220, 38, 38, 0.08); }
-  .lc-card-icon { width: 42px; height: 42px; border-radius: 0.7rem; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lc-card-icon { width: 42px; height: 42px; border-radius: 0.7rem; background: #DBEAFE; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .lc-card-icon.is-live { background: #FEE2E2; color: #DC2626; }
   .lc-card-icon.recording { background: #F3F4F6; color: #374151; cursor: pointer; border: none; }
   .lc-card-body { flex: 1; min-width: 0; }
   .lc-card-title { margin: 0; font-weight: 700; color: #111827; font-size: 0.95rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-  .lc-card-sub { margin: 0.2rem 0 0; color: #2563EB; font-weight: 600; font-size: 0.85rem; }
+  .lc-card-sub { margin: 0.2rem 0 0; color: #2492EB; font-weight: 600; font-size: 0.85rem; }
   .lc-card-meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.5rem; color: #9CA3AF; font-size: 0.8rem; flex-wrap: wrap; }
   .lc-card-meta span { display: flex; align-items: center; gap: 0.3rem; }
   .lc-card-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-  .lc-start-btn { border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.6rem 1.1rem; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+  .lc-start-btn { border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.6rem 1.1rem; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
   .lc-end-btn { border: none; background: #DC2626; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.6rem 1.1rem; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
   .lc-end-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .lc-recording-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; font-weight: 700; border-radius: 999px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
@@ -142,10 +142,10 @@ const PAGE_CSS = `
   .lc-modal-title { margin: 0 0 1.5rem; font-size: 1.15rem; font-weight: 800; color: #111827; text-align: left; }
   .lc-meet-badge { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 1.05rem; color: #111827; margin: 1rem 0; }
   .lc-meet-copy { color: #4B5563; font-size: 0.95rem; line-height: 1.5; margin: 0 0 1rem; }
-  .lc-meet-btn { width: 100%; border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.95rem; text-decoration: none; }
+  .lc-meet-btn { width: 100%; border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.95rem; text-decoration: none; }
   .lc-meet-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .lc-meet-link-row { display: flex; justify-content: center; margin: 1rem 0 1.5rem; }
-  .lc-meet-link { display: inline-flex; align-items: center; gap: 0.4rem; color: #2563EB; font-weight: 700; font-size: 1rem; text-decoration: underline; background: none; border: none; cursor: pointer; }
+  .lc-meet-link { display: inline-flex; align-items: center; gap: 0.4rem; color: #2492EB; font-weight: 700; font-size: 1rem; text-decoration: underline; background: none; border: none; cursor: pointer; }
   .lc-meet-input { width: 100%; box-sizing: border-box; border: 1px solid #BFDBFE; border-radius: 0.85rem; padding: 0.9rem 1rem; font-size: 0.95rem; font-family: inherit; text-align: center; color: #111827; margin-bottom: 1.25rem; background: #F9FAFB; }
   .lc-meet-input::placeholder { color: #9CA3AF; font-style: italic; }
   .lc-meet-input.invalid { border-color: #FCA5A5; }

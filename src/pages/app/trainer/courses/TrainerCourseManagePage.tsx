@@ -34,7 +34,7 @@ const PAGE_CSS = `
 
   .cm-publish-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
   .cm-btn { border-radius: 999px; padding: 0.7rem 1.2rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; border: none; }
-  .cm-btn.primary { background: #2563EB; color: #fff; }
+  .cm-btn.primary { background: #2492EB; color: #fff; }
   .cm-btn.unpublish { background: #FEF3C7; color: #D97706; }
   .cm-btn.publish { background: #DCFCE7; color: #16A34A; }
   .cm-btn:disabled { opacity: 0.6; cursor: default; }

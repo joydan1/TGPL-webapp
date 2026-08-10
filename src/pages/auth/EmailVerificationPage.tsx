@@ -19,8 +19,6 @@ export default function EmailVerificationPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
-  // Store profile completion status and role in local state so handleContinue
-  // never reads stale Zustand state — the values are captured at verify time
   const [profileStatus, setProfileStatus] = useState<string | null>(null)
   const [role] = useState<string | null>(null)
 
@@ -45,6 +43,7 @@ export default function EmailVerificationPage() {
             role: userData.role,
             createdAt: userData.created_at,
             learner_profile: userData.learner_profile || null,
+            avatar_url: userData.avatar_url || null,
           }
           useAuthStore.getState().setUser(user)
           // Capture status into local state — safe to read synchronously in handleContinue

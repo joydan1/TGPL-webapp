@@ -17,7 +17,7 @@ function getPasswordStrength(password: string): StrengthLevel {
   const levels: StrengthLevel[] = [
     { score: 1, label: 'Weak', color: '#EF4444' },
     { score: 2, label: 'Fair', color: '#F59E0B' },
-    { score: 3, label: 'Good', color: '#2563EB' },
+    { score: 3, label: 'Good', color: '#2492EB' },
     { score: 4, label: 'Strong', color: '#059669' },
   ]
   return { ...levels[score - 1] }
@@ -26,7 +26,7 @@ function getPasswordStrength(password: string): StrengthLevel {
 function PasswordStrengthIndicator({ password }: { password: string }) {
   const { score, label, color } = getPasswordStrength(password)
   if (!password) return null
-  const colors = ['#EF4444', '#F59E0B', '#2563EB', '#059669']
+  const colors = ['#EF4444', '#F59E0B', '#2492EB', '#059669']
   return (
     <div style={{ marginTop: '0.375rem' }}>
       <div style={{ display: 'flex', gap: '4px' }}>
@@ -46,7 +46,7 @@ const PAGE_CSS = `
   .field-row { margin-bottom: 1rem; }
   .actions { display:flex; flex-direction: column; gap:0.75rem; margin-top: 1rem; }
   .btn { width:100%; padding: 0.85rem 1rem; border-radius: 0.75rem; font-weight:700; cursor:pointer; }
-  .btn.primary { background: #2563EB; color:#fff; border: none }
+  .btn.primary { background: #2492EB; color:#fff; border: none }
   .btn.secondary { background:#fff; color:#6B7280; border:1px solid #E5E7EB }
   .form-error { color: #EF4444; margin-top: 0.5rem; font-weight:600 }
 `

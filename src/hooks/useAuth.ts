@@ -50,6 +50,7 @@ export const useAuth = () => {
         role: userData.role,
         createdAt: userData.created_at,
         learner_profile: userData.learner_profile || null,
+        avatar_url: userData.avatar_url || null,
       }
       store.login(user, result.access, result.refresh)
       return { success: true, user, token: result.access }
@@ -164,6 +165,7 @@ export const useAuth = () => {
           role: userData.role,
           createdAt: userData.created_at,
           learner_profile: userData.learner_profile || null,
+          avatar_url: userData.avatar_url || null,
         }
         store.setUser(user)
         return { success: true, user }
@@ -197,6 +199,7 @@ export const useAuth = () => {
           role: userData.role,
           createdAt: userData.created_at,
           learner_profile: userData.learner_profile || null,
+          avatar_url: userData.avatar_url || null,
         }
         store.setUser(user)
         return { success: true, user }

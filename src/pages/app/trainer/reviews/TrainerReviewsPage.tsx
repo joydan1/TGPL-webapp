@@ -21,7 +21,7 @@ const PAGE_CSS = `
 
   .rv-section-title { margin: 1.5rem 0 0.85rem; font-size: 1.1rem; font-weight: 700; color: #111827; }
   .rv-section-header { display: flex; align-items: center; justify-content: space-between; margin: 1.5rem 0 0.85rem; }
-  .rv-view-all { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  .rv-view-all { border: none; background: none; color: #2492EB; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
 
   .rv-empty-state { background: #fff; border-radius: 1rem; padding: 2rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9rem; border: 1px solid rgba(148, 163, 184, 0.12); }
   .rv-error-state { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 1rem; padding: 1rem; font-size: 0.875rem; }
@@ -33,7 +33,7 @@ const PAGE_CSS = `
   .rv-pending-name-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .rv-pending-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.95rem; }
   .rv-overdue-badge { background: #FEF3C7; color: #D97706; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; }
-  .rv-pending-assignment { margin: 0.35rem 0 0; color: #2563EB; font-weight: 600; font-size: 0.875rem; }
+  .rv-pending-assignment { margin: 0.35rem 0 0; color: #2492EB; font-weight: 600; font-size: 0.875rem; }
   .rv-pending-meta { margin: 0.35rem 0 0; color: #9CA3AF; font-size: 0.8rem; }
   .rv-grade-btn { width: 100%; border: none; border-top: 1px solid #F3F4F6; background: none; color: #2563EB; font-weight: 700; cursor: pointer; padding: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.875rem; }
 
@@ -82,7 +82,7 @@ const PAGE_CSS = `
   .rv-grade-name { margin: 0; font-weight: 800; font-size: 1.1rem; color: #111827; }
   .rv-grade-assignment-title { margin: 0.2rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .rv-grade-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.85rem; flex-wrap: wrap; font-size: 0.85rem; color: #6B7280; }
-  .rv-grade-tag { background: #DBEAFE; color: #2563EB; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.7rem; border-radius: 999px; }
+  .rv-grade-tag { background: #DBEAFE; color: #2492EB; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.7rem; border-radius: 999px; }
 
   .rv-file-list { margin-top: 1.25rem; display: grid; gap: 0.75rem; }
   .rv-file-row { display: flex; align-items: center; gap: 0.85rem; border: 1px solid #E5E7EB; border-radius: 0.85rem; padding: 0.85rem; }
@@ -92,7 +92,7 @@ const PAGE_CSS = `
   .rv-file-download { margin-left: auto; background: none; border: none; color: #374151; cursor: pointer; padding: 0.4rem; flex-shrink: 0; }
 
   .rv-note-box { margin-top: 1.25rem; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 0.85rem; padding: 1rem 1.1rem; }
-  .rv-note-title { margin: 0 0 0.35rem; color: #2563EB; font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .rv-note-title { margin: 0 0 0.35rem; color: #2492EB; font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .rv-note-body { margin: 0; color: #1E3A8A; font-size: 0.85rem; line-height: 1.5; }
 
   .rv-grade-right { padding: 1.5rem; }
@@ -116,7 +116,7 @@ const PAGE_CSS = `
 
   .rv-grade-actions { display: flex; flex-direction: column-reverse; gap: 0.75rem; margin-top: 1.5rem; }
   .rv-cancel-btn { border: none; background: none; color: #6B7280; font-weight: 700; cursor: pointer; padding: 0.9rem; }
-  .rv-submit-btn { border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem 1.4rem; cursor: pointer; }
+  .rv-submit-btn { border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem 1.4rem; cursor: pointer; }
   .rv-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   @media (min-width: 768px) {
@@ -126,14 +126,14 @@ const PAGE_CSS = `
   }
 
   /* ── Success modal ── */
-  .rv-past-score.revision { color: #2563EB; }
-.rv-past-status.revision { background: #DBEAFE; color: #2563EB; }
-  .rv-status-btn.active-revision { border-color: #2563EB; background: #DBEAFE; color: #2563EB; }
+  .rv-past-score.revision { color:#2492EB; }
+.rv-past-status.revision { background: #DBEAFE; color: #2492EB; }
+  .rv-status-btn.active-revision { border-color: #2492EB; background: #DBEAFE; color: #2492EB; }
   .rv-success-modal { background: #fff; border-radius: 1.25rem; padding: 2rem 1.5rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
   .rv-success-icon { width: 72px; height: 72px; border-radius: 999px; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
   .rv-success-title { margin: 0; font-size: 1.25rem; font-weight: 800; color: #111827; }
   .rv-success-sub { margin: 0.6rem 0 1.5rem; color: #6B7280; font-size: 0.9rem; }
-  .rv-success-btn { width: 100%; border: none; background: #2563EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem; cursor: pointer; }
+  .rv-success-btn { width: 100%; border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem; cursor: pointer; }
 `
 
 function initials(name: string) {

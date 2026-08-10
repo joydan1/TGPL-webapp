@@ -13,6 +13,7 @@ export interface User {
   role: 'learner' | 'trainer' | 'admin'
   createdAt: string
   learner_profile?: LearnerProfile | null
+  avatar_url: string | null
 }
 
 export interface LearnerProfile {

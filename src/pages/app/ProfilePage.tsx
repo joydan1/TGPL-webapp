@@ -53,28 +53,31 @@ const COUNTRIES = [
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
 const PAGE_CSS = `
+ 
+  * { box-sizing: border-box; }
+
   .profile-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; margin-top: 0.25rem; padding: 1.5rem; grid-column: 1 / -1; }
 
-  .avatar-row { display: flex; align-items: center; gap: 1.25rem; }
+  .avatar-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
   .avatar-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
   .avatar-img { width: 96px; height: 96px; border-radius: 999px; object-fit: cover; background: #E5E7EB; display: block; }
   .avatar-camera-btn { position: absolute; bottom: -6px; right: -6px; width: 36px; height: 36px; border-radius: 999px; background: #2563EB; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
   .avatar-camera-btn:hover { background: #1D4ED8; }
-  .avatar-info-name { font-weight: 700; color: #111; font-size: 1.0625rem; }
+  .avatar-info-name { font-weight: 700; color: #111; font-size: 1.0625rem; word-break: break-word; }
   .avatar-info-hint { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.2rem; }
-  .avatar-actions { margin-top: 0.6rem; display: flex; align-items: center; gap: 1.1rem; }
-  .avatar-upload-link { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; color: #2563EB; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; }
+  .avatar-actions { margin-top: 0.6rem; display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
+  .avatar-upload-link { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; color: #2563EB; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; white-space: nowrap; }
   .avatar-upload-link:hover { text-decoration: underline; }
-  .avatar-remove-link { background: none; border: none; color: #EF4444; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; }
+  .avatar-remove-link { background: none; border: none; color: #EF4444; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; white-space: nowrap; }
   .avatar-remove-link:hover { text-decoration: underline; }
   .avatar-remove-link:disabled, .avatar-upload-link:disabled { opacity: 0.5; cursor: default; }
 
   .field-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; margin-top: 1rem; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0.5rem; }
-  .field-block { padding: 1.25rem 1.5rem; background: transparent; border-bottom: none; }
+  .field-block { padding: 1.25rem 1.5rem; background: transparent; border-bottom: none; min-width: 0; }
   .field-block:not(.fullwidth) { border-bottom: none; }
   .field-block.fullwidth { grid-column: 1 / -1; }
-  .field-label-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem; }
-  .field-label-row svg { color: #6B7280; }
+  .field-label-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem; flex-wrap: wrap; }
+  .field-label-row svg { color: #6B7280; flex-shrink: 0; }
   .field-label { font-size: 0.9375rem; font-weight: 700; color: #111; }
   .field-optional { font-size: 0.8125rem; color: #9CA3AF; font-weight: 500; }
   .field-required { color: #EF4444; }
@@ -83,8 +86,8 @@ const PAGE_CSS = `
   .field-input:focus { outline: none; border-color: #93C5FD; background: #fff; }
   .field-input.readonly { color: #6B7280; padding-right: 8.5rem; position: relative; }
 
-  .email-row { position: relative; }
-  .verified-badge { position: absolute; top: 50%; right: 0.85rem; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem; background: #ECFDF5; color: #059669; font-size: 0.8125rem; font-weight: 700; padding: 0.3rem 0.7rem; border-radius: 999px; }
+  .email-row { position: relative; width: 100%; }
+  .verified-badge { position: absolute; top: 50%; right: 0.85rem; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem; background: #ECFDF5; color: #059669; font-size: 0.8125rem; font-weight: 700; padding: 0.3rem 0.7rem; border-radius: 999px; white-space: nowrap; }
   .field-hint { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.5rem; }
 
   .field-select { width: 100%; border: 1px solid #E5E7EB; background: #F9FAFB; border-radius: 0.75rem; padding: 0.85rem 1rem; font-size: 0.9375rem; color: #111; box-sizing: border-box; font-family: inherit; appearance: none; }
@@ -94,36 +97,63 @@ const PAGE_CSS = `
   .field-textarea:focus { outline: none; border-color: #93C5FD; background: #fff; }
   .char-count { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.4rem; text-align: right; }
 
-  .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 1rem 2.5rem; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.75rem; z-index: 20; }
-  .save-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; border-radius: 0.75rem; padding: 0.9rem 1.5rem; font-weight: 700; font-size: 0.9375rem; cursor: pointer; width: 100%; max-width: 340px; }
-  .save-btn.primary { background: #2563EB; color: #fff; }
+
+
+   :root { --bottom-nav-h: 64px; }
+
+  .profile-page-content { padding-bottom: calc(1rem + var(--bottom-nav-h)); }
+
+  .save-bar {
+    position: sticky;
+    bottom: var(--bottom-nav-h);
+    width: 100%;
+    background: #fff;
+    border-top: 1px solid #E5E7EB;
+    padding: 1rem clamp(1rem, 4vw, 2.5rem) calc(1rem + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 20;
+    box-sizing: border-box;
+  }
+  .save-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; border-radius: 0.75rem; padding: 0.9rem 1.5rem; font-weight: 700; font-size: 0.9375rem; cursor: pointer; width: 100%; max-width: 480px; box-sizing: border-box; }
+  .save-btn.primary { background: #2492EB; color: #fff; }
   .save-btn.primary:disabled { background: #E5E7EB; color: #9CA3AF; cursor: default; }
   .save-btn.secondary { background: #fff; color: #6B7280; border: 1px solid #E5E7EB; }
   .save-btn.secondary:disabled { color: #C4C9D1; cursor: default; }
-.toast { position: fixed; bottom: 6.5rem; left: 50%; transform: translateX(-50%); background: #1F2937; color: #fff; padding: 0.85rem 1.1rem; border-radius: 0.85rem; display: flex; align-items: center; gap: 0.7rem; font-size: 0.9rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 400; max-width: 90vw; }
+
+  .toast { position: fixed; bottom: 6.5rem; left: 50%; transform: translateX(-50%); background: #1F2937; color: #fff; padding: 0.85rem 1.1rem; border-radius: 0.85rem; display: flex; align-items: center; gap: 0.7rem; font-size: 0.9rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 400; max-width: 90vw; }
   .toast-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .toast-icon.success { background: #22C55E; }
   .toast-icon.error { background: #EF4444; }
   .toast-close { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0; display: flex; margin-left: 0.25rem; flex-shrink: 0; }
   .toast-close:hover { color: #fff; }
+
   @media (max-width: 640px) {
     .toast { bottom: 5.5rem; padding: 0.75rem 0.9rem; font-size: 0.85rem; }
-  }
-  @media (max-width: 640px) {
-    .save-bar { padding: 0.85rem 1rem; }
+    .save-bar { padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom)); }
     .field-card { grid-template-columns: 1fr; padding: 0; }
     .field-block { padding: 1rem; }
+    .avatar-wrap { width: 72px; height: 72px; }
+    .avatar-img { width: 72px; height: 72px; }
   }
+
+  @media (max-width: 360px) {
+    .avatar-actions { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  }
+
   /* Bottom-sheet (mobile) */
   .sheet-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(0,0,0,0.38); z-index: 60; }
-  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 12px 16px 24px; z-index: 70; box-shadow: 0 -8px 32px rgba(2,6,23,0.08); }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); z-index: 70; box-shadow: 0 -8px 32px rgba(2,6,23,0.08); }
   .sheet-handle { width: 40px; height: 4px; background: #E5E7EB; border-radius: 4px; margin: 6px auto; }
   .sheet-title { text-align: center; font-weight: 700; margin: 8px 0 12px; }
   .sheet-option { display: flex; align-items: center; gap: 16px; width: 100%; padding: 14px 12px; border: none; background: transparent; text-align: left; cursor: pointer; border-radius: 10px; }
   .sheet-option:hover { background: #F9FAFB; }
   .sheet-option-icon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .sheet-option-icon svg { display: block; }
-  .sheet-option-icon.icon-blue { background: #E6F0FF; color: #2563EB; }
+  .sheet-option-icon.icon-blue { background: #E6F0FF; color: #2492EB; }
   .sheet-option-icon.icon-purple { background: #F3E8FF; color: #8B5CF6; }
   .sheet-option .label { color: #0F172A; font-weight: 700; }
   .sheet-option .sub { color: #6B7280; font-size: 0.875rem; margin-top: 2px; font-weight: 500; }
@@ -132,7 +162,7 @@ const PAGE_CSS = `
 
 export default function SettingsProfilePage() {
   const navigate = useNavigate()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, loadCurrentUser } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -144,7 +174,8 @@ export default function SettingsProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
- const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
@@ -165,7 +196,6 @@ export default function SettingsProfilePage() {
         setProfile(response.data)
         setOriginal(response.data)
       } catch (err) {
-        console.error('Failed to fetch profile:', err)
         setError('Failed to load profile')
       } finally {
         setLoading(false)
@@ -173,13 +203,14 @@ export default function SettingsProfilePage() {
     }
     if (user) fetchProfile()
   }, [user])
-const isDirty = !!profile && !!original && (
-  profile.first_name !== original.first_name ||
-  profile.last_name !== original.last_name ||
-  profile.phone !== original.phone ||
-  profile.country !== original.country ||
-  profile.bio !== original.bio
-)
+
+  const isDirty = !!profile && !!original && (
+    profile.first_name !== original.first_name ||
+    profile.last_name !== original.last_name ||
+    profile.phone !== original.phone ||
+    profile.country !== original.country ||
+    profile.bio !== original.bio
+  )
 
   function updateField<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
     setProfile((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -190,18 +221,18 @@ const isDirty = !!profile && !!original && (
     try {
       setSaving(true)
       setError(null)
-     const response = await apiClient.patch<UserProfile>('/v1/auth/me/', {
-  first_name: profile.first_name,
-  last_name: profile.last_name,
-  phone: profile.phone,
-  country: profile.country,
-  bio: profile.bio,
-})
+      const response = await apiClient.patch<UserProfile>('/v1/auth/me/', {
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        phone: profile.phone,
+        country: profile.country,
+        bio: profile.bio,
+      })
       setProfile(response.data)
       setOriginal(response.data)
+      await loadCurrentUser()
       showToast('Profile updated successfully', 'success')
     } catch (err) {
-      console.error('Failed to save profile:', err)
       setError('Failed to save changes. Please try again.')
       showToast('Failed to update profile. Please try again.', 'error')
     } finally {
@@ -243,27 +274,35 @@ const isDirty = !!profile && !!original && (
       })
       setProfile((prev) => (prev ? { ...prev, avatar_url: response.data.avatar_url } : prev))
       setOriginal((prev) => (prev ? { ...prev, avatar_url: response.data.avatar_url } : prev))
+      await loadCurrentUser()
+      showToast('Photo updated', 'success')
     } catch (err) {
-      console.error('Failed to upload avatar:', err)
       setAvatarError('Upload failed. Please try again.')
+      showToast('Upload failed. Please try again.', 'error')
     } finally {
       setAvatarUploading(false)
     }
   }
 
-  async function handleAvatarRemove() {
+  function handleAvatarRemove() {
     if (!profile?.avatar_url) return
-    const confirmed = window.confirm('Remove your profile photo?')
-    if (!confirmed) return
+    setConfirmRemoveOpen(true)
+  }
+
+  async function confirmAvatarRemove() {
+    setConfirmRemoveOpen(false)
     try {
       setAvatarUploading(true)
       setAvatarError(null)
       await apiClient.delete('/v1/auth/me/avatar/')
       setProfile((prev) => (prev ? { ...prev, avatar_url: null } : prev))
       setOriginal((prev) => (prev ? { ...prev, avatar_url: null } : prev))
+      await loadCurrentUser()
+      showToast('Profile photo removed', 'success')
     } catch (err) {
-      console.error('Failed to remove avatar:', err)
-      setAvatarError('Could not remove photo. Please try again.')
+      const message = 'Could not remove photo. Please try again.'
+      setAvatarError(message)
+      showToast(message, 'error')
     } finally {
       setAvatarUploading(false)
     }
@@ -339,47 +378,47 @@ const isDirty = !!profile && !!original && (
             {/* Fields */}
             <div className="field-card">
               <div className="field-block">
-  <div className="field-label-row">
-    <User size={16} />
-    <span className="field-label">First name <span className="field-required">*</span></span>
-  </div>
-  <input
-    className="field-input"
-    type="text"
-    value={profile.first_name ?? ''}
-    onChange={(e) => updateField('first_name', e.target.value)}
-  />
-</div>
+                <div className="field-label-row">
+                  <User size={16} />
+                  <span className="field-label">First name <span className="field-required">*</span></span>
+                </div>
+                <input
+                  className="field-input"
+                  type="text"
+                  value={profile.first_name ?? ''}
+                  onChange={(e) => updateField('first_name', e.target.value)}
+                />
+              </div>
 
-<div className="field-block">
-  <div className="field-label-row">
-    <User size={16} />
-    <span className="field-label">Last name <span className="field-required">*</span></span>
-  </div>
-  <input
-    className="field-input"
-    type="text"
-    value={profile.last_name ?? ''}
-    onChange={(e) => updateField('last_name', e.target.value)}
-  />
-</div>
+              <div className="field-block">
+                <div className="field-label-row">
+                  <User size={16} />
+                  <span className="field-label">Last name <span className="field-required">*</span></span>
+                </div>
+                <input
+                  className="field-input"
+                  type="text"
+                  value={profile.last_name ?? ''}
+                  onChange={(e) => updateField('last_name', e.target.value)}
+                />
+              </div>
 
-             <div className="field-block">
-  <div className="field-label-row">
-    <Mail size={16} />
-    <span className="field-label">Email address</span>
-  </div>
-  <div
-    className="email-row"
-    onClick={() => showToast('To change your email, contact support.', 'error')}
-    style={{ cursor: 'pointer' }}
-  >
-    <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled style={{ pointerEvents: 'none' }} />
-    {profile.is_email_verified && (
-  <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
-)}
-  </div>
-</div>
+              <div className="field-block">
+                <div className="field-label-row">
+                  <Mail size={16} />
+                  <span className="field-label">Email address</span>
+                </div>
+                <div
+                  className="email-row"
+                  onClick={() => showToast('To change your email, contact support.', 'error')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <input className="field-input readonly" type="email" value={profile.email ?? ''} readOnly disabled style={{ pointerEvents: 'none' }} />
+                  {profile.is_email_verified && (
+                    <span className="verified-badge"><CheckCircle2 size={13} /> Verified</span>
+                  )}
+                </div>
+              </div>
 
               <div className="field-block">
                 <div className="field-label-row">
@@ -463,7 +502,29 @@ const isDirty = !!profile && !!original && (
             </div>
           </>
         )}
-{/* Toast notification */}
+
+        {/* Bottom-sheet modal for confirming photo removal */}
+        {confirmRemoveOpen && (
+          <>
+            <div className="sheet-overlay" onClick={() => setConfirmRemoveOpen(false)} />
+            <div className="sheet" role="dialog" aria-label="Remove profile photo">
+              <div className="sheet-handle" />
+              <div className="sheet-title">Remove profile photo?</div>
+              <button className="sheet-option" onClick={confirmAvatarRemove}>
+                <span className="sheet-option-icon" style={{ background: '#FEE2E2', color: '#EF4444' }}>
+                  <X size={18} />
+                </span>
+                <div>
+                  <div className="label" style={{ color: '#EF4444' }}>Remove photo</div>
+                  <div className="sub">This can't be undone</div>
+                </div>
+              </button>
+              <button className="sheet-cancel" onClick={() => setConfirmRemoveOpen(false)}>Cancel</button>
+            </div>
+          </>
+        )}
+
+        {/* Toast notification */}
         {toast && (
           <div className="toast" role="status">
             <span className={`toast-icon ${toast.type}`}>
