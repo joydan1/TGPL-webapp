@@ -9,7 +9,7 @@ export const SET_PRICE_MODAL_CSS = `
 
   .sp-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding-bottom: 1.25rem; border-bottom: 1px solid #F3F4F6; margin-bottom: 1.25rem; }
   .sp-head-left { display: flex; align-items: center; gap: 0.8rem; min-width: 0; }
-  .sp-icon { width: 44px; height: 44px; border-radius: 0.75rem; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sp-icon { width: 44px; height: 44px; border-radius: 0.75rem; background: #ECFDF5; color: #10B981; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .sp-title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #111827; }
   .sp-sub { margin: 0.1rem 0 0; font-size: 0.82rem; color: #9CA3AF; }
   .sp-close { border: none; background: none; cursor: pointer; color: #9CA3AF; padding: 0.2rem; flex-shrink: 0; }
@@ -18,14 +18,14 @@ export const SET_PRICE_MODAL_CSS = `
   .sp-input-wrap { position: relative; margin-bottom: 1.5rem; }
   .sp-currency { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; font-weight: 700; font-size: 1.1rem; }
   .sp-input { width: 100%; border: none; background: #F9FAFB; border-radius: 0.85rem; padding: 1rem 1rem 1rem 2.1rem; font-size: 1.25rem; font-weight: 800; color: #111827; }
-  .sp-input:focus { outline: 2px solid #2563EB; outline-offset: -1px; }
+  .sp-input:focus { outline: 2px solid #2492EB; outline-offset: -1px; }
   .sp-free-toggle { margin-top: 0.6rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #6B7280; }
-  .sp-free-toggle button { border: none; background: none; color: #2563EB; font-weight: 700; cursor: pointer; padding: 0; font-size: 0.8rem; }
+  .sp-free-toggle button { border: none; background: none; color: #2492EB; font-weight: 700; cursor: pointer; padding: 0; font-size: 0.8rem; }
 
   .sp-actions { display: flex; gap: 0.6rem; }
   .sp-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .sp-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
-  .sp-btn.confirm { border: none; background: #2563EB; color: #fff; }
+  .sp-btn.confirm { border: none; background: #2492EB; color: #fff; }
   .sp-btn.confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 `
 

@@ -5,7 +5,7 @@ import type { CourseSummary } from '../../types/adminCourse'
 export const DELETE_COURSE_MODAL_CSS = `
   .dc-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1100; padding: 1rem; }
   .dc-modal { background: #fff; border-radius: 1.1rem; width: 100%; max-width: 460px; position: relative; }
-  .dc-topbar { height: 5px; background: #DC2626; border-radius: 1.1rem 1.1rem 0 0; }
+  .dc-topbar { height: 5px; background: #EF4444; border-radius: 1.1rem 1.1rem 0 0; }
   .dc-inner { padding: 1.5rem; }
 
   .dc-head { display: flex; gap: 0.9rem; margin-bottom: 1.25rem; }
@@ -20,17 +20,17 @@ export const DELETE_COURSE_MODAL_CSS = `
 
   .dc-consequences { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.25rem; }
   .dc-consequence { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.86rem; color: #374151; }
-  .dc-x-icon { width: 20px; height: 20px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; margin-top: 0.1rem; }
+  .dc-x-icon { width: 20px; height: 20px; border-radius: 50%; background: #FEE2E2; color: #EF4444; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; margin-top: 0.1rem; }
 
   .dc-confirm-label { font-size: 0.85rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; display: block; }
-  .dc-confirm-label strong { color: #DC2626; }
+  .dc-confirm-label strong { color: #EF4444; }
   .dc-confirm-input { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; }
-  .dc-confirm-input:focus { outline: none; border-color: #DC2626; }
+  .dc-confirm-input:focus { outline: none; border-color: #EF4444; }
 
   .dc-actions { display: flex; gap: 0.6rem; }
   .dc-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .dc-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
-  .dc-btn.confirm { border: none; background: #DC2626; color: #fff; }
+  .dc-btn.confirm { border: none; background: #EF4444; color: #fff; }
   .dc-btn.confirm:disabled { opacity: 0.45; cursor: not-allowed; }
 `
 

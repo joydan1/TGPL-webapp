@@ -28,14 +28,14 @@ export const DEACTIVATE_MODAL_CSS = `
   .dm-duration-pill { border: 1.5px solid #E5E7EB; background: #fff; color: #6B7280; font-size: 0.82rem; font-weight: 700; padding: 0.55rem 0.9rem; border-radius: 0.7rem; cursor: pointer; }
   .dm-duration-pill.selected { border-color: #F59E0B; color: #D97706; background: #FFFBEB; }
 
-  .dm-required { color: #DC2626; }
+  .dm-required { color: #EF444; }
 
   .dm-reason-list { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.25rem; }
   .dm-reason-option { display: flex; align-items: center; gap: 0.75rem; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; cursor: pointer; font-size: 0.87rem; font-weight: 600; color: #374151; }
-  .dm-reason-option.selected { border-color: #2563EB; background: #EFF6FF; color: #1D4ED8; }
+  .dm-reason-option.selected { border-color: #2492EB; background: #EFF6FF; color: #2492EB; }
   .dm-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #D1D5DB; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .dm-reason-option.selected .dm-radio { border-color: #2563EB; }
-  .dm-radio-dot { width: 9px; height: 9px; border-radius: 50%; background: #2563EB; }
+  .dm-reason-option.selected .dm-radio { border-color: #2492EB; }
+  .dm-radio-dot { width: 9px; height: 9px; border-radius: 50%; background: #2492EB; }
 
   .dm-note { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.85rem; font-family: inherit; resize: vertical; min-height: 70px; margin-bottom: 1.25rem; }
   .dm-note::placeholder { color: #9CA3AF; }
@@ -47,7 +47,7 @@ export const DEACTIVATE_MODAL_CSS = `
   .dm-toggle { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
   .dm-toggle input { opacity: 0; width: 0; height: 0; }
   .dm-toggle-track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
-  .dm-toggle input:checked + .dm-toggle-track { background: #2563EB; }
+  .dm-toggle input:checked + .dm-toggle-track { background: #2492EB; }
   .dm-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
   .dm-toggle input:checked ~ .dm-toggle-track .dm-toggle-thumb { }
   .dm-toggle input:checked + .dm-toggle-track .dm-toggle-thumb { transform: translateX(19px); }

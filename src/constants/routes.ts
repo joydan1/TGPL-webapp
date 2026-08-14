@@ -76,16 +76,20 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   TRAINER_AVAILABILITY: '/trainer/availability',
   TRAINER_BOOKINGS: '/trainer/bookings',
   TRAINER_ANALYTICS: '/trainer/analytics',
+  TRAINER_NOTIFICATIONS: '/trainer/notifications',
 
-  // ===========================
-  // ADMIN ROUTES (Authenticated admins only)
-  // ===========================
-  ADMIN_LOGIN: '/admin/login',
-  ADMIN_SIGNUP: '/admin/signup',
-  ADMIN_DASHBOARD: '/admin/dashboard',  
- ADMIN_RESET_PASSWORD: '/admin/reset-password',
- ADMIN_FORGOT_PASSWORD: '/admin/forgot-password',
-ADMIN_USERS: 'admin/users',
+// ===========================
+// ADMIN ROUTES (Authenticated admins only)
+// ===========================
+ADMIN_LOGIN: '/admin/login',
+ADMIN_SIGNUP: '/admin/signup',
+ADMIN_DASHBOARD: '/admin/dashboard',
+ADMIN_RESET_PASSWORD: '/admin/reset-password',
+ADMIN_FORGOT_PASSWORD: '/admin/forgot-password',
+ADMIN_USERS: '/admin/users',        
+ADMIN_REVENUE: '/admin/revenue', 
+ADMIN_COURSES: '/admin/courses',  
+ADMIN_SETTINGS: '/admin/settings', 
 
   // ===========================
   // ERROR PAGES
@@ -128,7 +132,10 @@ export const ROUTE_GROUPS = {
   ],
   ADMIN: [
     ROUTES.ADMIN_DASHBOARD,
-   
+    ROUTES.ADMIN_USERS,
+    ROUTES.ADMIN_REVENUE,
+
+    ROUTES.ADMIN_LOGIN,
   ],
 } as const
 
@@ -234,6 +241,7 @@ export const ROUTE_METADATA: Record<
     requiredRole: 'trainer',
     showInNav: true,
   },
+  
 [ROUTES.TRAINER_BOOKINGS]: {
   title: 'Bookings',
   description: 'Manage session bookings from learners',
@@ -311,10 +319,18 @@ liveSessionJoin: (id: string | number) =>
   trainerAvailability: () => ROUTES.TRAINER_AVAILABILITY,
   trainerBookings: () => ROUTES.TRAINER_BOOKINGS,
   trainerAnalytics: () => ROUTES.TRAINER_ANALYTICS,
-
+trainerNotifications: () => ROUTES.TRAINER_NOTIFICATIONS,
   // Admin routes
+ 
   adminDashboard: () => ROUTES.ADMIN_DASHBOARD,
-  
+adminRevenue: () => ROUTES.ADMIN_REVENUE,
+adminUsers: () => ROUTES.ADMIN_USERS,
+adminCourses: () => ROUTES.ADMIN_COURSES,
+adminLogin: () => ROUTES.ADMIN_LOGIN,
+adminSignup: () => ROUTES.ADMIN_SIGNUP,
+adminResetPassword: () => ROUTES.ADMIN_RESET_PASSWORD,
+adminForgotPassword: () => ROUTES.ADMIN_FORGOT_PASSWORD,
+adminSettings: () => ROUTES.ADMIN_SETTINGS,
 
   // Error routes
   notFound: () => ROUTES.NOT_FOUND,

@@ -1,8 +1,5 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared data layer for notifications.
-// When the real API exists, replace NOTIFICATIONS with an API call and remove
-// this file — both NotificationPanel and NotificationsPage import from here.
-// ─────────────────────────────────────────────────────────────────────────────
+
+import type { ApiNotification } from '../../services/api'
 
 export type NotifCategory =
   | 'all'
@@ -14,30 +11,15 @@ export type NotifCategory =
   | 'system'
 
 export interface Notification {
-  id: number
+  id: string
   category: Exclude<NotifCategory, 'all'>
   title: string
   sub: string
   time: string
   unread: boolean
   iconBg: string
-  isNew: boolean
+  actionUrl: string | null
 }
-
-export const NOTIFICATIONS: Notification[] = [
-  { id: 1,  category: 'certificate', title: "You're 60% to your certificate",       sub: 'Complete 2 more modules and your project submission to unlock your PM certificate.',  time: '5h ago',      unread: true,  iconBg: '#FEF9EC', isNew: true  },
-  { id: 2,  category: 'feedback',    title: 'Your submission has been graded',       sub: 'Amara Osei graded your Scope Planning Quiz — you scored 84/100. Great work!',         time: '3h ago',      unread: true,  iconBg: '#ECFDF5', isNew: true  },
-  { id: 3,  category: 'live',        title: 'Live session starting soon',            sub: "Q&A: Stakeholder Communication in Practice starts in 1 hour. Don't miss it.",         time: '2h ago',      unread: true,  iconBg: '#FEF2F2', isNew: true  },
-  { id: 4,  category: 'deadlines',   title: 'Assignment missed',                    sub: 'Stakeholder Map Project for Project Management has not been done.',                     time: '1h ago',      unread: true,  iconBg: '#FEF2F2', isNew: true  },
-  { id: 5,  category: 'bookings',    title: 'Tutor session confirmed',               sub: 'Your 1-on-1 with Amara Osei is confirmed for Thu, 5 Jun at 10:00 AM WAT.',            time: 'Yesterday',   unread: false, iconBg: '#EFF6FF', isNew: false },
-  { id: 6,  category: 'deadlines',   title: 'Assignment missed',                    sub: 'Leadership Reflection Essay for Leadership Essentials has not been done.',             time: 'Yesterday',   unread: false, iconBg: '#FEF2F2', isNew: false },
-  { id: 7,  category: 'live',        title: 'New live session scheduled',            sub: 'Masterclass: Critical Path Method Deep Dive is scheduled for Wed, 4 Jun at 2:00 PM.', time: '2 days ago',  unread: false, iconBg: '#FEF2F2', isNew: false },
-  { id: 8,  category: 'system',      title: 'New module unlocked',                  sub: 'Module 6 — Risk Management is now available in your Project Management course.',       time: '2 days ago',  unread: false, iconBg: '#F3F4F6', isNew: false },
-  { id: 9,  category: 'feedback',    title: 'Revision requested on your submission', sub: 'Amara Osei has requested changes to your Stakeholder Map Project. Please review.',    time: '3 days ago',  unread: false, iconBg: '#ECFDF5', isNew: false },
-  { id: 10, category: 'certificate', title: 'Certificate ready for download',        sub: 'Your certificate of completion for Data Storytelling is now available.',              time: '1 week ago',  unread: false, iconBg: '#FEF9EC', isNew: false },
-  { id: 11, category: 'bookings',    title: 'Upcoming tutor session reminder',       sub: 'Your session with Bola Adeyinka is tomorrow at 10:00 AM WAT. A link will be sent.',   time: '1 week ago',  unread: false, iconBg: '#EFF6FF', isNew: false },
-  { id: 12, category: 'system',      title: 'Welcome to TGPL!',                     sub: 'Your account is set up. Explore your enrolled courses and start learning today.',      time: '2 weeks ago', unread: false, iconBg: '#F3F4F6', isNew: false },
-]
 
 export const TABS: { key: NotifCategory; label: string }[] = [
   { key: 'all',         label: 'All'         },
@@ -49,15 +31,72 @@ export const TABS: { key: NotifCategory; label: string }[] = [
   { key: 'system',      label: 'System'      },
 ]
 
+const ICON_BG: Record<Exclude<NotifCategory, 'all'>, string> = {
+  certificate: '#FEF9EC',
+  feedback:    '#ECFDF5',
+  live:        '#FEF2F2',
+  deadlines:   '#FEF2F2',
+  bookings:    '#EFF6FF',
+  system:      '#F3F4F6',
+}
+
+// Best-effort mapping from backend `type` strings (e.g. "CERTIFICATE_ISSUED",
+// "ASSIGNMENT_GRADED_PASS") to a display category. Order matters — first
+// match wins. Adjust/extend once the real set of `type` values is confirmed;
+// anything unmatched falls through to 'system' rather than erroring.
+const CATEGORY_RULES: { category: Exclude<NotifCategory, 'all'>; pattern: RegExp }[] = [
+  { category: 'certificate', pattern: /CERTIFICATE/i },
+  { category: 'feedback',    pattern: /GRAD|FEEDBACK|REVISION/i },
+  { category: 'deadlines',   pattern: /ASSIGNMENT|DEADLINE/i },
+  { category: 'live',        pattern: /LIVE|SESSION/i },
+  { category: 'bookings',    pattern: /BOOKING/i },
+]
+
+function categoryFromType(type: string): Exclude<NotifCategory, 'all'> {
+  const rule = CATEGORY_RULES.find((r) => r.pattern.test(type))
+  return rule ? rule.category : 'system'
+}
+
+/** "5 minutes ago" / "2h ago" / "Yesterday" / "3 days ago" / locale date fallback */
+export function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const diffSec = Math.floor((Date.now() - then) / 1000)
+
+  if (diffSec < 60) return 'Just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay === 1) return 'Yesterday'
+  if (diffDay < 7) return `${diffDay} days ago`
+  const diffWeek = Math.floor(diffDay / 7)
+  if (diffWeek < 5) return `${diffWeek} week${diffWeek > 1 ? 's' : ''} ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+export function mapApiNotification(n: ApiNotification): Notification {
+  const category = categoryFromType(n.type)
+  return {
+    id: n.id,
+    category,
+    title: n.title,
+    sub: n.body,
+    time: formatRelativeTime(n.created_at),
+    unread: !n.is_read,
+    iconBg: ICON_BG[category],
+    actionUrl: n.action_url,
+  }
+}
+
 /** Returns unread counts for every tab key */
-export function tabCounts(
-  notifications: Notification[],
-): Record<NotifCategory, number> {
+export function tabCounts(notifications: Notification[]): Record<NotifCategory, number> {
   return TABS.reduce((acc, t) => {
     acc[t.key] =
       t.key === 'all'
-        ? notifications.filter(n => n.unread).length
-        : notifications.filter(n => n.category === t.key && n.unread).length
+        ? notifications.filter((n) => n.unread).length
+        : notifications.filter((n) => n.category === t.key && n.unread).length
     return acc
   }, {} as Record<NotifCategory, number>)
 }

@@ -1,10 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import TrainerShell from '../layouts/TrainerShell'
 import {
   Trophy, MessageSquare, Radio, ClipboardList,
-  CalendarCheck, Info,
+  CalendarCheck, Info, Loader2,
 } from 'lucide-react'
 import AppShell, { SHELL_CSS } from '../components/layout/AppShell'
-import { NOTIFICATIONS, type Notification, type NotifCategory, TABS, tabCounts } from '../components/layout/notificationsData'
+import { notificationsAPI } from '../services/api'
+import {
+  type Notification, type NotifCategory, TABS, tabCounts, mapApiNotification,
+} from '../components/layout/notificationsData'
+
+const PAGE_SIZE = 20
 
 // ── Page-level CSS ────────────────────────────────────────────────────────────
 const PAGE_CSS = `
@@ -13,7 +20,6 @@ const PAGE_CSS = `
     display: flex; flex-direction: column; gap: 0;
   }
 
-  /* ── Page header ── */
   .np-page-header {
     display: flex; align-items: center;
     justify-content: space-between;
@@ -32,8 +38,8 @@ const PAGE_CSS = `
     background: none; border: none; cursor: pointer;
   }
   .np-mark-all:hover { opacity: 0.8; }
+  .np-mark-all:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Tabs ── */
   .np-tabs {
     display: flex; gap: 0.5rem; flex-wrap: wrap;
     margin-bottom: 1.5rem;
@@ -49,14 +55,12 @@ const PAGE_CSS = `
   .np-tab.active { background: #2492EB; border-color: #2492EB; color: #fff; }
   .np-tab-count { font-size: 0.75rem; font-weight: 700; }
 
-  /* ── Section label ── */
   .np-section-label {
     font-size: 0.75rem; font-weight: 800; letter-spacing: 0.1em;
     color: #9CA3AF; text-transform: uppercase;
     padding: 0.75rem 0 0.5rem;
   }
 
-  /* ── Notification card ── */
   .np-item {
     display: flex; align-items: flex-start; gap: 1rem;
     padding: 1rem 0; border-bottom: 1px solid #F3F4F6;
@@ -65,7 +69,6 @@ const PAGE_CSS = `
   }
   .np-item:hover { background: #F9FAFB; padding-left: 0.5rem; padding-right: 0.5rem; margin: 0 -0.5rem; }
 
-  /* Red right-border on unread — matching Image 2 */
   .np-item.unread::after {
     content: ''; position: absolute; right: 0; top: 0; bottom: 0;
     width: 3px; background: #EF4444; border-radius: 2px 0 0 2px;
@@ -87,23 +90,35 @@ const PAGE_CSS = `
   .np-time { font-size: 0.8rem; color: #9CA3AF; white-space: nowrap; }
   .np-dot { width: 8px; height: 8px; border-radius: 50%; background: #2492EB; }
 
-  /* ── Empty state ── */
   .np-empty {
     padding: 4rem 1rem; text-align: center;
     color: #9CA3AF; font-size: 0.9375rem;
   }
-
-  /* ── Swipe hint ── */
-  .np-hint {
-    text-align: center; font-size: 0.75rem; color: #9CA3AF;
-    padding: 1.25rem 0 0.25rem;
+  .np-error {
+    padding: 1rem 1.25rem; text-align: center;
+    color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA;
+    border-radius: 0.85rem; font-size: 0.875rem; margin-bottom: 1.25rem;
   }
+  .np-loading {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.5rem; padding: 3rem 1rem; color: #9CA3AF; font-size: 0.9rem;
+  }
+  .np-spin { animation: np-spin 0.8s linear infinite; }
+  @keyframes np-spin { to { transform: rotate(360deg); } }
+
+  .np-loadmore-wrap { display: flex; justify-content: center; padding: 1.25rem 0 0.25rem; }
+  .np-loadmore-btn {
+    padding: 0.6rem 1.5rem; border-radius: 2rem; border: 1px solid #E5E7EB;
+    background: #fff; color: #374151; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .np-loadmore-btn:hover { background: #F9FAFB; }
+  .np-loadmore-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   @media (max-width: 900px) { .np-content { padding: 1.5rem 1.25rem 2.5rem; } }
   @media (max-width: 640px) { .np-content { padding: 1.25rem 1rem 5rem; } .np-tabs { gap: 0.375rem; } }
 `
 
-// ── Icon map (lucide, matching Image 2) ───────────────────────────────────────
 function NotifIcon({ category, bg }: { category: Notification['category']; bg: string }) {
   const p = { size: 20 }
   const icons: Record<Notification['category'], React.ReactNode> = {
@@ -121,10 +136,9 @@ function NotifIcon({ category, bg }: { category: Notification['category']; bg: s
   )
 }
 
-// ── Full-page item row ─────────────────────────────────────────────────────────
-function PageItem({ n, onRead }: { n: Notification; onRead: (id: number) => void }) {
+function PageItem({ n, onOpen }: { n: Notification; onOpen: (n: Notification) => void }) {
   return (
-    <div className={`np-item${n.unread ? ' unread' : ' read'}`} onClick={() => onRead(n.id)}>
+    <div className={`np-item${n.unread ? ' unread' : ' read'}`} onClick={() => onOpen(n)}>
       <NotifIcon category={n.category} bg={n.iconBg} />
       <div className="np-body">
         <div className="np-item-title">{n.title}</div>
@@ -138,92 +152,166 @@ function PageItem({ n, onRead }: { n: Notification; onRead: (id: number) => void
   )
 }
 
-// ── Page component ─────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
-  const [activeTab,      setActiveTab]      = useState<NotifCategory>('all')
-  const [notifications,  setNotifications]  = useState<Notification[]>(NOTIFICATIONS)
-  const [activeNav,      setActiveNav]      = useState('home')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isTrainer = location.pathname.startsWith('/trainer')
+
+  const [activeTab, setActiveTab] = useState<NotifCategory>('all')
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [activeNav, setActiveNav] = useState('home')
+
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
+
+  const loadPage = useCallback(async (pageNum: number, append: boolean) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
+    setError(null)
+
+    const result = await notificationsAPI.list({ page: pageNum, page_size: PAGE_SIZE })
+
+    if (!result.success) {
+      setError(result.error || 'Failed to load notifications.')
+      setLoading(false)
+      setLoadingMore(false)
+      return
+    }
+
+    const mapped = result.data.map(mapApiNotification)
+    setNotifications((prev) => (append ? [...prev, ...mapped] : mapped))
+    setHasMore(Boolean(result.next))
+    setLoading(false)
+    setLoadingMore(false)
+  }, [])
+
+  useEffect(() => {
+    setPage(1)
+    loadPage(1, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function loadMore() {
+    const next = page + 1
+    setPage(next)
+    loadPage(next, true)
+  }
+
+  async function markAllRead() {
+    setMarkingAll(true)
+    const result = await notificationsAPI.markAllRead()
+    setMarkingAll(false)
+    if (!result.success) {
+      setError(result.error || 'Failed to mark all as read.')
+      return
+    }
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  }
+
+  async function openNotification(n: Notification) {
+    if (n.unread) {
+      // Optimistic — flip locally right away, reconcile silently if the API call fails.
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, unread: false } : x)))
+      const result = await notificationsAPI.markRead(n.id)
+      if (!result.success) {
+        setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, unread: true } : x)))
+      }
+    }
+    if (n.actionUrl) navigate(n.actionUrl)
+  }
 
   const filtered = activeTab === 'all'
     ? notifications
-    : notifications.filter(n => n.category === activeTab)
+    : notifications.filter((n) => n.category === activeTab)
 
-  const newItems  = filtered.filter(n => n.isNew)
-  const oldItems  = filtered.filter(n => !n.isNew)
-  const counts    = tabCounts(notifications)
+  const newItems = filtered.filter((n) => n.unread)
+  const oldItems = filtered.filter((n) => !n.unread)
+  const counts = tabCounts(notifications)
 
-  function markAllRead() {
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
-  }
-  function markRead(id: number) {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
-  }
+  const body = (
+    <div className="np-content">
+
+      <div className="np-page-header">
+        <div className="np-page-title-row">
+          <span className="np-page-title">Notifications</span>
+          {counts.all > 0 && (
+            <span className="np-new-badge">{counts.all} new</span>
+          )}
+        </div>
+        <button className="np-mark-all" onClick={markAllRead} disabled={markingAll || counts.all === 0}>
+          {markingAll ? 'Marking…' : 'Mark all read'}
+        </button>
+      </div>
+
+      <div className="np-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`np-tab${activeTab === t.key ? ' active' : ''}`}
+            onClick={() => setActiveTab(t.key)}
+          >
+            {t.label}
+            {counts[t.key] > 0 && (
+              <span className="np-tab-count">{counts[t.key]}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="np-error">{error}</div>}
+
+      {loading ? (
+        <div className="np-loading">
+          <Loader2 size={18} className="np-spin" /> Loading notifications…
+        </div>
+      ) : (
+        <>
+          {newItems.length > 0 && (
+            <>
+              <div className="np-section-label">New</div>
+              {newItems.map((n) => (
+                <PageItem key={n.id} n={n} onOpen={openNotification} />
+              ))}
+            </>
+          )}
+
+          {oldItems.length > 0 && (
+            <>
+              <div className="np-section-label">Earlier</div>
+              {oldItems.map((n) => (
+                <PageItem key={n.id} n={n} onOpen={openNotification} />
+              ))}
+            </>
+          )}
+
+          {filtered.length === 0 && !error && (
+            <div className="np-empty">You're all caught up</div>
+          )}
+
+          {hasMore && (
+            <div className="np-loadmore-wrap">
+              <button className="np-loadmore-btn" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 
   return (
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
-      <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
-        <div className="np-content">
-
-          {/* Page header */}
-          <div className="np-page-header">
-            <div className="np-page-title-row">
-              <span className="np-page-title">Notifications</span>
-              {counts.all > 0 && (
-                <span className="np-new-badge">{counts.all} new</span>
-              )}
-            </div>
-            <button className="np-mark-all" onClick={markAllRead}>
-              Mark all read
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="np-tabs">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                className={`np-tab${activeTab === t.key ? ' active' : ''}`}
-                onClick={() => setActiveTab(t.key)}
-              >
-                {t.label}
-                {counts[t.key] > 0 && (
-                  <span className="np-tab-count">{counts[t.key]}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* New section */}
-          {newItems.length > 0 && (
-            <>
-              <div className="np-section-label">New</div>
-              {newItems.map(n => (
-                <PageItem key={n.id} n={n} onRead={markRead} />
-              ))}
-            </>
-          )}
-
-          {/* Earlier section */}
-          {oldItems.length > 0 && (
-            <>
-              <div className="np-section-label">Earlier</div>
-              {oldItems.map(n => (
-                <PageItem key={n.id} n={n} onRead={markRead} />
-              ))}
-            </>
-          )}
-
-          {filtered.length === 0 && (
-            <div className="np-empty">No notifications here</div>
-          )}
-
-          {filtered.length > 0 && (
-            <div className="np-hint">Swipe left on a notification to dismiss</div>
-          )}
-
-        </div>
-      </AppShell>
+      {isTrainer ? (
+        <TrainerShell>{body}</TrainerShell>
+      ) : (
+        <AppShell activeNav={activeNav} onNavChange={setActiveNav}>{body}</AppShell>
+      )}
     </>
   )
 }

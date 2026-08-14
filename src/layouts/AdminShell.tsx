@@ -77,13 +77,20 @@ export const ADMIN_SHELL_CSS = `
 
   /* ── Main slot ── */
   .main { flex: 1; min-width: 0; overflow-y: auto; }
+/* ── Mobile tab bar ── */
+  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
+  .mobile-tabbar-inner { display: flex; height: 100%; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
+  .tab-item.active { color: #2563EB; }
 
-  @media (max-width: 640px) {
-    .sidebar { display: none; }
-    .search-wrap { display: none; }
-    .navbar { padding: 0 1rem; }
-    .navbar-logo img { height: 1.35rem; width: auto; }
-  }
+ @media (max-width: 640px) {
+  .sidebar { display: none; }
+  .search-wrap { display: none; }
+  .navbar { padding: 0 1rem; }
+  .navbar-logo img { height: 1.35rem; width: auto; }
+  .mobile-tabbar { display: block; }
+  .main { padding-bottom: 60px; }
+}
 `
 
 interface AdminShellProps {
@@ -92,10 +99,10 @@ interface AdminShellProps {
 
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', route: ROUTES.ADMIN_DASHBOARD, Icon: LayoutGrid },
-  { key: 'users',     label: 'Users',     route: '/admin/users',         Icon: Users },
-  { key: 'courses',   label: 'Courses',   route: '/admin/courses',       Icon: BookOpen },
-  { key: 'revenue',   label: 'Revenue',   route: '/admin/revenue',       Icon: CreditCard },
-  { key: 'settings',  label: 'Settings',  route: '/admin/settings',      Icon: SettingsIcon },
+  { key: 'users',     label: 'Users',     route: ROUTES.ADMIN_USERS,     Icon: Users },
+  { key: 'courses',   label: 'Courses',   route: ROUTES.ADMIN_COURSES,    Icon: BookOpen },
+  { key: 'revenue',   label: 'Revenue',   route: ROUTES.ADMIN_REVENUE,    Icon: CreditCard },
+  { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon },
 ]
 
 const ROLE_SWITCH_OPTIONS = [
@@ -272,7 +279,21 @@ export default function AdminShell({ children }: AdminShellProps) {
             {children}
           </main>
         </div>
-
+              {/* ── Mobile tab bar ── */}
+<div className="mobile-tabbar">
+  <div className="mobile-tabbar-inner">
+    {navItems.map(({ key, label, route, Icon }) => (
+      <button
+        key={key}
+        className={`tab-item${activeRoute === route ? ' active' : ''}`}
+        onClick={() => navigate(route)}
+      >
+        <Icon size={20} />
+        <span>{label}</span>
+      </button>
+    ))}
+  </div>
+</div>
         {logoutConfirmOpen && (
           <LogoutConfirmModal
             onCancel={() => setLogoutConfirmOpen(false)}

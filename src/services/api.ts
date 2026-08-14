@@ -1958,7 +1958,7 @@ interface PresignResponse {
   expires_in: number
 }
 
-// ─── Assignments API ──────────────────────────────────────────────────────────
+// ─── Assignments API (learner-facing) ─────────────────────────────────────────
 
 export const assignmentsAPI = {
   /** GET /v1/assignments/{assignment_id}/ */
@@ -2087,6 +2087,250 @@ export const assignmentsAPI = {
         return { success: false as const, error: error.message }
       }
       const { message, statusCode } = parseApiError(error, 'Submission failed')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+
+// ─── Trainer Assignments Types ─────────────────────────────────────────────
+// Backend guide: "Trainer Assignment Management — Implementation Guide",
+// 1 Aug 2026. 5 endpoints under /v1/trainer/courses/<slug>/assignments/.
+
+export interface TrainerRubricCriterion {
+  weight: number
+  description: string
+}
+
+export type TrainerRubric = Record<string, TrainerRubricCriterion>
+
+export interface TrainerAssignmentModuleRef {
+  id: string
+  title: string
+}
+
+export interface TrainerAssignmentListItem {
+  id: string
+  title: string
+  module: TrainerAssignmentModuleRef
+  deadline: string
+  is_final: boolean
+  created_at: string
+  submission_count: number
+  graded_count: number
+  pending_grading: number
+  deleted_at: string | null
+  can_edit: boolean
+  can_delete: boolean
+}
+
+export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
+  description: string
+  instructions: string
+  rubric: TrainerRubric
+  created_by: string
+}
+
+export interface CreateTrainerAssignmentPayload {
+  title: string
+  module_id: string
+  description?: string
+  instructions?: string
+  deadline: string
+  is_final?: boolean
+  rubric?: TrainerRubric
+}
+
+export type UpdateTrainerAssignmentPayload = Partial<CreateTrainerAssignmentPayload>
+
+// ─── Trainer Assignments API ───────────────────────────────────────────────
+
+export const trainerAssignmentsAPI = {
+  /** GET /v1/trainer/courses/{slug}/assignments/ */
+  list: async (
+    courseSlug: string,
+    params?: { include_deleted?: boolean; page?: number; page_size?: number },
+  ) => {
+    try {
+      const query = new URLSearchParams()
+      if (params?.include_deleted) query.set('include_deleted', 'true')
+      if (params?.page) query.set('page', String(params.page))
+      if (params?.page_size) query.set('page_size', String(params.page_size))
+      const qs = query.toString()
+
+      const response = await apiClient.get<{
+        count: number
+        next: string | null
+        previous: string | null
+        results: TrainerAssignmentListItem[]
+      }>(`/v1/trainer/courses/${courseSlug}/assignments/${qs ? `?${qs}` : ''}`)
+
+      return { success: true as const, data: response.data.results, count: response.data.count }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load assignments')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/trainer/courses/{slug}/assignments/{id}/ */
+  get: async (courseSlug: string, assignmentId: string) => {
+    try {
+      const response = await apiClient.get<TrainerAssignmentDetail>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load assignment')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/trainer/courses/{slug}/assignments/ */
+  create: async (courseSlug: string, payload: CreateTrainerAssignmentPayload) => {
+    try {
+      const response = await apiClient.post<TrainerAssignmentDetail>(
+        `/v1/trainer/courses/${courseSlug}/assignments/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode, code } = parseApiError(error, 'Failed to create assignment')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: 'Another final assignment already exists for this course. Only one is allowed.',
+          statusCode,
+          code,
+        }
+      }
+      return { success: false as const, error: message, statusCode, code }
+    }
+  },
+
+  /** PATCH /v1/trainer/courses/{slug}/assignments/{id}/ */
+  update: async (courseSlug: string, assignmentId: string, payload: UpdateTrainerAssignmentPayload) => {
+    try {
+      const response = await apiClient.patch<TrainerAssignmentDetail>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update assignment')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: 'This assignment can no longer be edited — learners have already submitted work.',
+          statusCode,
+        }
+      }
+      if (statusCode === 400 && message.toLowerCase().includes('deadline')) {
+        return {
+          success: false as const,
+          error: 'Deadline can only be moved forward, not backward.',
+          statusCode,
+        }
+      }
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** DELETE /v1/trainer/courses/{slug}/assignments/{id}/ — soft-delete */
+  remove: async (courseSlug: string, assignmentId: string) => {
+    try {
+      await apiClient.delete(`/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/`)
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to delete assignment')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: "This assignment can't be deleted — learners have already submitted work.",
+          statusCode,
+        }
+      }
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+}
+
+export interface ApiNotification {
+  id: string
+  type: string
+  title: string
+  body: string
+  action_url: string | null
+  is_read: boolean
+  created_at: string
+}
+
+export interface NotificationListParams {
+  is_read?: boolean
+  type?: string
+  page?: number
+  page_size?: number
+  search?: string
+}
+
+interface NotificationListResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: ApiNotification[]
+}
+
+// ─── Notifications API ───────────────────────────────────────────────────────
+
+export const notificationsAPI = {
+  /** GET /v1/learner/notifications/ */
+  list: async (params?: NotificationListParams) => {
+    try {
+      const query = new URLSearchParams()
+      if (params?.is_read !== undefined) query.set('is_read', String(params.is_read))
+      if (params?.type) query.set('type', params.type)
+      if (params?.page) query.set('page', String(params.page))
+      if (params?.page_size) query.set('page_size', String(params.page_size))
+      if (params?.search) query.set('search', params.search)
+      const qs = query.toString()
+
+      const response = await apiClient.get<NotificationListResponse>(
+        `/v1/learner/notifications/${qs ? `?${qs}` : ''}`,
+      )
+      return {
+        success: true as const,
+        data: response.data.results,
+        count: response.data.count,
+        next: response.data.next,
+      }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load notifications')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** PATCH /v1/learner/notifications/<id>/ */
+  markRead: async (id: string) => {
+    try {
+      const response = await apiClient.patch<ApiNotification>(
+        `/v1/learner/notifications/${id}/`,
+        { is_read: true },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to mark notification as read')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** PATCH /v1/learner/notifications/mark-all-read/ */
+  markAllRead: async () => {
+    try {
+      const response = await apiClient.patch<{ marked_count: number }>(
+        `/v1/learner/notifications/mark-all-read/`,
+        {},
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to mark all notifications as read')
       return { success: false as const, error: message, statusCode }
     }
   },

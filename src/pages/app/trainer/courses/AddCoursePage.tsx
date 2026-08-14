@@ -8,8 +8,17 @@ import {
 import AdminShell from '../../../../layouts/AdminShell'
 import TrainerShell from '../../../../layouts/TrainerShell'
 import { ROUTES } from '../../../../constants/routes'
-import { coursesManageAPI, type CourseLevel } from '../../../../services/api'
-import AssignmentCreatorModal, { type AssignmentDraft } from '../../../../components/AssignmentCreationModal'
+import {
+  coursesManageAPI,
+  trainerAssignmentsAPI,
+  type CourseLevel,
+  type CreateTrainerAssignmentPayload,
+} from '../../../../services/api'
+import AssignmentCreatorModal, {
+  type AssignmentDraft,
+  draftToRubric,
+  deadlineToISOString,
+} from '../../../../components/AssignmentCreationModal'
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -32,9 +41,11 @@ type Lesson = {
   existingMaterialsCount: number
   videoUploaded: boolean
   materialsUploaded: boolean
-  // Local-only until a backend assignment endpoint exists (see
-  // AssignmentCreatorModal.tsx header note). Not sent anywhere yet.
   assignment: AssignmentDraft | null
+  // Id of the assignment once it's been saved to the trainer assignments
+  // API (module-scoped, not lesson-scoped — see saveCurriculumAndContinue).
+  // null until the first successful create.
+  assignmentRemoteId: string | null
 }
 
 type CourseForm = {
@@ -83,6 +94,7 @@ function emptyLesson(): Lesson {
     videoUploaded: false,
     materialsUploaded: false,
     assignment: null,
+    assignmentRemoteId: null,
   }
 }
 
@@ -283,6 +295,10 @@ export default function AddCoursePage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   const [courseId, setCourseId] = useState<string | null>(id ?? null)
+  // The trainer assignments API is slug-scoped (/v1/trainer/courses/<slug>/assignments/),
+  // unlike the rest of this wizard which works off the course's UUID — so we
+  // track both once the draft exists.
+  const [courseSlug, setCourseSlug] = useState<string | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -377,10 +393,13 @@ export default function AddCoursePage() {
           // we only re-upload if the user picks a new file in this session.
           videoUploaded: true,
           materialsUploaded: true,
-          // No backend endpoint yet to fetch an existing assignment for a
-          // lesson — see AssignmentCreatorModal.tsx header note. Existing
-          // assignments (if any) won't show here until that lands.
+          // The trainer assignments list endpoint isn't queried here, so
+          // an existing assignment on this lesson's module won't show
+          // pre-filled — it'll just look like the lesson has none yet.
+          // Wire up trainerAssignmentsAPI.list(courseSlug) here if/when
+          // edit mode needs to surface existing assignments.
           assignment: null,
+          assignmentRemoteId: null,
         }
       })
 
@@ -406,6 +425,7 @@ export default function AddCoursePage() {
       }))
 
       setCourseId(id as string)
+      setCourseSlug(draft.slug ?? null)
       if (firstModule) setModuleId(firstModule.id)
       setLoading(false)
     }
@@ -450,6 +470,7 @@ export default function AddCoursePage() {
       }
       activeCourseId = result.data.id
       setCourseId(activeCourseId)
+      setCourseSlug(result.data.slug)
     } else {
       const result = await coursesManageAPI.updateDraft(activeCourseId, basics)
       if (!result.success) {
@@ -457,6 +478,7 @@ export default function AddCoursePage() {
         setSaving(false)
         return
       }
+      if (result.data.slug) setCourseSlug(result.data.slug)
     }
 
     // NOTE: cover image is intentionally NOT uploaded here.
@@ -573,15 +595,47 @@ export default function AddCoursePage() {
         }
       }
 
-      // NOTE: lesson.assignment is intentionally not sent anywhere here —
-      // there is no backend endpoint to save it against yet. See
-      // AssignmentCreatorModal.tsx header note. Once an endpoint exists,
-      // this is the place to add the save call (after remoteId is known).
+      // Assignments live on the trainer assignments API (module-scoped, not
+      // lesson-scoped — see the Lesson.assignmentRemoteId comment above).
+      // We save it here, right after this lesson's own save succeeds, using
+      // the module id resolved above and the course's slug.
+      let assignmentRemoteId = lesson.assignmentRemoteId
+
+      if (lesson.assignment) {
+        if (!courseSlug) {
+          setSaveError('Missing course reference — please reload the page and try again.')
+          setSaving(false)
+          return
+        }
+
+        const payload: CreateTrainerAssignmentPayload = {
+          title: lesson.assignment.title,
+          module_id: activeModuleId,
+          description: lesson.assignment.description,
+          instructions: lesson.assignment.instructions,
+          deadline: deadlineToISOString(lesson.assignment.deadline),
+          is_final: lesson.assignment.isFinal,
+          rubric: draftToRubric(lesson.assignment),
+        }
+
+        const assignmentResult = assignmentRemoteId
+          ? await trainerAssignmentsAPI.update(courseSlug, assignmentRemoteId, payload)
+          : await trainerAssignmentsAPI.create(courseSlug, payload)
+
+        if (!assignmentResult.success) {
+          setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
+          setSaving(false)
+          return
+        }
+
+        assignmentRemoteId = assignmentResult.data.id
+      }
 
       updateLesson(lesson.id, {
         remoteId,
         videoUploaded: lesson.videoFile ? true : lesson.videoUploaded,
         materialsUploaded: lesson.materialFiles.length > 0 ? true : lesson.materialsUploaded,
+        assignmentRemoteId,
       })
     }
 
@@ -678,6 +732,14 @@ export default function AddCoursePage() {
         setSaveError(result.error || 'Lesson removed locally, but failed to delete it on the server.')
       }
     }
+
+    // Note: this only removes the lesson locally/server-side — it does NOT
+    // delete the underlying assignment via trainerAssignmentsAPI.remove().
+    // Assignments are module-scoped, so the assignment may still be
+    // relevant to other lessons/the module as a whole; deleting it here
+    // could surprise the trainer. If a "delete lesson also deletes its
+    // assignment" behavior is wanted, call trainerAssignmentsAPI.remove()
+    // with lesson.assignmentRemoteId here (courseSlug must be set).
   }
 
   function openAssignmentModal(lessonId: string) {

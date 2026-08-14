@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import {
   Plus, Search, MoreVertical, Layers, Globe, Pencil, TrendingUp,
   Eye, Tag, UserCog, Archive, Trash2,
@@ -65,25 +65,26 @@ const PAGE_CSS = `
   .cc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
   .cc-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #111827; }
   .cc-subtitle { margin: 0.25rem 0 0; color: #6B7280; font-size: 0.9rem; }
-  .cc-create-btn { display: flex; align-items: center; gap: 0.5rem; background: #2563EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+  .cc-create-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2563EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 
   .cc-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-  .cc-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); }
+  .cc-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); min-width: 0; }
   .cc-stat-icon { width: 44px; height: 44px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cc-stat-value { margin: 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
-  .cc-stat-label { margin: 0.15rem 0 0; font-size: 0.82rem; color: #9CA3AF; }
+  .cc-stat-label { margin: 0.15rem 0 0; font-size: 0.82rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .cc-panel { background: #fff; border-radius: 1rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); overflow: hidden; }
 
   .cc-toolbar { display: flex; align-items: center; gap: 0.75rem; padding: 1.1rem 1.25rem; flex-wrap: wrap; }
-  .cc-status-tabs { display: flex; gap: 0.4rem; background: #F9FAFB; border-radius: 0.75rem; padding: 0.3rem; }
-  .cc-status-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer; white-space: nowrap; }
+  .cc-status-tabs { display: flex; gap: 0.4rem; background: #F9FAFB; border-radius: 0.75rem; padding: 0.3rem; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .cc-status-tabs::-webkit-scrollbar { display: none; }
+  .cc-status-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .cc-status-tab.active { background: #2563EB; color: #fff; }
-  .cc-search-wrap { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.75rem; padding: 0.6rem 1rem; }
-  .cc-search-wrap input { flex: 1; background: none; border: none; outline: none; font-size: 0.875rem; color: #111; }
+  .cc-search-wrap { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.75rem; padding: 0.6rem 1rem; }
+  .cc-search-wrap input { flex: 1; min-width: 0; background: none; border: none; outline: none; font-size: 0.875rem; color: #111; }
   .cc-search-wrap input::placeholder { color: #9CA3AF; }
 
-  .cc-table-wrap { overflow-x: auto; }
+  .cc-table-wrap { overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
   .cc-table { width: 100%; border-collapse: collapse; min-width: 900px; }
   .cc-table th { text-align: left; font-size: 0.72rem; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.75rem 1.25rem; border-top: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6; background: #FAFAFA; }
   .cc-table td { padding: 0.9rem 1.25rem; border-bottom: 1px solid #F3F4F6; font-size: 0.875rem; color: #111827; vertical-align: middle; }
@@ -109,12 +110,13 @@ const PAGE_CSS = `
   .cc-row-menu-wrap { position: relative; text-align: right; }
   .cc-row-menu-btn { border: none; background: none; cursor: pointer; color: #9CA3AF; padding: 0.4rem; border-radius: 0.5rem; display: inline-flex; }
   .cc-row-menu-btn:hover { background: #F3F4F6; color: #374151; }
-  .cc-row-menu { position: absolute; top: calc(100% + 0.3rem); right: 1.25rem; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 190px; padding: 0.4rem; z-index: 50; text-align: left; }
+  .cc-row-menu { position: fixed; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 190px; padding: 0.4rem; z-index: 200; text-align: left; }
   .cc-row-menu-item { display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.6rem 0.7rem; border-radius: 0.55rem; border: none; background: none; font-size: 0.85rem; font-weight: 500; color: #374151; cursor: pointer; text-align: left; }
   .cc-row-menu-item:hover { background: #F9FAFB; }
   .cc-row-menu-item.danger { color: #DC2626; }
   .cc-row-menu-item.danger:hover { background: #FEF2F2; }
   .cc-row-menu-divider { height: 1px; background: #F3F4F6; margin: 0.3rem 0.2rem; }
+  .cc-row-menu-backdrop { position: fixed; inset: 0; z-index: 150; }
 
   .cc-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; flex-wrap: wrap; }
   .cc-footer-text { font-size: 0.82rem; color: #6B7280; }
@@ -127,8 +129,13 @@ const PAGE_CSS = `
   }
   @media (max-width: 640px) {
     .cc-page { padding: 1.25rem; }
+    .cc-header { flex-direction: column; align-items: stretch; }
+    .cc-create-btn { width: 100%; }
     .cc-toolbar { flex-direction: column; align-items: stretch; }
-    .cc-status-tabs { overflow-x: auto; }
+    .cc-search-wrap { flex-basis: auto; }
+  }
+  @media (max-width: 420px) {
+    .cc-stats-grid { grid-template-columns: 1fr; }
   }
 `
 
@@ -155,11 +162,16 @@ const STATUS_TABS: { key: 'all' | CourseStatus; label: string }[] = [
   { key: 'archived',  label: 'Archived' },
 ]
 
+const ROW_MENU_WIDTH = 190
+const ROW_MENU_MARGIN = 8
+
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<CourseSummary[]>(MOCK_COURSES)
   const [statusFilter, setStatusFilter] = useState<'all' | CourseStatus>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const menuBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const [viewingCourse, setViewingCourse] = useState<CourseSummary | null>(null)
   const [pricingCourse, setPricingCourse] = useState<CourseSummary | null>(null)
@@ -176,32 +188,67 @@ export default function AdminCoursesPage() {
     })
   }, [courses, statusFilter, searchQuery])
 
+  // Close the row menu on scroll/resize so it never floats away from its
+  // trigger button — it's `position: fixed` and computed once on open.
+  useEffect(() => {
+    if (!openMenuId) return
+    function close() {
+      setOpenMenuId(null)
+      setMenuPos(null)
+    }
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [openMenuId])
+
   function toggleRowMenu(id: string) {
-    setOpenMenuId((prev) => (prev === id ? null : id))
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      setMenuPos(null)
+      return
+    }
+    const btn = menuBtnRefs.current[id]
+    if (btn) {
+      const rect = btn.getBoundingClientRect()
+      const left = Math.min(
+        rect.right - ROW_MENU_WIDTH,
+        window.innerWidth - ROW_MENU_WIDTH - ROW_MENU_MARGIN
+      )
+      setMenuPos({ top: rect.bottom + 6, left: Math.max(ROW_MENU_MARGIN, left) })
+    }
+    setOpenMenuId(id)
+  }
+
+  function closeRowMenu() {
+    setOpenMenuId(null)
+    setMenuPos(null)
   }
 
   function handleViewCourse(course: CourseSummary) {
-    setOpenMenuId(null)
+    closeRowMenu()
     setViewingCourse(course)
   }
 
   function handleSetPrice(course: CourseSummary) {
-    setOpenMenuId(null)
+    closeRowMenu()
     setPricingCourse(course)
   }
 
   function handleAssignTrainer(course: CourseSummary) {
-    setOpenMenuId(null)
+    closeRowMenu()
     setAssigningCourse(course)
   }
 
   function handleArchive(course: CourseSummary) {
-    setOpenMenuId(null)
+    closeRowMenu()
     setArchivingCourse(course)
   }
 
   function handleDelete(course: CourseSummary) {
-    setOpenMenuId(null)
+    closeRowMenu()
     setDeletingCourse(course)
   }
 
@@ -227,6 +274,8 @@ export default function AdminCoursesPage() {
     // TODO: open create-course flow — out of scope for now
     console.log('Create course clicked')
   }
+
+  const openCourse = filteredCourses.find((c) => c.id === openMenuId) ?? null
 
   return (
     <AdminShell>
@@ -356,6 +405,7 @@ export default function AdminCoursesPage() {
                     <td>
                       <div className="cc-row-menu-wrap">
                         <button
+                          ref={(el) => { menuBtnRefs.current[course.id] = el }}
                           className="cc-row-menu-btn"
                           onClick={() => toggleRowMenu(course.id)}
                           aria-label="Row actions"
@@ -365,26 +415,6 @@ export default function AdminCoursesPage() {
                         >
                           <MoreVertical size={17} />
                         </button>
-                        {openMenuId === course.id && (
-                          <div className="cc-row-menu" role="menu">
-                            <button className="cc-row-menu-item" onClick={() => handleViewCourse(course)} type="button">
-                              <Eye size={15} /> View course
-                            </button>
-                            <button className="cc-row-menu-item" onClick={() => handleSetPrice(course)} type="button">
-                              <Tag size={15} /> Set price
-                            </button>
-                            <button className="cc-row-menu-item" onClick={() => handleAssignTrainer(course)} type="button">
-                              <UserCog size={15} /> Assign trainer
-                            </button>
-                            <div className="cc-row-menu-divider" />
-                            <button className="cc-row-menu-item" onClick={() => handleArchive(course)} type="button">
-                              <Archive size={15} /> Archive
-                            </button>
-                            <button className="cc-row-menu-item danger" onClick={() => handleDelete(course)} type="button">
-                              <Trash2 size={15} /> Delete course
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -405,6 +435,30 @@ export default function AdminCoursesPage() {
           </div>
         </div>
       </div>
+
+      {openMenuId && openCourse && menuPos && (
+        <>
+          <div className="cc-row-menu-backdrop" onClick={closeRowMenu} />
+          <div className="cc-row-menu" role="menu" style={{ top: menuPos.top, left: menuPos.left }}>
+            <button className="cc-row-menu-item" onClick={() => handleViewCourse(openCourse)} type="button">
+              <Eye size={15} /> View course
+            </button>
+            <button className="cc-row-menu-item" onClick={() => handleSetPrice(openCourse)} type="button">
+              <Tag size={15} /> Set price
+            </button>
+            <button className="cc-row-menu-item" onClick={() => handleAssignTrainer(openCourse)} type="button">
+              <UserCog size={15} /> Assign trainer
+            </button>
+            <div className="cc-row-menu-divider" />
+            <button className="cc-row-menu-item" onClick={() => handleArchive(openCourse)} type="button">
+              <Archive size={15} /> Archive
+            </button>
+            <button className="cc-row-menu-item danger" onClick={() => handleDelete(openCourse)} type="button">
+              <Trash2 size={15} /> Delete course
+            </button>
+          </div>
+        </>
+      )}
 
       {viewingCourse && (
         <CourseDetailModal

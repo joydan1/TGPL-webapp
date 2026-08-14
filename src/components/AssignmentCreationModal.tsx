@@ -6,12 +6,21 @@ import {
 } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────
-// NOTE: There is currently no backend endpoint for creating/updating
-// assignments (checked both the `assignments` and `courses` API tags).
-// Until one exists, `onSave` below just stores the draft in the parent
-// wizard's local state (see AddCoursePage.tsx). When the endpoint ships,
-// swap the `onSave` call site in AddCoursePage for a real API call —
-// nothing in this modal needs to change.
+// Maps to the trainer assignments API (see trainerAssignmentsAPI in
+// services/api.ts): title, module_id, description, instructions, deadline,
+// is_final, rubric. `onSave` still just hands the draft back to the parent
+// wizard (AddCoursePage.tsx), which converts it to that payload — via
+// draftToRubric/deadlineToISOString below — and calls the API once the
+// lesson's module id is known. Nothing in this modal needs to change if
+// that call site changes.
+//
+// Everything below "Resources & Templates" in the UI (cover images,
+// "what you'll do" checklist, scenarios, deliverables, resource files,
+// word count, accepted file types) has no equivalent field in the current
+// backend contract. They're kept in local state so the trainer's input
+// isn't silently lost, but they are NOT sent anywhere yet — only
+// title / description / instructions / deadline / is_final / rubric are.
+// Revisit this if/when the backend adds fields for them.
 // ─────────────────────────────────────────────────────────────────────────
 
 export type GradingCriterionDraft = {
@@ -31,7 +40,10 @@ export type AssignmentResourceDraft = {
 
 export type AssignmentDraft = {
   title: string
+  description: string
   instructions: string
+  deadline: string // value of a <input type="datetime-local"> — see deadlineToISOString()
+  isFinal: boolean
   coverImages: File[]
   whatYoullDo: string[]
   scenarios: string[]
@@ -52,7 +64,10 @@ function makeId() {
 export function emptyAssignmentDraft(): AssignmentDraft {
   return {
     title: '',
+    description: '',
     instructions: '',
+    deadline: '',
+    isFinal: false,
     coverImages: [],
     whatYoullDo: [''],
     scenarios: [''],
@@ -83,6 +98,50 @@ function extColor(ext: string): { bg: string; fg: string } {
   return { bg: '#F7F7F7', fg: '#616873' }
 }
 
+// ─── Draft → API payload helpers ───────────────────────────────────────────
+
+function slugifyCriterion(text: string, used: Set<string>): string {
+  const base =
+    text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'criterion'
+  let key = base
+  let i = 2
+  while (used.has(key)) {
+    key = `${base}_${i}`
+    i += 1
+  }
+  used.add(key)
+  return key
+}
+
+/** Sum of all grading-criteria weights — the backend requires this to equal 100. */
+export function rubricWeightTotal(draft: AssignmentDraft): number {
+  return draft.gradingCriteria.reduce((sum, c) => sum + (Number(c.points) || 0), 0)
+}
+
+/** Converts the editable grading-criteria rows into the rubric shape the API expects. */
+export function draftToRubric(draft: AssignmentDraft): Record<string, { weight: number; description: string }> {
+  const rubric: Record<string, { weight: number; description: string }> = {}
+  const used = new Set<string>()
+  draft.gradingCriteria
+    .filter((c) => c.criterion.trim())
+    .forEach((c) => {
+      const key = slugifyCriterion(c.criterion, used)
+      rubric[key] = { weight: Number(c.points) || 0, description: c.description.trim() }
+    })
+  return rubric
+}
+
+/**
+ * `draft.deadline` comes from a <input type="datetime-local"> value
+ * ("YYYY-MM-DDTHH:mm"), interpreted in the browser's local time zone.
+ * The API wants a full ISO-8601 timestamp with an explicit offset.
+ */
+export function deadlineToISOString(localValue: string): string {
+  if (!localValue) return ''
+  const date = new Date(localValue)
+  return date.toISOString()
+}
+
 const MODAL_CSS = `
   .acm-overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1.5rem; z-index: 600; overflow-y: auto; }
   .acm-modal { width: 100%; max-width: 760px; background: #FFFFFF; border-radius: 24px; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
@@ -102,6 +161,19 @@ const MODAL_CSS = `
   .acm-input, .acm-textarea { box-sizing: border-box; width: 100%; background: #F7F7F7; border: 1px solid #EBEBEB; border-radius: 14px; padding: 0 12px; height: 40px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 14px; color: #2B2B2C; }
   .acm-input.readonly { color: #616873; font-weight: 400; }
   .acm-textarea { height: auto; padding: 12px 16px; min-height: 90px; font-weight: 400; font-size: 13px; line-height: 21px; resize: vertical; }
+
+  .acm-toggle-field { flex: 1 1 260px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .acm-toggle-labels { display: flex; flex-direction: column; gap: 2px; }
+  .acm-toggle-title { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; color: #2B2B2C; }
+  .acm-toggle-sub { font-family: 'Sora', sans-serif; font-weight: 400; font-size: 10px; color: #99A1AF; }
+  .acm-toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+  .acm-toggle input { opacity: 0; width: 0; height: 0; }
+  .acm-toggle .track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
+  .acm-toggle .track::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.15s; }
+  .acm-toggle input:checked + .track { background: #2492EB; }
+  .acm-toggle input:checked + .track::before { transform: translateX(18px); }
+
+  .acm-field-error { font-family: 'Sora', sans-serif; font-weight: 500; font-size: 11px; color: #DC2626; }
 
   /* section header (icon + title + sub) */
   .acm-section { display: flex; flex-direction: column; gap: 12px; }
@@ -151,6 +223,8 @@ const MODAL_CSS = `
   .acm-grading-footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #FAFAFA; border-top: 1px solid #F3F4F6; }
   .acm-grading-add-btn { border: none; background: none; display: flex; align-items: center; gap: 6px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; color: #2492EB; cursor: pointer; }
   .acm-grading-total { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px; color: #2B2B2C; }
+  .acm-grading-total.warn { color: #EA580C; }
+  .acm-grading-total.ok { color: #059669; }
 
   /* resources */
   .acm-resource-row { box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #FAFAFA; border: 1px solid #EBEBEB; border-radius: 14px; }
@@ -176,7 +250,8 @@ const MODAL_CSS = `
   .acm-filetype-chip.active { background: #E9F5FF; border-color: #2492EB; color: #2492EB; }
 
   /* footer */
-  .acm-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 20px 24px; border-top: 1px solid #F3F4F6; }
+  .acm-footer { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 20px 24px; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
+  .acm-footer-warning { font-family: 'Sora', sans-serif; font-weight: 500; font-size: 12px; color: #DC2626; flex: 1 1 100%; text-align: right; }
   .acm-btn-cancel { box-sizing: border-box; padding: 0 20px; height: 40px; background: #FFFFFF; border: 1px solid #EBEBEB; border-radius: 14px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 13px; color: #616873; cursor: pointer; }
   .acm-btn-cancel:hover { background: #F7F7F7; }
   .acm-btn-save { display: flex; align-items: center; gap: 8px; padding: 0 24px; height: 40px; background: #2492EB; border: none; border-radius: 14px; box-shadow: 0 1px 3px rgba(36,146,235,0.2), 0 1px 2px -1px rgba(36,146,235,0.2); font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px; color: #FFFFFF; cursor: pointer; }
@@ -288,7 +363,9 @@ export default function AssignmentCreatorModal({
   function removeCriterion(id: string) {
     setDraft((d) => ({ ...d, gradingCriteria: d.gradingCriteria.filter((c) => c.id !== id) }))
   }
-  const totalPoints = draft.gradingCriteria.reduce((sum, c) => sum + (Number(c.points) || 0), 0)
+  const totalPoints = rubricWeightTotal(draft)
+  const hasCriteria = draft.gradingCriteria.some((c) => c.criterion.trim())
+  const rubricValid = !hasCriteria || totalPoints === 100
 
   function addCoverImages(files: FileList | null) {
     if (!files) return
@@ -322,7 +399,14 @@ export default function AssignmentCreatorModal({
     }))
   }
 
+  const deadlineDate = draft.deadline ? new Date(draft.deadline) : null
+  const deadlineMissing = !draft.deadline
+  const deadlineInPast = !!deadlineDate && deadlineDate.getTime() < Date.now()
+
+  const canSave = draft.title.trim().length > 0 && !deadlineMissing && !deadlineInPast && rubricValid
+
   function handleSave() {
+    if (!canSave) return
     onSave(draft)
   }
 
@@ -336,7 +420,7 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-body">
-          {/* Assignment title / Module / Course */}
+          {/* Assignment title / Module / Course / Deadline / Final */}
           <div className="acm-top-fields">
             <div className="acm-field-half">
               <span className="acm-field-label">Assignment title</span>
@@ -354,6 +438,43 @@ export default function AssignmentCreatorModal({
             <div className="acm-field-full">
               <span className="acm-field-label">Course</span>
               <input className="acm-input readonly" value={courseTitle} readOnly />
+            </div>
+
+            <div className="acm-field-full">
+              <span className="acm-field-label">Short description</span>
+              <textarea
+                className="acm-textarea"
+                style={{ minHeight: 60 }}
+                placeholder="One or two sentences summarizing the assignment"
+                value={draft.description}
+                onChange={(e) => update('description', e.target.value)}
+              />
+            </div>
+
+            <div className="acm-field-half">
+              <span className="acm-field-label">Deadline</span>
+              <input
+                type="datetime-local"
+                className="acm-input"
+                value={draft.deadline}
+                onChange={(e) => update('deadline', e.target.value)}
+              />
+              {deadlineInPast && <span className="acm-field-error">Deadline must be in the future.</span>}
+            </div>
+
+            <div className="acm-toggle-field">
+              <div className="acm-toggle-labels">
+                <span className="acm-toggle-title">Final assignment</span>
+                <span className="acm-toggle-sub">Only one allowed per course</span>
+              </div>
+              <label className="acm-toggle">
+                <input
+                  type="checkbox"
+                  checked={draft.isFinal}
+                  onChange={(e) => update('isFinal', e.target.checked)}
+                />
+                <span className="track" />
+              </label>
             </div>
           </div>
 
@@ -481,14 +602,14 @@ export default function AssignmentCreatorModal({
               <div className="acm-section-icon"><Award size={15} /></div>
               <div>
                 <div className="acm-section-title">Grading criteria</div>
-                <div className="acm-section-sub">Breakdown of how submissions are scored</div>
+                <div className="acm-section-sub">Breakdown of how submissions are scored —must add up to 100</div>
               </div>
             </div>
             <div className="acm-grading-table">
               <div className="acm-grading-head">
                 <span>Criterion</span>
                 <span>Description</span>
-                <span>Points</span>
+                <span>Weight %</span>
                 <span />
               </div>
               {draft.gradingCriteria.map((c) => (
@@ -521,7 +642,9 @@ export default function AssignmentCreatorModal({
                 <button className="acm-grading-add-btn" onClick={addCriterion}>
                   <Plus size={12} /> Add criterion
                 </button>
-                <span className="acm-grading-total">{totalPoints} pts</span>
+                <span className={`acm-grading-total${hasCriteria ? (totalPoints === 100 ? ' ok' : ' warn') : ''}`}>
+                  {totalPoints} / 100
+                </span>
               </div>
             </div>
           </div>
@@ -532,7 +655,7 @@ export default function AssignmentCreatorModal({
               <div className="acm-section-icon"><Paperclip size={15} /></div>
               <div>
                 <div className="acm-section-title">Resources &amp; Templates</div>
-                <div className="acm-section-sub">Files and links learners can download before starting</div>
+                <div className="acm-section-sub">Files and links learners can download before starting </div>
               </div>
             </div>
             <div className="acm-section-card">
@@ -574,7 +697,7 @@ export default function AssignmentCreatorModal({
               <div className="acm-section-icon"><ClipboardList size={15} /></div>
               <div>
                 <div className="acm-section-title">Submission requirements</div>
-                <div className="acm-section-sub">Rules and constraints for learner submissions</div>
+                <div className="acm-section-sub">Rules and constraints for learner submissions </div>
               </div>
             </div>
             <div className="acm-section-card">
@@ -626,8 +749,14 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-footer">
+          {!rubricValid && (
+            <span className="acm-footer-warning">Grading weights must add up to 100 before saving.</span>
+          )}
+          {deadlineMissing && (
+            <span className="acm-footer-warning">Set a deadline before saving.</span>
+          )}
           <button className="acm-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="acm-btn-save" onClick={handleSave} disabled={!draft.title.trim()}>
+          <button className="acm-btn-save" onClick={handleSave} disabled={!canSave}>
             {initialData ? 'Save changes' : 'Add assignment'}
           </button>
         </div>

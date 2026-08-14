@@ -5,11 +5,11 @@ import type { AdminUser } from '../../types/adminUser'
 export const DELETE_MODAL_CSS = `
   .da-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1100; padding: 1rem; }
   .da-modal { background: #fff; border-radius: 1.1rem; width: 100%; max-width: 460px; position: relative; }
-  .da-topbar { height: 5px; background: #DC2626; border-radius: 1.1rem 1.1rem 0 0; }
+  .da-topbar { height: 5px; background: #EF4444; border-radius: 1.1rem 1.1rem 0 0; }
   .da-inner { padding: 1.5rem; }
 
   .da-head { display: flex; gap: 0.9rem; margin-bottom: 1.25rem; }
-  .da-icon { width: 48px; height: 48px; border-radius: 0.85rem; background: #FEF2F2; display: flex; align-items: center; justify-content: center; color: #DC2626; flex-shrink: 0; }
+  .da-icon { width: 48px; height: 48px; border-radius: 0.85rem; background: #FEF2F2; display: flex; align-items: center; justify-content: center; color: #EF4444; flex-shrink: 0; }
   .da-title { margin: 0 0 0.3rem; font-size: 1.2rem; font-weight: 800; color: #111827; }
   .da-desc { margin: 0; color: #6B7280; font-size: 0.86rem; line-height: 1.5; }
   .da-desc strong { color: #111827; }
@@ -19,21 +19,21 @@ export const DELETE_MODAL_CSS = `
   .da-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
   .da-user-name { margin: 0; font-weight: 700; font-size: 0.9rem; color: #111827; }
   .da-user-email { margin: 0; font-size: 0.78rem; color: #9CA3AF; }
-  .da-role-badge { font-size: 0.76rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 999px; background: #EFF6FF; color: #2563EB; white-space: nowrap; }
+  .da-role-badge { font-size: 0.76rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 999px; background: #EFF6FF; color: #2492EB; white-space: nowrap; }
 
   .da-consequences { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.25rem; }
   .da-consequence { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.86rem; color: #374151; }
-  .da-x-icon { width: 20px; height: 20px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; margin-top: 0.1rem; }
+  .da-x-icon { width: 20px; height: 20px; border-radius: 50%; background: #FEE2E2; color: #EF4444; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; margin-top: 0.1rem; }
 
   .da-confirm-label { font-size: 0.85rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; display: block; }
-  .da-confirm-label strong { color: #DC2626; }
+  .da-confirm-label strong { color: #EF4444; }
   .da-confirm-input { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; }
-  .da-confirm-input:focus { outline: none; border-color: #DC2626; }
+  .da-confirm-input:focus { outline: none; border-color: #EF4444; }
 
   .da-actions { display: flex; gap: 0.6rem; }
   .da-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .da-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
-  .da-btn.confirm { border: none; background: #DC2626; color: #fff; }
+  .da-btn.confirm { border: none; background: #EF4444; color: #fff; }
   .da-btn.confirm:disabled { opacity: 0.45; cursor: not-allowed; }
 `
 

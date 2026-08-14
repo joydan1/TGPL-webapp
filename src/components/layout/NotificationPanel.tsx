@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  X, ChevronRight,
+  X, ChevronRight, Loader2,
   Trophy, MessageSquare, Radio, ClipboardList,
   CalendarCheck, Info,
 } from 'lucide-react'
 import { RouteBuilder } from '../../constants/routes'
-import { NOTIFICATIONS, type Notification, type NotifCategory, TABS, tabCounts } from './notificationsData'
+import { notificationsAPI } from '../../services/api'
+import {
+  type Notification, type NotifCategory, TABS, tabCounts, mapApiNotification,
+} from './notificationsData'
+
+const PANEL_PAGE_SIZE = 10
 
 export const NOTIF_CSS = `
   /* ── Bell wrapper ── */
@@ -113,6 +118,7 @@ export const NOTIF_CSS = `
     border-bottom: 1px solid #F3F4F6; flex-shrink: 0;
   }
   .notif-mark-read:hover { opacity: 0.8; }
+  .notif-mark-read:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ── Scrollable list ── */
   .notif-body {
@@ -159,6 +165,19 @@ export const NOTIF_CSS = `
   .notif-time { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; }
   .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563EB; }
 
+  /* ── Loading / error / empty ── */
+  .notif-loading {
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    padding: 2.5rem 1rem; color: #9CA3AF; font-size: 0.875rem;
+  }
+  .notif-spin { animation: notif-spin 0.8s linear infinite; }
+  @keyframes notif-spin { to { transform: rotate(360deg); } }
+  .notif-error {
+    margin: 0.75rem 1.25rem; padding: 0.75rem 1rem;
+    background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C;
+    border-radius: 0.75rem; font-size: 0.8rem;
+  }
+
   /* ── Footer ── */
   .notif-footer {
     border-top: 1px solid #F3F4F6; padding: 0.875rem;
@@ -197,17 +216,17 @@ export function notifIcon(category: Notification['category'], bg: string) {
 // ── Shared NotifItem (used in panel AND full page) ─────────────────────────
 export function NotifItem({
   n,
-  onRead,
+  onOpen,
   fullText = false,
 }: {
   n: Notification
-  onRead: (id: number) => void
+  onOpen: (n: Notification) => void
   fullText?: boolean
 }) {
   return (
     <div
       className={`notif-item${n.unread ? ' unread' : ' read'}`}
-      onClick={() => onRead(n.id)}
+      onClick={() => onOpen(n)}
     >
       {notifIcon(n.category, n.iconBg)}
       <div className="notif-content">
@@ -234,9 +253,35 @@ interface NotificationPanelProps {
 
 export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab]       = useState<NotifCategory>('all')
-  const [notifications, setNotifications] = useState<Notification[]>(NOTIFICATIONS)
+  const location = useLocation()
+  const isTrainer = location.pathname.startsWith('/trainer')
+
+  const [activeTab, setActiveTab] = useState<NotifCategory>('all')
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [markingAll, setMarkingAll] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // Fetch a first page as soon as the panel opens.
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      const result = await notificationsAPI.list({ page: 1, page_size: PANEL_PAGE_SIZE })
+      if (cancelled) return
+      if (!result.success) {
+        setError(result.error || 'Failed to load notifications.')
+        setLoading(false)
+        return
+      }
+      setNotifications(result.data.map(mapApiNotification))
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   // Close on outside click/tap
   useEffect(() => {
@@ -265,20 +310,36 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
     ? notifications
     : notifications.filter(n => n.category === activeTab)
 
-  const newItems = filtered.filter(n => n.isNew)
-  const oldItems = filtered.filter(n => !n.isNew)
+  const newItems = filtered.filter(n => n.unread)
+  const oldItems = filtered.filter(n => !n.unread)
   const counts   = tabCounts(notifications)
 
-  function markAllRead() {
+  async function markAllRead() {
+    setMarkingAll(true)
+    const result = await notificationsAPI.markAllRead()
+    setMarkingAll(false)
+    if (!result.success) {
+      setError(result.error || 'Failed to mark all as read.')
+      return
+    }
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
   }
-  function markRead(id: number) {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+
+  async function openNotification(n: Notification) {
+    if (n.unread) {
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: false } : x))
+      const result = await notificationsAPI.markRead(n.id)
+      if (!result.success) {
+        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: true } : x))
+      }
+    }
+    onClose()
+    if (n.actionUrl) navigate(n.actionUrl)
   }
 
   function goToAll() {
     onClose()
-    navigate(RouteBuilder.notifications())
+    navigate(isTrainer ? RouteBuilder.trainerNotifications() : RouteBuilder.notifications())
   }
 
   return (
@@ -316,28 +377,38 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         </div>
 
         {/* Mark all read */}
-        <button className="notif-mark-read" onClick={markAllRead}>
-          Mark all read
+        <button className="notif-mark-read" onClick={markAllRead} disabled={markingAll || counts.all === 0}>
+          {markingAll ? 'Marking…' : 'Mark all read'}
         </button>
+
+        {error && <div className="notif-error">{error}</div>}
 
         {/* List */}
         <div className="notif-body">
-          {newItems.length > 0 && (
-            <>
-              <div className="notif-section-label">New</div>
-              {newItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
-            </>
-          )}
-          {oldItems.length > 0 && (
-            <>
-              <div className="notif-section-label">Earlier</div>
-              {oldItems.map(n => <NotifItem key={n.id} n={n} onRead={markRead} />)}
-            </>
-          )}
-          {filtered.length === 0 && (
-            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem' }}>
-              No notifications here
+          {loading ? (
+            <div className="notif-loading">
+              <Loader2 size={16} className="notif-spin" /> Loading…
             </div>
+          ) : (
+            <>
+              {newItems.length > 0 && (
+                <>
+                  <div className="notif-section-label">New</div>
+                  {newItems.map(n => <NotifItem key={n.id} n={n} onOpen={openNotification} />)}
+                </>
+              )}
+              {oldItems.length > 0 && (
+                <>
+                  <div className="notif-section-label">Earlier</div>
+                  {oldItems.map(n => <NotifItem key={n.id} n={n} onOpen={openNotification} />)}
+                </>
+              )}
+              {filtered.length === 0 && !error && (
+                <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.875rem' }}>
+                  You're all caught up
+                </div>
+              )}
+            </>
           )}
         </div>
 

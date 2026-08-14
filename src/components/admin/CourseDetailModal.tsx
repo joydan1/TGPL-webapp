@@ -9,7 +9,7 @@ export const COURSE_DETAIL_MODAL_CSS = `
   .cd-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: flex-start; justify-content: center; z-index: 900; padding: 2rem 1rem; overflow-y: auto; }
   .cd-modal { background: #fff; border-radius: 1.1rem; width: 100%; max-width: 620px; overflow: hidden; }
 
-  .cd-hero { background: linear-gradient(135deg, #2563EB, #3B82F6); padding: 1.5rem; position: relative; }
+  .cd-hero { background: linear-gradient(135deg, #2492EB, #3B82F6); padding: 1.5rem; position: relative; }
   .cd-hero-status { display: inline-flex; align-items: center; gap: 0.35rem; background: rgba(255,255,255,0.18); color: #fff; font-size: 0.78rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; margin-bottom: 0.9rem; }
   .cd-hero-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
   .cd-hero-close { position: absolute; top: 1.25rem; right: 1.25rem; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.18); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -39,7 +39,7 @@ export const COURSE_DETAIL_MODAL_CSS = `
   .cd-trend-pill { font-size: 0.78rem; font-weight: 700; color: #059669; }
 
   .cd-chart { display: flex; align-items: flex-end; gap: 0.4rem; height: 70px; padding: 0 1.1rem 1rem; }
-  .cd-bar { flex: 1; background: linear-gradient(180deg, #60A5FA, #2563EB); border-radius: 4px 4px 0 0; min-height: 4px; }
+  .cd-bar { flex: 1; background: linear-gradient(180deg, #60A5FA, #2492EB); border-radius: 4px 4px 0 0; min-height: 4px; }
   .cd-chart-labels { display: flex; justify-content: space-between; padding: 0 1.1rem 1rem; font-size: 0.72rem; color: #9CA3AF; }
 
   .cd-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem 1.5rem; padding: 0 1.1rem 1.1rem; }
@@ -59,10 +59,10 @@ export const COURSE_DETAIL_MODAL_CSS = `
 
   .cd-footer { display: flex; align-items: center; gap: 0.6rem; padding: 1.1rem 1.5rem; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
   .cd-footer-btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 0.75rem; padding: 0.75rem 1rem; font-size: 0.86rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
-  .cd-footer-btn.primary { flex: 1; border: none; background: #2563EB; color: #fff; }
+  .cd-footer-btn.primary { flex: 1; border: none; background: #2492EB; color: #fff; }
   .cd-footer-btn.secondary { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
   .cd-footer-btn.archive { border: 1.5px solid #FDE68A; background: #FFFBEB; color: #D97706; }
-  .cd-footer-btn.danger { border: 1.5px solid #FECACA; background: #fff; color: #DC2626; padding: 0.75rem; }
+  .cd-footer-btn.danger { border: 1.5px solid #FECACA; background: #fff; color: #EFF4444; padding: 0.75rem; }
 
   @media (max-width: 560px) {
     .cd-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

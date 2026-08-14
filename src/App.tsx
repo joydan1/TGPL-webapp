@@ -20,7 +20,6 @@ import OnboardingPage from './pages/app/OnboardingPage'
 import EmailVerificationPage from './pages/auth/EmailVerificationPage'
 import DashboardPage from './pages/app/DashboardPage'
 import CertificatesPage from './pages/app/CertificatesPage'
-import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
 import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
@@ -44,6 +43,14 @@ import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
 import HelpSupportPage from './pages/app/HelpSupportPage'
 import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
+//admin pages
+import AdminRevenuePage from './pages/admin/AdminRevenuePage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminCoursesPage from './pages/admin/AdminCoursesPage'
+import AdminLoginPage from './pages/admin/AdminLoginPage.tsx'
+import AdminSettingsPage from './pages/admin/AdminSettingsPage.tsx'
+
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -244,15 +251,22 @@ function App() {
   }
 />
 
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route
-          path={ROUTES.COURSES}
-          element={
-            <ProtectedRoute requiredRole="learner">
-              <CourseCatalogPage />
-            </ProtectedRoute>
-          }
-        />
+      <Route
+  path={ROUTES.NOTIFICATIONS}
+  element={
+    <ProtectedRoute requiredRole="learner">
+      <NotificationsPage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path={ROUTES.TRAINER_NOTIFICATIONS}
+  element={
+    <ProtectedRoute requiredRole="trainer">
+      <NotificationsPage />
+    </ProtectedRoute>
+  }
+/>
         <Route
           path="/courses/:slug"
           element={
@@ -309,6 +323,51 @@ function App() {
               <LiveSessionDetailPage />
             </ProtectedRoute>
           }
+        />
+        {/* ===== ADMIN ROUTES ===== */}
+        <Route
+          path={ROUTES.ADMIN_DASHBOARD}
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_REVENUE}
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminRevenuePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_USERS}
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminUsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_COURSES}
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_LOGIN}
+          element={
+            <AdminLoginPage />
+          }
+        />
+        <Route
+        path={ROUTES.ADMIN_SETTINGS}
+        element={
+          <AdminSettingsPage />
+        }
         />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />

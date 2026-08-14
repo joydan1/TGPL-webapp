@@ -26,19 +26,19 @@ export const ASSIGN_TRAINER_MODAL_CSS = `
 
   .at-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; max-height: 260px; overflow-y: auto; }
   .at-option { display: flex; align-items: center; gap: 0.7rem; border: 1.5px solid #E5E7EB; border-radius: 0.85rem; padding: 0.65rem 0.85rem; cursor: pointer; }
-  .at-option.selected { border-color: #2563EB; background: #EFF6FF; }
+  .at-option.selected { border-color: #2492EB; background: #EFF6FF; }
   .at-option-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
   .at-option-text { flex: 1; min-width: 0; }
   .at-option-name { margin: 0; font-size: 0.86rem; font-weight: 700; color: #111827; }
   .at-option-role { margin: 0; font-size: 0.76rem; color: #9CA3AF; }
   .at-option-current { font-size: 0.7rem; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.02em; flex-shrink: 0; }
-  .at-option-check { width: 22px; height: 22px; border-radius: 50%; background: #2563EB; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .at-option-check { width: 22px; height: 22px; border-radius: 50%; background: #2492EB; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .at-empty { padding: 1.5rem; text-align: center; color: #9CA3AF; font-size: 0.85rem; }
 
   .at-actions { display: flex; gap: 0.6rem; }
   .at-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .at-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
-  .at-btn.confirm { border: none; background: #2563EB; color: #fff; }
+  .at-btn.confirm { border: none; background: #2492EB; color: #fff; }
   .at-btn.confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 `
 

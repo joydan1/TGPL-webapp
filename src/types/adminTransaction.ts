@@ -70,7 +70,7 @@ function successfulDetail(overrides: Partial<TransactionDetail>): TransactionDet
     method: 'card',
     learner_name: '',
     learner_email: '',
-    learner_avatar_color: '#2563EB',
+    learner_avatar_color: '#2968f0',
     enrollment_state: 'enrolled',
     course_title: '',
     gateway: 'Paystack',

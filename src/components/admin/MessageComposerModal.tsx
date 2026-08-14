@@ -11,11 +11,11 @@ export const MESSAGE_MODAL_CSS = `
   .mc-sub { margin: 0.2rem 0 0; font-size: 0.82rem; color: #9CA3AF; }
   .mc-close { border: none; background: none; cursor: pointer; color: #9CA3AF; padding: 0.2rem; }
   .mc-textarea { width: 100%; min-height: 120px; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.85rem; font-size: 0.9rem; font-family: inherit; resize: vertical; margin-bottom: 1.25rem; }
-  .mc-textarea:focus { outline: none; border-color: #2563EB; }
+  .mc-textarea:focus { outline: none; border-color: #2492EB; }
   .mc-actions { display: flex; gap: 0.6rem; }
   .mc-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .mc-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
-  .mc-btn.send { border: none; background: #2563EB; color: #fff; }
+  .mc-btn.send { border: none; background: #2492EB; color: #fff; }
   .mc-btn.send:disabled { opacity: 0.5; cursor: not-allowed; }
 `
 
