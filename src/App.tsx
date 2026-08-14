@@ -20,6 +20,7 @@ import OnboardingPage from './pages/app/OnboardingPage'
 import EmailVerificationPage from './pages/auth/EmailVerificationPage'
 import DashboardPage from './pages/app/DashboardPage'
 import CertificatesPage from './pages/app/CertificatesPage'
+import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
 import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
@@ -267,6 +268,14 @@ function App() {
     </ProtectedRoute>
   }
 />
+        <Route
+          path={ROUTES.COURSES}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <CourseCatalogPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/courses/:slug"
           element={

@@ -3,7 +3,7 @@ import {
   Plus, Search, MoreVertical, Layers, Globe, Pencil, TrendingUp,
   Eye, Tag, UserCog, Archive, Trash2,
 } from 'lucide-react'
-//import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import AdminShell from '../../layouts/AdminShell'
 import { type CourseSummary, type CourseStatus, type CatalogStats, type CourseTrainer } from '../../types/adminCourse'
 import CourseDetailModal, { COURSE_DETAIL_MODAL_CSS } from '../../components/admin/CourseDetailModal'
@@ -16,7 +16,6 @@ import AssignTrainerModal, { ASSIGN_TRAINER_MODAL_CSS } from '../../components/a
 
 // TODO: swap for adminCoursesAPI.listCourses() once GET /api/v1/admin/courses/
 // exists. Shape is kept API-ready so the swap is a drop-in replacement.
-//const navigate = useNavigate()
 
 const MOCK_COURSES: CourseSummary[] = [
   {
@@ -166,6 +165,7 @@ const ROW_MENU_WIDTH = 190
 const ROW_MENU_MARGIN = 8
 
 export default function AdminCoursesPage() {
+  const navigate = useNavigate()
   const [courses, setCourses] = useState<CourseSummary[]>(MOCK_COURSES)
   const [statusFilter, setStatusFilter] = useState<'all' | CourseStatus>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -461,15 +461,15 @@ export default function AdminCoursesPage() {
       )}
 
       {viewingCourse && (
-        <CourseDetailModal
-          course={viewingCourse}
-          onClose={() => setViewingCourse(null)}
-          onEdit={() => console.log('Edit course', viewingCourse.id)}
-          onSetPrice={() => { setPricingCourse(viewingCourse); setViewingCourse(null) }}
-          onArchive={() => { setArchivingCourse(viewingCourse); setViewingCourse(null) }}
-          onDelete={() => { setDeletingCourse(viewingCourse); setViewingCourse(null) }}
-        />
-      )}
+  <CourseDetailModal
+    course={viewingCourse}
+    onClose={() => setViewingCourse(null)}
+    onEdit={() => navigate(`/admin/courses/${viewingCourse.id}/edit`)}
+    onSetPrice={() => { setPricingCourse(viewingCourse); setViewingCourse(null) }}
+    onArchive={() => { setArchivingCourse(viewingCourse); setViewingCourse(null) }}
+    onDelete={() => { setDeletingCourse(viewingCourse); setViewingCourse(null) }}
+  />
+)}
 
       {pricingCourse && (
         <SetPriceModal
