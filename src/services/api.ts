@@ -266,7 +266,7 @@ export const apiClient = new ApiClient()
 
 // ─── Error parser helper ──────────────────────────────────────────────────────
 
-function parseApiError(error: unknown, fallback: string): { message: string; statusCode?: number; code?: string } {
+export function parseApiError(error: unknown, fallback: string): { message: string; statusCode?: number; code?: string } {
   const err = error as AxiosError<ApiErrorResponse>
   const data = err.response?.data
   const statusCode = err.response?.status
@@ -1331,6 +1331,7 @@ export interface CourseLesson {
   title: string
   body?: string | null
   duration_seconds?: number
+  duration_display?: string
   is_preview?: boolean
   order: number
   video_key?: string | null
@@ -1996,10 +1997,22 @@ export const assignmentsAPI = {
     | { success: false; error: string; statusCode?: number }
   > => {
     try {
-      if (files.length > requirements.length) {
+      const resolvedRequirements = requirements.length > 0
+        ? requirements
+        : [{
+            id: 'default-submission-slot',
+            label: 'Submission file',
+            allowed_file_types: 'pdf,docx',
+            max_bytes: 20 * 1024 * 1024,
+            required: true,
+            order: 1,
+            naming_hint: 'Use your name and assignment title in the filename.',
+          } as AssignmentRequirement]
+
+      if (files.length > resolvedRequirements.length) {
         return {
           success: false as const,
-          error: `Too many files — this assignment only accepts ${requirements.length} file(s).`,
+          error: `Too many files — this assignment only accepts ${resolvedRequirements.length} file(s).`,
         }
       }
 
@@ -2009,17 +2022,21 @@ export const assignmentsAPI = {
       )
       const submissionId = attemptRes.data.id
 
-      // Step 2 — presign → upload → confirm per file, auto-mapped to requirements in order
+      // Step 2 — presign → upload → confirm per file, auto-mapped to requirements in order.
+      // Some assignments legitimately have no requirement slots; in that case the backend rejects
+      // a fake/placeholder requirement_id, so we must omit it completely instead of sending null.
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const requirementId = requirements[i].id
+        const requirement = resolvedRequirements[i] ?? resolvedRequirements[0]
+        const requirementId = requirement?.id ?? null
+        const shouldIncludeRequirementId = Boolean(requirementId && requirementId !== 'default-submission-slot')
 
         try {
           // 2a. presign
           const presignRes = await apiClient.post<PresignResponse>(
             `/v1/assignments/submissions/${submissionId}/files/presign/`,
             {
-              requirement_id: requirementId,
+              ...(shouldIncludeRequirementId ? { requirement_id: requirementId } : {}),
               filename: file.name,
               content_type: file.type || 'application/octet-stream',
               file_size: file.size,
@@ -2047,7 +2064,7 @@ export const assignmentsAPI = {
           await apiClient.post(
             `/v1/assignments/submissions/${submissionId}/files/confirm/`,
             {
-              requirement_id: requirementId,
+              ...(shouldIncludeRequirementId ? { requirement_id: requirementId } : {}),
               object_key,
               file_name: file.name,
               file_size: file.size,
@@ -2093,15 +2110,34 @@ export const assignmentsAPI = {
 }
 
 // ─── Trainer Assignments Types ─────────────────────────────────────────────
-// Backend guide: "Trainer Assignment Management — Implementation Guide",
-// 1 Aug 2026. 5 endpoints under /v1/trainer/courses/<slug>/assignments/.
 
-export interface TrainerRubricCriterion {
-  weight: number
-  description: string
+
+export interface TrainerGradingCriterion {
+  label: string
+  max_points: number
 }
 
-export type TrainerRubric = Record<string, TrainerRubricCriterion>
+export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
+  instructions: string
+  grading_criteria: TrainerGradingCriterion[]
+  max_attempts: number
+  accept_late: boolean
+  created_by: string
+}
+
+export interface CreateTrainerAssignmentPayload {
+  module_id: string
+  title: string
+  instructions?: string
+  deadline: string
+  max_attempts: number
+  accept_late: boolean
+  grading_criteria?: TrainerGradingCriterion[]
+  is_final?: boolean
+  order: number
+}
+
+export type UpdateTrainerAssignmentPayload = Partial<CreateTrainerAssignmentPayload>
 
 export interface TrainerAssignmentModuleRef {
   id: string
@@ -2126,8 +2162,32 @@ export interface TrainerAssignmentListItem {
 export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
   description: string
   instructions: string
-  rubric: TrainerRubric
+  requirements?: CreateAssignmentRequirementPayload[]
   created_by: string
+}
+
+export interface CreateAssignmentRequirementPayload {
+  label: string
+  allowed_file_types: string
+  max_bytes: number
+  required: boolean
+  order: number
+  naming_hint: string
+}
+
+export interface TrainerAssignmentResource {
+  id: string
+  title: string
+  resource_type: 'template' | 'worksheet' | 'slides' | 'document' | 'other'
+  file_format: string | null
+  file_size: number
+  created_at: string
+}
+
+export interface CreateAssignmentResourcePayload {
+  title: string
+  file: File
+  resource_type?: 'template' | 'worksheet' | 'slides' | 'document' | 'other'
 }
 
 export interface CreateTrainerAssignmentPayload {
@@ -2137,12 +2197,12 @@ export interface CreateTrainerAssignmentPayload {
   instructions?: string
   deadline: string
   is_final?: boolean
-  rubric?: TrainerRubric
+  max_attempts: number
+  accept_late: boolean
+  grading_criteria?: TrainerGradingCriterion[]
+  order: number
+  
 }
-
-export type UpdateTrainerAssignmentPayload = Partial<CreateTrainerAssignmentPayload>
-
-// ─── Trainer Assignments API ───────────────────────────────────────────────
 
 export const trainerAssignmentsAPI = {
   /** GET /v1/trainer/courses/{slug}/assignments/ */
@@ -2251,6 +2311,109 @@ export const trainerAssignmentsAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
+
+  /** POST /v1/trainer/courses/{slug}/assignments/{id}/requirements/
+   *  Must be called AFTER the assignment exists — requirements are
+   *  per-slot rows keyed to assignmentId, not a field on assignment create/update. */
+  createRequirement: async (
+    courseSlug: string,
+    assignmentId: string,
+    payload: CreateAssignmentRequirementPayload,
+  ) => {
+    try {
+      const response = await apiClient.post<CreateAssignmentRequirementPayload & { id: string }>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/requirements/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to save a submission requirement')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/trainer/courses/{slug}/assignments/{id}/requirements/ */
+  listRequirements: async (courseSlug: string, assignmentId: string) => {
+    try {
+      const response = await apiClient.get<(CreateAssignmentRequirementPayload & { id: string })[]>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/requirements/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load submission requirements')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** PATCH /v1/trainer/courses/{slug}/assignments/{id}/requirements/{requirement_id}/ */
+  updateRequirement: async (
+    courseSlug: string,
+    assignmentId: string,
+    requirementId: string,
+    payload: Partial<CreateAssignmentRequirementPayload>,
+  ) => {
+    try {
+      const response = await apiClient.patch<CreateAssignmentRequirementPayload & { id: string }>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/requirements/${requirementId}/`,
+        payload,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update a submission requirement')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** POST /v1/trainer/courses/{slug}/assignments/{id}/resources/ — direct
+   *  multipart upload (not presign/confirm — the file goes in this request). */
+  createResource: async (
+    courseSlug: string,
+    assignmentId: string,
+    payload: CreateAssignmentResourcePayload,
+  ) => {
+    try {
+      const formData = new FormData()
+      formData.append('title', payload.title)
+      formData.append('file', payload.file)
+      if (payload.resource_type) formData.append('resource_type', payload.resource_type)
+
+      const response = await apiClient.post<TrainerAssignmentResource>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/resources/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to upload a resource')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** GET /v1/trainer/courses/{slug}/assignments/{id}/resources/ */
+  listResources: async (courseSlug: string, assignmentId: string) => {
+    try {
+      const response = await apiClient.get<TrainerAssignmentResource[]>(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/resources/`,
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load resources')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** DELETE /v1/trainer/courses/{slug}/assignments/{id}/resources/{resource_id}/ */
+  deleteResource: async (courseSlug: string, assignmentId: string, resourceId: string) => {
+    try {
+      await apiClient.delete(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/resources/${resourceId}/`,
+      )
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to remove a resource')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
 }
 
 export interface ApiNotification {
@@ -2281,7 +2444,7 @@ interface NotificationListResponse {
 // ─── Notifications API ───────────────────────────────────────────────────────
 
 export const notificationsAPI = {
-  /** GET /v1/learner/notifications/ */
+  /** GET /v1/notifications/ */
   list: async (params?: NotificationListParams) => {
     try {
       const query = new URLSearchParams()
@@ -2293,7 +2456,7 @@ export const notificationsAPI = {
       const qs = query.toString()
 
       const response = await apiClient.get<NotificationListResponse>(
-        `/v1/learner/notifications/${qs ? `?${qs}` : ''}`,
+        `/v1/notifications/${qs ? `?${qs}` : ''}`,
       )
       return {
         success: true as const,
@@ -2307,12 +2470,23 @@ export const notificationsAPI = {
     }
   },
 
-  /** PATCH /v1/learner/notifications/<id>/ */
+  /** GET /v1/notifications/unread-count/ */
+  getUnreadCount: async () => {
+    try {
+      const response = await apiClient.get<{ unread_count: number }>(`/v1/notifications/unread-count/`)
+      return { success: true as const, count: response.data.unread_count ?? 0 }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load unread notification count')
+      return { success: false as const, error: message, statusCode, count: 0 }
+    }
+  },
+
+  /** POST /v1/notifications/{notification_id}/read/ */
   markRead: async (id: string) => {
     try {
-      const response = await apiClient.patch<ApiNotification>(
-        `/v1/learner/notifications/${id}/`,
-        { is_read: true },
+      const response = await apiClient.post<ApiNotification>(
+        `/v1/notifications/${id}/read/`,
+        {},
       )
       return { success: true as const, data: response.data }
     } catch (error) {
@@ -2321,11 +2495,11 @@ export const notificationsAPI = {
     }
   },
 
-  /** PATCH /v1/learner/notifications/mark-all-read/ */
+  /** POST /v1/notifications/read-all/ */
   markAllRead: async () => {
     try {
-      const response = await apiClient.patch<{ marked_count: number }>(
-        `/v1/learner/notifications/mark-all-read/`,
+      const response = await apiClient.post<{ marked_count: number }>(
+        `/v1/notifications/read-all/`,
         {},
       )
       return { success: true as const, data: response.data }

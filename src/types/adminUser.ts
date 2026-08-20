@@ -1,4 +1,4 @@
-export type UserRole = 'learner' | 'trainer' | 'admin'
+export type UserRole = 'Learner' | 'Trainer' | 'Admin Asst' | 'Super Admin'
 export type UserStatus = 'active' | 'inactive'
 
 export interface AdminUser {
@@ -15,7 +15,7 @@ export interface AdminUser {
 
 export interface ActivityEntry {
   id: string
-  icon: 'book' | 'star' | 'check'
+  icon: 'book' | 'star' | 'check'| 'upload' | 'message' | 'calendar' | 'bell'
   title: string
   time_ago: string
 }
@@ -46,9 +46,7 @@ export interface TrainerProfileStats {
   recent_activity: ActivityEntry[]
 }
 
-// TODO: replace both of these with adminUsersAPI.getUserDetail(id) once
-// GET /api/v1/admin/users/{id}/ (or similar) exists. Kept deterministic per
-// user id so the demo data doesn't jump around between renders.
+
 
 export function getMockLearnerStats(_user: AdminUser): LearnerProfileStats {
   return {

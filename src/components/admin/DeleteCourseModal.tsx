@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Trash2, BookOpen } from 'lucide-react'
-import type { CourseSummary } from '../../types/adminCourse'
+import { Trash2, BookOpen, AlertCircle } from 'lucide-react'
+import type { AdminCourseRow } from '../../types/adminCourse'
 
 export const DELETE_COURSE_MODAL_CSS = `
   .dc-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1100; padding: 1rem; }
@@ -27,6 +27,9 @@ export const DELETE_COURSE_MODAL_CSS = `
   .dc-confirm-input { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; }
   .dc-confirm-input:focus { outline: none; border-color: #EF4444; }
 
+  .dc-error { display: flex; align-items: flex-start; gap: 0.5rem; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.82rem; line-height: 1.45; margin-bottom: 1.25rem; }
+  .dc-error svg { flex-shrink: 0; margin-top: 0.1rem; }
+
   .dc-actions { display: flex; gap: 0.6rem; }
   .dc-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .dc-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
@@ -42,14 +45,18 @@ const CONSEQUENCES = [
 ]
 
 interface DeleteCourseModalProps {
-  course: CourseSummary
+  course: AdminCourseRow
   onClose: () => void
   onConfirm: () => void
+  error?: string | null
+  submitting?: boolean
 }
 
-export default function DeleteCourseModal({ course, onClose, onConfirm }: DeleteCourseModalProps) {
+export default function DeleteCourseModal({
+  course, onClose, onConfirm, error = null, submitting = false,
+}: DeleteCourseModalProps) {
   const [confirmText, setConfirmText] = useState('')
-  const canDelete = confirmText === 'Delete'
+  const canDelete = confirmText === 'Delete' && !submitting
 
   function handleConfirm() {
     if (!canDelete) return
@@ -77,7 +84,10 @@ export default function DeleteCourseModal({ course, onClose, onConfirm }: Delete
             </div>
             <div>
               <p className="dc-course-title">{course.title}</p>
-              <p className="dc-course-sub">{course.category} · {course.enrolled} enrolled</p>
+              {/* AdminCourseRow (list row) has no `category` field — that
+                  only exists on the full detail response. Using
+                  enrollment_count here instead, which is on the row. */}
+              <p className="dc-course-sub">{course.enrollment_count} enrolled</p>
             </div>
           </div>
 
@@ -102,12 +112,19 @@ export default function DeleteCourseModal({ course, onClose, onConfirm }: Delete
             autoComplete="off"
           />
 
+          {error && (
+            <div className="dc-error">
+              <AlertCircle size={15} />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="dc-actions">
-            <button className="dc-btn cancel" onClick={onClose} type="button">
+            <button className="dc-btn cancel" onClick={onClose} type="button" disabled={submitting}>
               Cancel
             </button>
             <button className="dc-btn confirm" onClick={handleConfirm} disabled={!canDelete} type="button">
-              <Trash2 size={15} /> Delete permanently
+              <Trash2 size={15} /> {submitting ? 'Deleting…' : 'Delete permanently'}
             </button>
           </div>
         </div>

@@ -1,60 +1,20 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react'
 import {
   Plus, Search, MoreVertical, Layers, Globe, Pencil, TrendingUp,
-  Eye, Tag, UserCog, Archive, Trash2,
+  Eye, Tag, UserCog, Archive, Trash2, AlertCircle, X as XIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AdminShell from '../../layouts/AdminShell'
-import { type CourseSummary, type CourseStatus, type CatalogStats, type CourseTrainer } from '../../types/adminCourse'
+import {
+  type AdminCourseRow, type CourseStatus, type CatalogStats,
+  type ArchiveCoursePayload,
+} from '../../types/adminCourse'
+import { adminCoursesAPI } from '../../services/adminCoursesApi'
 import CourseDetailModal, { COURSE_DETAIL_MODAL_CSS } from '../../components/admin/CourseDetailModal'
 import SetPriceModal, { SET_PRICE_MODAL_CSS } from '../../components/admin/SetPriceModal'
 import ArchiveCourseModal, { ARCHIVE_COURSE_MODAL_CSS } from '../../components/admin/ArchiveCourseModal'
 import DeleteCourseModal, { DELETE_COURSE_MODAL_CSS } from '../../components/admin/DeleteCourseModal'
 import AssignTrainerModal, { ASSIGN_TRAINER_MODAL_CSS } from '../../components/admin/AssignTrainerModal'
-
-// ─── Mock data ─────────────────────────────────────────────────────────────
-
-// TODO: swap for adminCoursesAPI.listCourses() once GET /api/v1/admin/courses/
-// exists. Shape is kept API-ready so the swap is a drop-in replacement.
-
-const MOCK_COURSES: CourseSummary[] = [
-  {
-    id: 'c1',
-    title: 'Introductory Course Video',
-    subtitle: 'Welcome video · updated 1 week ago',
-    category: 'Onboarding',
-    trainer: { id: 't1', name: 'Enobong Okposin', role: 'Lead Trainer · Leadership', avatar_color: '#059669' },
-    price: null,
-    status: 'published',
-    enrolled: 980,
-    revenue: 0,
-    updated_at: '1 week ago',
-  },
-  {
-    id: 'c2',
-    title: 'Project management Course',
-    subtitle: 'Leadership · updated 1 week ago',
-    category: 'Leadership',
-    trainer: { id: 't1', name: 'Enobong Okposin', role: 'Lead Trainer · Leadership', avatar_color: '#059669' },
-    price: 49999,
-    status: 'published',
-    enrolled: 980,
-    revenue: 73_500_000,
-    updated_at: '1 week ago',
-  },
-]
-
-// Note: the stat cards below come from a separate mock summary object, so they
-// currently show 12 total / 7 published / 3 draft / ₦369.0M — while the table
-// only has these 2 seeded rows ("Showing 2 of 2"). That mismatch is in the
-// original design too; worth deciding whether the cards should be derived
-// from the actual course list once real data is wired in.
-const MOCK_STATS: CatalogStats = {
-  total_courses: 12,
-  published: 7,
-  draft: 3,
-  total_revenue: 369_000_000,
-}
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 
@@ -64,12 +24,16 @@ const PAGE_CSS = `
   .cc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
   .cc-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #111827; }
   .cc-subtitle { margin: 0.25rem 0 0; color: #6B7280; font-size: 0.9rem; }
-  .cc-create-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2563EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .cc-create-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+  .cc-error-banner { display: flex; align-items: center; gap: 0.6rem; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; }
+  .cc-error-banner button { margin-left: auto; background: none; border: none; color: #B91C1C; cursor: pointer; display: flex; flex-shrink: 0; }
 
   .cc-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
   .cc-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); min-width: 0; }
   .cc-stat-icon { width: 44px; height: 44px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cc-stat-value { margin: 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
+  .cc-stat-value.loading { color: #D1D5DB; }
   .cc-stat-label { margin: 0.15rem 0 0; font-size: 0.82rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .cc-panel { background: #fff; border-radius: 1rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); overflow: hidden; }
@@ -78,16 +42,17 @@ const PAGE_CSS = `
   .cc-status-tabs { display: flex; gap: 0.4rem; background: #F9FAFB; border-radius: 0.75rem; padding: 0.3rem; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .cc-status-tabs::-webkit-scrollbar { display: none; }
   .cc-status-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-  .cc-status-tab.active { background: #2563EB; color: #fff; }
+  .cc-status-tab.active { background: #2492EB; color: #fff; }
   .cc-search-wrap { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.75rem; padding: 0.6rem 1rem; }
   .cc-search-wrap input { flex: 1; min-width: 0; background: none; border: none; outline: none; font-size: 0.875rem; color: #111; }
   .cc-search-wrap input::placeholder { color: #9CA3AF; }
 
-  .cc-table-wrap { overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
+  .cc-table-wrap { overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; position: relative; min-height: 120px; }
   .cc-table { width: 100%; border-collapse: collapse; min-width: 900px; }
   .cc-table th { text-align: left; font-size: 0.72rem; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.75rem 1.25rem; border-top: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6; background: #FAFAFA; }
   .cc-table td { padding: 0.9rem 1.25rem; border-bottom: 1px solid #F3F4F6; font-size: 0.875rem; color: #111827; vertical-align: middle; }
   .cc-table tr:last-child td { border-bottom: none; }
+  .cc-table tr.pending { opacity: 0.5; pointer-events: none; }
 
   .cc-course-cell { display: flex; align-items: center; gap: 0.7rem; }
   .cc-course-icon { width: 38px; height: 38px; border-radius: 0.6rem; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -99,8 +64,8 @@ const PAGE_CSS = `
 
   .cc-status-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px; white-space: nowrap; }
   .cc-status-dot { width: 6px; height: 6px; border-radius: 50%; }
-  .cc-status-badge.published { background: #ECFDF5; color: #059669; }
-  .cc-status-badge.published .cc-status-dot { background: #059669; }
+  .cc-status-badge.published { background: #F0FDF4; color: #10B981; border: 1px solid #BBF7D0; }
+.cc-status-badge.published .cc-status-dot { background: #10B981; }
   .cc-status-badge.draft { background: #FEF3C7; color: #D97706; }
   .cc-status-badge.draft .cc-status-dot { background: #D97706; }
   .cc-status-badge.archived { background: #F3F4F6; color: #6B7280; }
@@ -112,6 +77,7 @@ const PAGE_CSS = `
   .cc-row-menu { position: fixed; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 190px; padding: 0.4rem; z-index: 200; text-align: left; }
   .cc-row-menu-item { display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.6rem 0.7rem; border-radius: 0.55rem; border: none; background: none; font-size: 0.85rem; font-weight: 500; color: #374151; cursor: pointer; text-align: left; }
   .cc-row-menu-item:hover { background: #F9FAFB; }
+  .cc-row-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
   .cc-row-menu-item.danger { color: #DC2626; }
   .cc-row-menu-item.danger:hover { background: #FEF2F2; }
   .cc-row-menu-divider { height: 1px; background: #F3F4F6; margin: 0.3rem 0.2rem; }
@@ -119,9 +85,14 @@ const PAGE_CSS = `
 
   .cc-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; flex-wrap: wrap; }
   .cc-footer-text { font-size: 0.82rem; color: #6B7280; }
-  .cc-page-pill { width: 30px; height: 30px; border-radius: 0.5rem; background: #2563EB; color: #fff; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; }
+  .cc-pagination { display: flex; align-items: center; gap: 0.5rem; }
+  .cc-page-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; font-size: 0.8rem; font-weight: 600; border-radius: 0.5rem; padding: 0.4rem 0.8rem; cursor: pointer; }
+  .cc-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .cc-page-pill { min-width: 30px; height: 30px; padding: 0 0.5rem; border-radius: 0.5rem; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; }
+
 
   .cc-empty { padding: 3rem 1.25rem; text-align: center; color: #9CA3AF; font-size: 0.9rem; }
+  .cc-loading-row td { color: #9CA3AF; text-align: center; padding: 2.5rem 1.25rem; }
 
   @media (max-width: 900px) {
     .cc-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -132,6 +103,7 @@ const PAGE_CSS = `
     .cc-create-btn { width: 100%; }
     .cc-toolbar { flex-direction: column; align-items: stretch; }
     .cc-search-wrap { flex-basis: auto; }
+    .cc-footer { flex-direction: column; align-items: flex-start; }
   }
   @media (max-width: 420px) {
     .cc-stats-grid { grid-template-columns: 1fr; }
@@ -140,18 +112,23 @@ const PAGE_CSS = `
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-//function handleCreateCourse() {
- // navigate('/admin/courses/new')
-
-//}
 function initials(name: string) {
   return name.split(' ').map((p) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
 }
 
-function formatMoney(n: number) {
-  if (n >= 1_000_000) return `₦${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `₦${(n / 1_000).toFixed(1)}K`
-  return n === 0 ? 'Nil' : `₦${n}`
+// price_kobo / revenue_kobo are in kobo (1 naira = 100 kobo) per the live
+// schema — everything downstream must convert before formatting.
+function formatNaira(kobo: number) {
+  const naira = kobo / 100
+  if (naira >= 1_000_000) return `₦${(naira / 1_000_000).toFixed(1)}M`
+  if (naira >= 1_000) return `₦${(naira / 1_000).toFixed(1)}K`
+  return naira === 0 ? 'Nil' : `₦${naira.toLocaleString()}`
+}
+
+function apiErrorMessage(err: unknown): string {
+  if (typeof err === 'string') return err
+  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message)
+  return 'Something went wrong. Please try again.'
 }
 
 const STATUS_TABS: { key: 'all' | CourseStatus; label: string }[] = [
@@ -163,33 +140,101 @@ const STATUS_TABS: { key: 'all' | CourseStatus; label: string }[] = [
 
 const ROW_MENU_WIDTH = 190
 const ROW_MENU_MARGIN = 8
+const PAGE_SIZE = 20
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function AdminCoursesPage() {
   const navigate = useNavigate()
-  const [courses, setCourses] = useState<CourseSummary[]>(MOCK_COURSES)
+
+  // ── List data ──
+  const [courses, setCourses] = useState<AdminCourseRow[]>([])
+  const [count, setCount] = useState(0)
+  const [next, setNext] = useState<string | null>(null)
+  const [previous, setPrevious] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
+
+  // ── Stats ──
+  const [stats, setStats] = useState<CatalogStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  // ── Filters ──
   const [statusFilter, setStatusFilter] = useState<'all' | CourseStatus>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // ── Row action state ──
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actioningSlug, setActioningSlug] = useState<string | null>(null)
+
+  // ── Row menu ──
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const menuBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
-  const [viewingCourse, setViewingCourse] = useState<CourseSummary | null>(null)
-  const [pricingCourse, setPricingCourse] = useState<CourseSummary | null>(null)
-  const [assigningCourse, setAssigningCourse] = useState<CourseSummary | null>(null)
-  const [archivingCourse, setArchivingCourse] = useState<CourseSummary | null>(null)
-  const [deletingCourse, setDeletingCourse] = useState<CourseSummary | null>(null)
+  // ── Modals ──
+  const [viewingCourse, setViewingCourse] = useState<AdminCourseRow | null>(null)
+  const [pricingCourse, setPricingCourse] = useState<AdminCourseRow | null>(null)
+  const [assigningCourse, setAssigningCourse] = useState<AdminCourseRow | null>(null)
+  const [archivingCourse, setArchivingCourse] = useState<AdminCourseRow | null>(null)
+  const [deletingCourse, setDeletingCourse] = useState<AdminCourseRow | null>(null)
 
-  const filteredCourses = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return courses.filter((c) => {
-      const matchesStatus = statusFilter === 'all' || c.status === statusFilter
-      const matchesSearch = !q || c.title.toLowerCase().includes(q) || c.trainer.name.toLowerCase().includes(q)
-      return matchesStatus && matchesSearch
+  // Debounce search input → debouncedSearch, and reset to page 1 whenever
+  // the effective query (search or status) changes.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, statusFilter])
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true)
+    const res = await adminCoursesAPI.aggregateCatalogStats()
+    if (res.success) {
+      setStats(res.data)
+    } else {
+      // Stats failing shouldn't block the table — just leave tiles blank.
+      setStats(null)
+    }
+    setStatsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
+
+  useEffect(() => {
+    let cancelled = false
+    setListLoading(true)
+    setListError(null)
+
+    adminCoursesAPI.listCourses({
+      page,
+      page_size: PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+    }).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        setCourses(res.data.results)
+        setCount(res.data.count)
+        setNext(res.data.next)
+        setPrevious(res.data.previous)
+      } else {
+        setListError(apiErrorMessage(res.error))
+      }
+      setListLoading(false)
     })
-  }, [courses, statusFilter, searchQuery])
 
-  // Close the row menu on scroll/resize so it never floats away from its
-  // trigger button — it's `position: fixed` and computed once on open.
+    return () => { cancelled = true }
+  }, [page, debouncedSearch, statusFilter])
+
+  
   useEffect(() => {
     if (!openMenuId) return
     function close() {
@@ -204,13 +249,43 @@ export default function AdminCoursesPage() {
     }
   }, [openMenuId])
 
-  function toggleRowMenu(id: string) {
-    if (openMenuId === id) {
+  // Flip the row menu above its button (or clamp to viewport) if it doesn't
+  // fit below — fixes menus near the bottom of the page getting clipped.
+  useLayoutEffect(() => {
+    if (!openMenuId || !menuPos) return
+    const btn = menuBtnRefs.current[openMenuId]
+    const menuEl = menuRef.current
+    if (!btn || !menuEl) return
+
+    const btnRect = btn.getBoundingClientRect()
+    const menuHeight = menuEl.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - btnRect.bottom - ROW_MENU_MARGIN
+    const spaceAbove = btnRect.top - ROW_MENU_MARGIN
+
+    let top: number
+    if (menuHeight <= spaceBelow) {
+      top = btnRect.bottom + 6
+    } else if (menuHeight <= spaceAbove) {
+      top = btnRect.top - menuHeight - 6
+    } else {
+      top = spaceBelow >= spaceAbove
+        ? Math.max(ROW_MENU_MARGIN, window.innerHeight - menuHeight - ROW_MENU_MARGIN)
+        : ROW_MENU_MARGIN
+    }
+
+    if (Math.abs(top - menuPos.top) > 0.5) {
+      setMenuPos((prev) => (prev ? { ...prev, top } : prev))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openMenuId, menuPos?.left])
+
+  function toggleRowMenu(slug: string) {
+    if (openMenuId === slug) {
       setOpenMenuId(null)
       setMenuPos(null)
       return
     }
-    const btn = menuBtnRefs.current[id]
+    const btn = menuBtnRefs.current[slug]
     if (btn) {
       const rect = btn.getBoundingClientRect()
       const left = Math.min(
@@ -219,7 +294,7 @@ export default function AdminCoursesPage() {
       )
       setMenuPos({ top: rect.bottom + 6, left: Math.max(ROW_MENU_MARGIN, left) })
     }
-    setOpenMenuId(id)
+    setOpenMenuId(slug)
   }
 
   function closeRowMenu() {
@@ -227,55 +302,98 @@ export default function AdminCoursesPage() {
     setMenuPos(null)
   }
 
-  function handleViewCourse(course: CourseSummary) {
+  function handleViewCourse(course: AdminCourseRow) {
     closeRowMenu()
     setViewingCourse(course)
   }
 
-  function handleSetPrice(course: CourseSummary) {
+  function handleSetPrice(course: AdminCourseRow) {
     closeRowMenu()
     setPricingCourse(course)
   }
 
-  function handleAssignTrainer(course: CourseSummary) {
+  function handleAssignTrainer(course: AdminCourseRow) {
     closeRowMenu()
     setAssigningCourse(course)
   }
 
-  function handleArchive(course: CourseSummary) {
+  function handleArchive(course: AdminCourseRow) {
     closeRowMenu()
     setArchivingCourse(course)
   }
 
-  function handleDelete(course: CourseSummary) {
+  function handleDelete(course: AdminCourseRow) {
     closeRowMenu()
     setDeletingCourse(course)
   }
 
-  function applyPriceChange(courseId: string, newPrice: number | null) {
-    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, price: newPrice } : c)))
+  async function confirmSetPrice(course: AdminCourseRow, priceKobo: number | null) {
+    setActioningSlug(course.slug)
+    setActionError(null)
+    const res = await adminCoursesAPI.updateCourse(course.slug, {
+      is_free: priceKobo === null,
+      price_kobo: priceKobo ?? 0,
+    })
+    setActioningSlug(null)
+    if (res.success) {
+      setCourses((prev) => prev.map((c) => (c.slug === course.slug ? { ...c, ...res.data } : c)))
+      setPricingCourse(null)
+    } else {
+      setActionError(apiErrorMessage(res.error))
+    }
   }
 
-  function applyTrainerChange(courseId: string, trainer: CourseTrainer) {
-    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, trainer } : c)))
+  async function confirmArchive(course: AdminCourseRow, payload: ArchiveCoursePayload) {
+    setActioningSlug(course.slug)
+    setActionError(null)
+    const res = await adminCoursesAPI.archiveCourse(course.slug, payload)
+    setActioningSlug(null)
+    if (res.success) {
+      setCourses((prev) => prev.map((c) => (c.slug === course.slug ? { ...c, ...res.data } : c)))
+      setArchivingCourse(null)
+      fetchStats()
+    } else {
+      
+      setActionError(apiErrorMessage(res.error))
+    }
   }
 
-  function applyArchive(courseId: string) {
-    // TODO: call adminCoursesAPI.setCourseStatus(courseId, 'archived') once the endpoint exists
-    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, status: 'archived' } : c)))
+  async function confirmDelete(course: AdminCourseRow) {
+    setActioningSlug(course.slug)
+    setActionError(null)
+    const res = await adminCoursesAPI.deleteCourse(course.slug)
+    setActioningSlug(null)
+    if (res.success) {
+      setCourses((prev) => prev.filter((c) => c.slug !== course.slug))
+      setCount((prev) => Math.max(0, prev - 1))
+      setDeletingCourse(null)
+      fetchStats()
+    } else {
+     
+      setActionError(apiErrorMessage(res.error))
+    }
   }
 
-  function applyDelete(courseId: string) {
-    // TODO: call adminCoursesAPI.deleteCourse(courseId) once the endpoint exists
-    setCourses((prev) => prev.filter((c) => c.id !== courseId))
+  async function confirmAssignTrainer(course: AdminCourseRow, trainerId: string) {
+    setActioningSlug(course.slug)
+    setActionError(null)
+    const res = await adminCoursesAPI.assignTrainer(course.slug, trainerId)
+    setActioningSlug(null)
+    if (res.success) {
+      setCourses((prev) => prev.map((c) => (c.slug === course.slug ? { ...c, ...res.data } : c)))
+      setAssigningCourse(null)
+    } else {
+      setActionError(apiErrorMessage(res.error))
+    }
   }
 
-  function handleCreateCourse() {
-    // TODO: open create-course flow — out of scope for now
-    console.log('Create course clicked')
-  }
+function handleCreateCourse() {
+  navigate('/admin/courses/create')
+}
 
-  const openCourse = filteredCourses.find((c) => c.id === openMenuId) ?? null
+  const openCourse = courses.find((c) => c.slug === openMenuId) ?? null
+  const pageStart = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const pageEnd = Math.min(page * PAGE_SIZE, count)
 
   return (
     <AdminShell>
@@ -288,39 +406,57 @@ export default function AdminCoursesPage() {
         <div className="cc-header">
           <div>
             <h1 className="cc-title">Course Catalog</h1>
-            <p className="cc-subtitle">{courses.length} Course{courses.length === 1 ? '' : 's'} / 1 Category</p>
+            <p className="cc-subtitle">{count} course{count === 1 ? '' : 's'}</p>
           </div>
           <button className="cc-create-btn" type="button" onClick={handleCreateCourse}>
             <Plus size={17} /> Create course
           </button>
         </div>
 
+        {actionError && (
+          <div className="cc-error-banner">
+            <AlertCircle size={16} />
+            <span>{actionError}</span>
+            <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss">
+              <XIcon size={14} />
+            </button>
+          </div>
+        )}
+
         <div className="cc-stats-grid">
           <div className="cc-stat-card">
-            <div className="cc-stat-icon" style={{ background: '#DBEAFE' }}><Layers size={20} color="#2563EB" /></div>
+            <div className="cc-stat-icon" style={{ background: '#E9F5FF' }}>
+  <Layers size={20} color="#2492EB" />
+</div>
             <div>
-              <p className="cc-stat-value">{MOCK_STATS.total_courses}</p>
+              <p className={`cc-stat-value${statsLoading ? ' loading' : ''}`}>{statsLoading ? '—' : stats?.total_courses ?? 0}</p>
               <p className="cc-stat-label">Total courses</p>
             </div>
           </div>
           <div className="cc-stat-card">
-            <div className="cc-stat-icon" style={{ background: '#D1FAE5' }}><Globe size={20} color="#059669" /></div>
+            <div className="cc-stat-icon" style={{ background: '#F0FDF4' }}>
+  <Globe size={20} color="#10B981" />
+</div>
             <div>
-              <p className="cc-stat-value">{MOCK_STATS.published}</p>
+              <p className={`cc-stat-value${statsLoading ? ' loading' : ''}`}>{statsLoading ? '—' : stats?.published ?? 0}</p>
               <p className="cc-stat-label">Published</p>
             </div>
           </div>
           <div className="cc-stat-card">
-            <div className="cc-stat-icon" style={{ background: '#FEF3C7' }}><Pencil size={20} color="#D97706" /></div>
+            <div className="cc-stat-icon" style={{ background: '#FFF7E6' }}>
+  <Pencil size={20} color="#FE9A00" />
+</div>
             <div>
-              <p className="cc-stat-value">{MOCK_STATS.draft}</p>
+              <p className={`cc-stat-value${statsLoading ? ' loading' : ''}`}>{statsLoading ? '—' : stats?.draft ?? 0}</p>
               <p className="cc-stat-label">Draft</p>
             </div>
           </div>
           <div className="cc-stat-card">
-            <div className="cc-stat-icon" style={{ background: '#EDE9FE' }}><TrendingUp size={20} color="#7C3AED" /></div>
+           <div className="cc-stat-icon" style={{ background: '#F5F3FF' }}>
+  <TrendingUp size={20} color="#8B5CF6" />
+</div>
             <div>
-              <p className="cc-stat-value">{formatMoney(MOCK_STATS.total_revenue)}</p>
+              <p className={`cc-stat-value${statsLoading ? ' loading' : ''}`}>{statsLoading ? '—' : formatNaira(stats?.total_revenue_kobo ?? 0)}</p>
               <p className="cc-stat-label">Total revenue</p>
             </div>
           </div>
@@ -345,9 +481,9 @@ export default function AdminCoursesPage() {
               <Search size={16} color="#9CA3AF" />
               <input
                 type="text"
-                placeholder="Search courses or trainers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title, slug, or trainer email..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
           </div>
@@ -369,8 +505,16 @@ export default function AdminCoursesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCourses.map((course) => (
-                  <tr key={course.id}>
+                {listLoading && (
+                  <tr className="cc-loading-row"><td colSpan={8}>Loading courses…</td></tr>
+                )}
+
+                {!listLoading && listError && (
+                  <tr className="cc-loading-row"><td colSpan={8}>{listError}</td></tr>
+                )}
+
+                {!listLoading && !listError && courses.map((course) => (
+                  <tr key={course.slug} className={actioningSlug === course.slug ? 'pending' : ''}>
                     <td>
                       <input type="checkbox" />
                     </td>
@@ -381,37 +525,41 @@ export default function AdminCoursesPage() {
                         </div>
                         <div>
                           <div className="cc-course-title">{course.title}</div>
-                          <div className="cc-course-sub">{course.subtitle}</div>
+                          <div className="cc-course-sub">
+                            {course.completion_percentage}% avg. completion
+                            {!course.is_final_assignment_set && ' · No capstone set'}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <div className="cc-trainer-cell">
-                        <div className="cc-trainer-avatar" style={{ background: course.trainer.avatar_color }}>
-                          {initials(course.trainer.name)}
+                        <div className="cc-trainer-avatar" style={{ background: '#059669' }}>
+                          {initials(course.trainer.full_name)}
                         </div>
-                        {course.trainer.name}
+                        {course.trainer.full_name}
                       </div>
                     </td>
-                    <td>{course.price == null ? 'Free' : `₦${course.price.toLocaleString()}`}</td>
+                    <td>{course.is_free ? 'Free' : formatNaira(course.price_kobo)}</td>
                     <td>
                       <span className={`cc-status-badge ${course.status}`}>
                         <span className="cc-status-dot" />
                         {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
                       </span>
                     </td>
-                    <td>{course.enrolled}</td>
-                    <td>{formatMoney(course.revenue)}</td>
+                    <td>{course.enrollment_count}</td>
+                    <td>{formatNaira(course.revenue_kobo)}</td>
                     <td>
                       <div className="cc-row-menu-wrap">
                         <button
-                          ref={(el) => { menuBtnRefs.current[course.id] = el }}
+                          ref={(el) => { menuBtnRefs.current[course.slug] = el }}
                           className="cc-row-menu-btn"
-                          onClick={() => toggleRowMenu(course.id)}
+                          onClick={() => toggleRowMenu(course.slug)}
                           aria-label="Row actions"
                           aria-haspopup="true"
-                          aria-expanded={openMenuId === course.id}
+                          aria-expanded={openMenuId === course.slug}
                           type="button"
+                          disabled={actioningSlug === course.slug}
                         >
                           <MoreVertical size={17} />
                         </button>
@@ -422,16 +570,34 @@ export default function AdminCoursesPage() {
               </tbody>
             </table>
 
-            {filteredCourses.length === 0 && (
+            {!listLoading && !listError && courses.length === 0 && (
               <div className="cc-empty">No courses match your filters.</div>
             )}
           </div>
 
           <div className="cc-footer">
             <span className="cc-footer-text">
-              Showing {filteredCourses.length} of {courses.length} courses
+              {count === 0 ? 'No courses' : `Showing ${pageStart}–${pageEnd} of ${count} courses`}
             </span>
-            <span className="cc-page-pill">1</span>
+            <div className="cc-pagination">
+              <button
+                className="cc-page-btn"
+                type="button"
+                disabled={!previous || listLoading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span className="cc-page-pill">{page}</span>
+              <button
+                className="cc-page-btn"
+                type="button"
+                disabled={!next || listLoading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -439,7 +605,7 @@ export default function AdminCoursesPage() {
       {openMenuId && openCourse && menuPos && (
         <>
           <div className="cc-row-menu-backdrop" onClick={closeRowMenu} />
-          <div className="cc-row-menu" role="menu" style={{ top: menuPos.top, left: menuPos.left }}>
+          <div ref={menuRef} className="cc-row-menu" role="menu" style={{ top: menuPos.top, left: menuPos.left }}>
             <button className="cc-row-menu-item" onClick={() => handleViewCourse(openCourse)} type="button">
               <Eye size={15} /> View course
             </button>
@@ -450,7 +616,12 @@ export default function AdminCoursesPage() {
               <UserCog size={15} /> Assign trainer
             </button>
             <div className="cc-row-menu-divider" />
-            <button className="cc-row-menu-item" onClick={() => handleArchive(openCourse)} type="button">
+            <button
+              className="cc-row-menu-item"
+              onClick={() => handleArchive(openCourse)}
+              type="button"
+              disabled={openCourse.status === 'archived'}
+            >
               <Archive size={15} /> Archive
             </button>
             <button className="cc-row-menu-item danger" onClick={() => handleDelete(openCourse)} type="button">
@@ -461,24 +632,21 @@ export default function AdminCoursesPage() {
       )}
 
       {viewingCourse && (
-  <CourseDetailModal
-    course={viewingCourse}
-    onClose={() => setViewingCourse(null)}
-    onEdit={() => navigate(`/admin/courses/${viewingCourse.id}/edit`)}
-    onSetPrice={() => { setPricingCourse(viewingCourse); setViewingCourse(null) }}
-    onArchive={() => { setArchivingCourse(viewingCourse); setViewingCourse(null) }}
-    onDelete={() => { setDeletingCourse(viewingCourse); setViewingCourse(null) }}
-  />
-)}
+        <CourseDetailModal
+          course={viewingCourse}
+          onClose={() => setViewingCourse(null)}
+          onEdit={() => navigate(`/admin/courses/${viewingCourse.slug}/edit`)}
+          onSetPrice={() => { setPricingCourse(viewingCourse); setViewingCourse(null) }}
+          onArchive={() => { setArchivingCourse(viewingCourse); setViewingCourse(null) }}
+          onDelete={() => { setDeletingCourse(viewingCourse); setViewingCourse(null) }}
+        />
+      )}
 
       {pricingCourse && (
         <SetPriceModal
           course={pricingCourse}
           onClose={() => setPricingCourse(null)}
-          onConfirm={(newPrice) => {
-            applyPriceChange(pricingCourse.id, newPrice)
-            setPricingCourse(null)
-          }}
+          onConfirm={(newPriceKobo: number | null) => confirmSetPrice(pricingCourse, newPriceKobo)}
         />
       )}
 
@@ -486,10 +654,7 @@ export default function AdminCoursesPage() {
         <AssignTrainerModal
           course={assigningCourse}
           onClose={() => setAssigningCourse(null)}
-          onConfirm={(trainer) => {
-            applyTrainerChange(assigningCourse.id, trainer)
-            setAssigningCourse(null)
-          }}
+          onConfirm={(trainerId: string) => confirmAssignTrainer(assigningCourse, trainerId)}
         />
       )}
 
@@ -497,10 +662,7 @@ export default function AdminCoursesPage() {
         <ArchiveCourseModal
           course={archivingCourse}
           onClose={() => setArchivingCourse(null)}
-          onConfirm={() => {
-            applyArchive(archivingCourse.id)
-            setArchivingCourse(null)
-          }}
+          onConfirm={(payload: ArchiveCoursePayload) => confirmArchive(archivingCourse, payload)}
         />
       )}
 
@@ -508,10 +670,7 @@ export default function AdminCoursesPage() {
         <DeleteCourseModal
           course={deletingCourse}
           onClose={() => setDeletingCourse(null)}
-          onConfirm={() => {
-            applyDelete(deletingCourse.id)
-            setDeletingCourse(null)
-          }}
+          onConfirm={() => confirmDelete(deletingCourse)}
         />
       )}
     </AdminShell>

@@ -96,7 +96,7 @@ const PAGE_CSS = `
   }
   .np-error {
     padding: 1rem 1.25rem; text-align: center;
-    color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA;
+    color: #EF4444; background: #FEF2F2; border: 1px solid #FECACA;
     border-radius: 0.85rem; font-size: 0.875rem; margin-bottom: 1.25rem;
   }
   .np-loading {

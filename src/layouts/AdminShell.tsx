@@ -3,7 +3,7 @@ import {
   LayoutGrid, Users, BookOpen, CreditCard, Settings as SettingsIcon,
   Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon,
+  LogOut, User as UserIcon, MessageCircle
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
@@ -25,13 +25,13 @@ export const ADMIN_SHELL_CSS = `
   .search-wrap input::placeholder { color: #9CA3AF; }
   .topbar-bell { width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative; transition: background 0.15s; }
   .topbar-bell:hover { background: #F3F4F6; }
-  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
+  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2492EB; }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
 
   /* ── Profile dropdown ── */
   .profile-menu-wrap { position: relative; }
   .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
-  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
+  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2492EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
   .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
   .profile-chevron.open { transform: rotate(180deg); }
   .profile-dropdown { position: absolute; top: calc(100% + 0.625rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 220px; padding: 0.5rem; z-index: 300; }
@@ -53,7 +53,7 @@ export const ADMIN_SHELL_CSS = `
   .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; }
   .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
   .nav-item:hover { background: #F9FAFB; color: #111; }
-  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+  .nav-item.active { background: #EFF6FF; color: #2492EB; font-weight: 600; }
   .nav-item .nav-label { flex: 1; }
   .sidebar.collapsed .nav-label { display: none; }
   .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
@@ -69,7 +69,7 @@ export const ADMIN_SHELL_CSS = `
   .switch-role-option:hover { background: #F9FAFB; }
 
   .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
-  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
+  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2492EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
   .user-text { overflow: hidden; }
   .user-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .user-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -81,7 +81,7 @@ export const ADMIN_SHELL_CSS = `
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
-  .tab-item.active { color: #2563EB; }
+  .tab-item.active { color: #2492EB; }
 
  @media (max-width: 640px) {
   .sidebar { display: none; }
@@ -97,10 +97,30 @@ interface AdminShellProps {
   children: React.ReactNode
 }
 
+function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; initials: string; className: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+
+  if (avatarUrl && !imgFailed) {
+    return (
+      <div className={className}>
+        <img
+          src={avatarUrl}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  return <div className={className}>{initials}</div>
+}
+
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', route: ROUTES.ADMIN_DASHBOARD, Icon: LayoutGrid },
   { key: 'users',     label: 'Users',     route: ROUTES.ADMIN_USERS,     Icon: Users },
   { key: 'courses',   label: 'Courses',   route: ROUTES.ADMIN_COURSES,    Icon: BookOpen },
+  {key: 'community', label: 'Community', route: ROUTES.ADMIN_COMMUNITY, Icon: MessageCircle},
   { key: 'revenue',   label: 'Revenue',   route: ROUTES.ADMIN_REVENUE,    Icon: CreditCard },
   { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon },
 ]
@@ -124,6 +144,7 @@ export default function AdminShell({ children }: AdminShellProps) {
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
+  const avatarUrl = user.avatar_url ?? null
   const activeRoute = navItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.ADMIN_DASHBOARD
 
   function requestLogout() {
@@ -191,13 +212,13 @@ export default function AdminShell({ children }: AdminShellProps) {
                 aria-expanded={profileOpen}
                 aria-label="Open profile menu"
               >
-                <div className="topbar-avatar">{initials}</div>
+                <Avatar avatarUrl={avatarUrl} initials={initials} className="topbar-avatar" />
                 <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
               </button>
               {profileOpen && (
                 <div className="profile-dropdown" role="menu">
                   <div className="profile-dropdown-header">
-                    <div className="user-avatar">{initials}</div>
+                    <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
                     <div style={{ overflow: 'hidden' }}>
                       <div className="profile-dropdown-name">{user.name || user.email}</div>
                       <div className="profile-dropdown-email">{user.email}</div>
@@ -266,7 +287,7 @@ export default function AdminShell({ children }: AdminShellProps) {
             </div>
 
             <div className="sidebar-user">
-              <div className="user-avatar">{initials}</div>
+              <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
               <div className="user-text">
                 <div className="user-name">{user.name || user.email}</div>
                 <div className="user-email">{user.email}</div>

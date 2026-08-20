@@ -1,20 +1,60 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, ChevronDown, LogOut, User as UserIcon } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
+import { notificationsAPI } from '../../services/api'
 import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 
 interface NavbarProps {
   initials: string
 }
 
+function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; initials: string; className: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+
+  if (avatarUrl && !imgFailed) {
+    return (
+      <div className={className}>
+        <img
+          src={avatarUrl}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  return <div className={className}>{initials}</div>
+}
+
 export default function Navbar({ initials }: NavbarProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const [profileOpen,  setProfileOpen]  = useState(false)
-  const [notifOpen,    setNotifOpen]    = useState(false)
-  const [searchTerm,   setSearchTerm]   = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [hasUnread, setHasUnread] = useState(false)
+  const avatarUrl = user?.avatar_url ?? null
+
+  useEffect(() => {
+    if (!user) return
+
+    let cancelled = false
+
+    async function syncUnreadBadge() {
+      const result = await notificationsAPI.getUnreadCount()
+      if (!cancelled && result.success) {
+        setHasUnread(result.count > 0)
+      }
+    }
+
+    syncUnreadBadge()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   async function handleLogout() {
     setProfileOpen(false)
@@ -58,7 +98,7 @@ export default function Navbar({ initials }: NavbarProps) {
               style={{ cursor: 'pointer' }}
             >
               <Bell size={20} />
-              <div className="bell-dot" />
+              {hasUnread && <div className="bell-dot" />}
             </div>
             {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
           </div>
@@ -72,13 +112,13 @@ export default function Navbar({ initials }: NavbarProps) {
               aria-expanded={profileOpen}
               aria-label="Open profile menu"
             >
-              <div className="topbar-avatar">{initials}</div>
+              <Avatar avatarUrl={avatarUrl} initials={initials} className="topbar-avatar" />
               <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
             </button>
             {profileOpen && (
               <div className="profile-dropdown" role="menu">
                 <div className="profile-dropdown-header">
-                  <div className="user-avatar">{initials}</div>
+                  <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
                   <div style={{ overflow: 'hidden' }}>
                     <div className="profile-dropdown-name">{user.name || user.email}</div>
                     <div className="profile-dropdown-email">{user.email}</div>

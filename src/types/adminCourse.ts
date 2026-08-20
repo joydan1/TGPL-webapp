@@ -1,115 +1,127 @@
-export type CourseStatus = 'published' | 'draft' | 'archived'
 
-export interface CourseTrainer {
-  id: string
-  name: string
-  role: string
-  avatar_color: string
+export type CourseStatus = 'draft' | 'published' | 'archived'
+export type CourseLevel = 'beginner' | 'intermediate' | 'advanced'
+export type TrendPeriod = 'last_7_days' | 'last_30_days' | 'last_90_days' | 'all_time'
+
+
+export interface EnrollmentTrendPoint {
+  date: string
+  new_enrollments: number
+  total_enrollments: number
 }
 
-export interface CourseSummary {
+export interface EnrollmentTrendsSummary {
+  period_start: string
+  period_end: string
+  total_new_enrollments: number
+  total_enrollments_all_time: number
+  growth_rate_percent: number
+}
+
+export interface EnrollmentTrendsResponse {
+  course_slug: string
+  course_title: string
+  period: TrendPeriod
+  data: EnrollmentTrendPoint[]
+  summary: EnrollmentTrendsSummary
+}
+
+
+export interface CourseTrainerRef {
+  id: string
+  full_name: string
+  email: string
+}
+
+
+export interface AdminCourseRow {
   id: string
   title: string
-  subtitle: string // e.g. "Welcome video · updated 1 week ago"
-  category: string
-  trainer: CourseTrainer
-  price: number | null // null = free
+  slug: string
+  trainer: CourseTrainerRef
   status: CourseStatus
-  enrolled: number
-  revenue: number
+  is_archived: boolean
+  is_free: boolean
+  price_kobo: number
+  enrollment_count: number
+  completion_count: number
+  completion_percentage: number
+  revenue_kobo: number
+  is_final_assignment_set: boolean
+  has_live_sessions: boolean
+  created_at: string
+}
+
+export interface CourseArchiveInfo {
+  archived_at: string
+  archived_by_email: string
+  reason: string
+  note: string
+}
+
+// GET/PATCH /api/v1/admin/courses/{slug}/ — superset of the list row.
+export interface AdminCourseDetail extends AdminCourseRow {
+  subtitle: string
+  description: string
+  category: string
+  level: CourseLevel
+  language: string
+  has_certificate: boolean
+  has_live_support: boolean
+  module_count: number
+  lesson_count: number
+  assignment_count: number
+  live_session_count: number
+  certificate_count: number
+  in_progress_count: number
+  archived_at: string | null
+  archive: CourseArchiveInfo | null
   updated_at: string
 }
 
+export interface PaginatedCourses {
+  count: number
+  next: string | null
+  previous: string | null
+  results: AdminCourseRow[]
+}
+
+export interface ListCoursesParams {
+  page?: number
+  page_size?: number
+  search?: string
+  status?: CourseStatus
+  trainer_id?: string
+}
+
+export interface UpdateCoursePayload {
+  title?: string
+  subtitle?: string
+  description?: string
+  status?: 'draft' | 'published'
+  is_free?: boolean
+  price_kobo?: number
+  has_certificate?: boolean
+  has_live_support?: boolean
+  category?: string
+  level?: CourseLevel
+  language?: string
+}
+
+export type ArchiveReason =
+  | 'low_completion'
+  | 'outdated_content'
+  | 'trainer_departed'
+  | 'policy_violation'
+  | 'other'
+
+export interface ArchiveCoursePayload {
+  reason: ArchiveReason
+  note?: string
+}
 export interface CatalogStats {
   total_courses: number
   published: number
   draft: number
-  total_revenue: number
+  total_revenue_kobo: number
 }
-
-export interface CourseLesson {
-  id: string
-  title: string
-  type: 'video' | 'reading' | 'quiz'
-  duration?: string
-  questions?: number
-}
-
-export interface CourseModule {
-  id: string
-  title: string
-  lessons: CourseLesson[]
-}
-
-export interface CourseDetailStats {
-  avg_rating: number
-  completion_rate: number
-  total_lessons: number
-  video_count: number
-  quiz_count: number
-  has_certificate: boolean
-  language: string
-  access: string
-  enrollment_trend: number[] // 12 relative bar heights, 0-100, oldest -> newest
-  trend_change_pct: number
-  modules: CourseModule[]
-}
-
-// TODO: replace with adminCoursesAPI.getCourseDetail(id) once
-// GET /api/v1/admin/courses/{id}/ (or similar) exists. Deterministic per
-// course id so the demo data doesn't jump around between renders.
-export function getMockCourseDetail(_course: CourseSummary): CourseDetailStats {
-  return {
-    avg_rating: 4.7,
-    completion_rate: 68,
-    total_lessons: 12,
-    video_count: 6,
-    quiz_count: 3,
-    has_certificate: true,
-    language: 'English',
-    access: 'Lifetime after enroll',
-    enrollment_trend: [4, 18, 10, 28, 22, 34, 30, 44, 38, 56, 50, 72],
-    trend_change_pct: 12,
-    modules: [
-      {
-        id: 'm1',
-        title: 'Module 1 — Foundations',
-        lessons: [
-          { id: 'l1', title: 'Welcome & course overview', type: 'video', duration: '4:12' },
-          { id: 'l2', title: 'Core concepts introduction', type: 'video', duration: '11:38' },
-          { id: 'l3', title: 'Key terminology reference', type: 'reading' },
-          { id: 'l4', title: 'Module 1 knowledge check', type: 'quiz', questions: 5 },
-        ],
-      },
-      {
-        id: 'm2',
-        title: 'Module 2 — Core Skills',
-        lessons: [
-          { id: 'l5', title: 'Planning fundamentals', type: 'video', duration: '9:04' },
-          { id: 'l6', title: 'Stakeholder mapping', type: 'video', duration: '7:51' },
-          { id: 'l7', title: 'Worksheet: risk register', type: 'reading' },
-          { id: 'l8', title: 'Module 2 knowledge check', type: 'quiz', questions: 5 },
-        ],
-      },
-      {
-        id: 'm3',
-        title: 'Module 3 — Advanced Application',
-        lessons: [
-          { id: 'l9', title: 'Case study walkthrough', type: 'video', duration: '14:20' },
-          { id: 'l10', title: 'Advanced scheduling', type: 'video', duration: '10:15' },
-          { id: 'l11', title: 'Final project brief', type: 'reading' },
-          { id: 'l12', title: 'Final assessment', type: 'quiz', questions: 10 },
-        ],
-      },
-    ],
-  }
-}
-
-// TODO: replace with adminUsersAPI.listUsers({ role: 'trainer' }) once that
-// filter exists — kept as a separate mock list for now since AdminUsersPage
-// owns its own mock user set.
-export const MOCK_TRAINERS: CourseTrainer[] = [
-  { id: 't1', name: 'Enobong Okposin', role: 'Lead Trainer · Leadership', avatar_color: '#2563EB' },
-  { id: 't2', name: 'Amara Osei', role: 'Trainer · Communication', avatar_color: '#7C3AED' },
-  { id: 't3', name: 'Chioma Ike', role: 'Trainer · Leadership', avatar_color: '#7C3AED' },
-]

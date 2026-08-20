@@ -154,7 +154,17 @@ function formatMaxFileSize(reqs: AssignmentRequirement[]): string {
 
 function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext): AssignmentDetail {
   const attempt = latestAttempt(raw)
-  const requirements = raw.requirements ?? []
+  const requirements = (raw.requirements && raw.requirements.length > 0)
+    ? raw.requirements
+    : [{
+        id: 'default-submission-slot',
+        label: 'Submission file',
+        allowed_file_types: 'pdf,docx',
+        max_bytes: 20 * 1024 * 1024,
+        required: true,
+        order: 1,
+        naming_hint: 'Use your name and assignment title in the filename.',
+      } as AssignmentRequirement]
 
   return {
     id: raw.id,
@@ -374,7 +384,12 @@ const PAGE_CSS = `
   .req-label { font-size: 0.75rem; font-weight: 400; color: #6A7282; }
   .req-sub { font-size: 0.6875rem; color: #99A1AF; margin-top: 0.125rem; }
   .req-value { font-size: 0.75rem; font-weight: 700; color: #2B3942; text-align: right; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
-
+.req-slots-list { display: flex; flex-direction: column; gap: 1rem; }
+.req-slot { display: flex; flex-direction: column; gap: 0.5rem; }
+.req-slot-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.req-slot-label { font-size: 0.9375rem; font-weight: 600; color: #111; }
+.req-slot-hint { font-size: 0.75rem; color: #9CA3AF; }
+.req-dropzone { padding: 1.25rem 1rem; }
   .submitted-files-section { display: flex; flex-direction: column; gap: 0.875rem; }
   .submitted-files-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem; }
   .submitted-files-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
@@ -452,142 +467,168 @@ const PAGE_CSS = `
 `
 
 function SubmissionModal({
-assignment,
-onClose,
-onSubmitted,
+  assignment,
+  onClose,
+  onSubmitted,
 }: {
-assignment: AssignmentDetail
-onClose: () => void
-onSubmitted: (files: SubmittedFile[]) => void
+  assignment: AssignmentDetail
+  onClose: () => void
+  onSubmitted: (files: SubmittedFile[]) => void
 }) {
-const [files, setFiles] = useState<File[]>([])
-const [dragOver, setDragOver] = useState(false)
-const [submitting, setSubmitting] = useState(false)
-const [uploadStep, setUploadStep] = useState<string | null>(null)
-const [error, setError] = useState<string | null>(null)
-const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const requirements = sortedRequirements(assignment.requirements)
 
-const requirements = sortedRequirements(assignment.requirements)
+  // Keyed by requirement.id — one slot per requirement, not a flat pool.
+  const [filesByRequirement, setFilesByRequirement] = useState<Record<string, File | null>>({})
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadStep, setUploadStep] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-const minFiles = 1
-const maxFiles = 3
+  function setFileForRequirement(reqId: string, file: File | null) {
+    setFilesByRequirement((prev) => ({ ...prev, [reqId]: file }))
+  }
 
-function addFiles(list: FileList | null) {
-if (!list) return
-setFiles((prev) => [...prev, ...Array.from(list)].slice(0, maxFiles))
-}
+  function acceptAttr(allowedTypes: string): string {
+    return allowedTypes
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((t) => (t.startsWith('.') ? t : `.${t}`))
+      .join(',')
+  }
 
-function removeFile(index: number) {
-setFiles((prev) => prev.filter((_, i) => i !== index))
-}
+  const missingRequired = requirements.filter((r) => r.required && !filesByRequirement[r.id])
+  const filledCount = requirements.filter((r) => filesByRequirement[r.id]).length
 
-async function handleSubmit() {
-if (files.length < minFiles) {
-setError(`Upload at least ${minFiles} file`)
-return
-}
+  async function handleSubmit() {
+    if (missingRequired.length > 0) {
+      setError(`Please add a file for: ${missingRequired.map((r) => r.label).join(', ')}`)
+      return
+    }
 
-setSubmitting(true)
-setError(null)
-setUploadStep(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`)
+    // Build files/requirements in matching order — submitAssignment maps
+    // files[i] to requirements[i].id positionally, so order must line up
+    // exactly, including skipping requirements left empty (optional ones).
+    const orderedReqs = requirements.filter((r) => filesByRequirement[r.id])
+    const orderedFiles = orderedReqs.map((r) => filesByRequirement[r.id] as File)
 
-const res = await assignmentsAPI.submitAssignment(assignment.id, files, requirements)
+    if (orderedFiles.length === 0) {
+      setError('Upload at least one file.')
+      return
+    }
 
-setSubmitting(false)
-setUploadStep(null)
+    setSubmitting(true)
+    setError(null)
+    setUploadStep(`Uploading ${orderedFiles.length} file${orderedFiles.length > 1 ? 's' : ''}...`)
 
-if (res.success) {
-  onSubmitted(res.data.submitted_files)
-} else {
-  setError(res.error)
-}
+    const res = await assignmentsAPI.submitAssignment(assignment.id, orderedFiles, orderedReqs)
 
+    setSubmitting(false)
+    setUploadStep(null)
 
-}
+    if (res.success) {
+      onSubmitted(res.data.submitted_files)
+    } else {
+      setError(res.error)
+    }
+  }
 
-return ( <div className="modal-backdrop" onClick={onClose}>
-<div className="submit-modal" onClick={(e) => e.stopPropagation()}> <div className="submit-modal-head"> <span className="submit-modal-title">{assignment.title}</span> <button className="submit-modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button> </div>
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="submit-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="submit-modal-head">
+          <span className="submit-modal-title">{assignment.title}</span>
+          <button className="submit-modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        </div>
 
-    <div className="asgn-modal-progress-row">
-      <span className="asgn-modal-progress-label">Submission progress</span>
-      <span className="asgn-modal-progress-count">{files.length} of {maxFiles} files uploaded</span>
+        <div className="asgn-modal-progress-row">
+          <span className="asgn-modal-progress-label">Submission progress</span>
+          <span className="asgn-modal-progress-count">{filledCount} of {requirements.length} slots filled</span>
+        </div>
+
+        <div className="req-slots-list">
+          {requirements.map((req) => {
+            const file = filesByRequirement[req.id] ?? null
+            const isDragOver = dragOverId === req.id
+
+            return (
+              <div className="req-slot" key={req.id}>
+                <div className="req-slot-head">
+                  <span className="req-slot-label">
+                    {req.label}{req.required ? '' : ' (optional)'}
+                  </span>
+                  <span className="req-slot-status">
+                    {file
+                      ? <CheckCircle2 size={16} color="#16A34A" />
+                      : req.required
+                        ? <X size={14} color="#DC2626" strokeWidth={3} />
+                        : null}
+                  </span>
+                </div>
+                <span className="req-slot-hint">
+                  {req.allowed_file_types} · up to {toMB(req.max_bytes)} MB
+                  {req.naming_hint ? ` · Name your file: ${req.naming_hint}` : ''}
+                </span>
+
+                {file ? (
+                  <div className="file-list-item">
+                    <FileText size={16} color="#6B7280" />
+                    <span className="file-list-name">{file.name}</span>
+                    <span className="file-list-size">{(file.size / 1024).toFixed(0)} KB</span>
+                    <button
+                      className="file-list-remove"
+                      onClick={() => setFileForRequirement(req.id, null)}
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className={`dropzone req-dropzone${isDragOver ? ' dragover' : ''}`}
+                    onClick={() => fileInputRefs.current[req.id]?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverId(req.id) }}
+                    onDragLeave={() => setDragOverId(null)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragOverId(null)
+                      const dropped = e.dataTransfer.files?.[0]
+                      if (dropped) setFileForRequirement(req.id, dropped)
+                    }}
+                  >
+                    <div className="dropzone-icon"><Plus size={18} /></div>
+                    <span className="dropzone-text">Click to add file</span>
+                    <input
+                      ref={(el) => { fileInputRefs.current[req.id] = el }}
+                      type="file"
+                      accept={acceptAttr(req.allowed_file_types)}
+                      hidden
+                      onChange={(e) => setFileForRequirement(req.id, e.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {uploadStep && <div className="upload-progress">{uploadStep}</div>}
+        {error && <div className="submit-error">{error}</div>}
+
+        <button
+          className="action-btn start"
+          disabled={missingRequired.length > 0 || submitting}
+          style={{
+            opacity: missingRequired.length > 0 || submitting ? 0.6 : 1,
+            cursor: missingRequired.length > 0 || submitting ? 'default' : 'pointer',
+          }}
+          onClick={handleSubmit}
+        >
+          {submitting ? 'Submitting…' : 'Submit Assignment'}
+        </button>
+      </div>
     </div>
-
-    <div className="modal-body-row">
-      <div
-        className={`dropzone${dragOver ? ' dragover' : ''}${files.length >= maxFiles ? ' disabled' : ''}`}
-        onClick={() => files.length < maxFiles && fileInputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); if (files.length < maxFiles) setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragOver(false)
-          if (files.length < maxFiles) addFiles(e.dataTransfer.files)
-        }}
-      >
-        <div className="dropzone-icon"><Plus size={20} /></div>
-        <span className="dropzone-text">
-          {files.length >= maxFiles ? 'All slots filled' : 'Click to add file(s)'}
-        </span>
-        <span className="dropzone-sub">{assignment.submission_requirements.accepted_file_types}</span>
-        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
-      </div>
-
-      <div className="criteria-list">
-        {requirements.map((req) => (
-          <div className="criteria-row" key={req.id}>
-            <div className="criteria-label-wrap">
-              <span>{req.label}{req.required ? '' : ' (optional)'}</span>
-              <span className="criteria-hint">
-                {req.allowed_file_types} · up to {toMB(req.max_bytes)} MB
-              </span>
-              {req.naming_hint && (
-                <span className="criteria-hint">Name your file: {req.naming_hint}</span>
-              )}
-            </div>
-            <span className="criteria-status">
-              {files.length >= minFiles
-                ? <CheckCircle2 size={18} color="#16A34A" />
-                : <X size={16} color="#DC2626" strokeWidth={3} />}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {files.length > 0 && (
-      <div className="file-list">
-        {files.map((f, i) => (
-          <div className="file-list-item" key={`${f.name}-${i}`}>
-            <FileText size={16} color="#6B7280" />
-            <span className="file-list-name">{f.name}</span>
-            <span className="file-list-size">{(f.size / 1024).toFixed(0)} KB</span>
-            <button className="file-list-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-    )}
-
-    {uploadStep && <div className="upload-progress">{uploadStep}</div>}
-    {error && <div className="submit-error">{error}</div>}
-
-    <button
-      className="action-btn start"
-      disabled={files.length < minFiles || submitting}
-      style={{
-        opacity: files.length < minFiles || submitting ? 0.6 : 1,
-        cursor: files.length < minFiles || submitting ? 'default' : 'pointer'
-      }}
-      onClick={handleSubmit}
-    >
-      {submitting ? 'Submitting…' : 'Submit Assignment'}
-    </button>
-  </div>
-</div>
-
-
   )
 }
 

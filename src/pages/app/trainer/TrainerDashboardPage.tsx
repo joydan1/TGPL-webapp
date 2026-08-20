@@ -15,7 +15,7 @@ import {
 } from '../../../services/api'
 
 const PAGE_CSS = `
-  .db-page { padding: 1rem; background: #F5F5F5; }
+  .db-page { padding: 1rem; padding-bottom: 2rem; background: #F5F5F5; }
 
   .db-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .db-greeting { margin: 0; color: #6B7280; font-size: 0.9rem; }
@@ -63,6 +63,30 @@ const PAGE_CSS = `
   .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
   .db-course-date { margin: 0; color: #6B7280; font-size: 0.8rem; }
   .db-course-preview-btn { margin-top: 1rem; width: 100%; border: none; border-radius: 999px; padding: 0.8rem 1rem; background: #EFF6FF; color: #2492EB; font-weight: 700; cursor: pointer; }
+
+ @media (max-width: 639px) {
+  .db-course-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .db-course-img {
+    height: 140px;   /* was fixed at 176px for all breakpoints */
+  }
+  .db-course-body {
+    gap: 0.4rem;     /* slightly tighter on small screens */
+  }
+  .db-course-preview-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.8rem 1rem;
+    font-size: 0.92rem;
+    box-sizing: border-box;
+  }
+}
 
   @media (min-width: 640px) {
     .db-page { padding: 1.5rem; }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   X, Mail, KeyRound, Ban, BookOpen, CheckCircle2, BadgeCheck, BarChart3,
-  Users, Star, Trash2,
+  Users, Star, Trash2, UploadCloud, MessageSquare, Calendar, Bell,
 } from 'lucide-react'
 import {
   type AdminUser, type UserStatus, getMockLearnerStats, getMockTrainerStats,
@@ -24,9 +24,10 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
   .up-name { margin: 0; font-size: 1.35rem; font-weight: 800; color: #111827; }
   .up-role-badge { display: inline-flex; align-items: center; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; }
-  .up-role-badge.learner { background: #EFF6FF; color: #2563EB; }
-  .up-role-badge.trainer { background: #ECFDF5; color: #059669; }
-  .up-role-badge.admin { background: #F5F3FF; color: #7C3AED; }
+  .up-role-badge.Learner { background: #EFF6FF; color: #2563EB; }
+  .up-role-badge.Trainer { background: #ECFDF5; color: #059669; }
+  .up-role-badge.Admin-Asst { background: #F5F3FF; color: #7C3AED; }
+  .up-role-badge.Super-Admin { background: #F5F3FF; color: #7C3AED; }
   .up-status-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; }
   .up-status-badge.active { background: #ECFDF5; color: #059669; }
   .up-status-badge.inactive { background: #FEF3C7; color: #D97706; }
@@ -96,10 +97,19 @@ export const USER_PROFILE_MODAL_CSS = `
 export const USER_PROFILE_MODAL_ALL_CSS =
   USER_PROFILE_MODAL_CSS + DEACTIVATE_MODAL_CSS + DELETE_MODAL_CSS + MESSAGE_MODAL_CSS
 
+// Covers every variant of ActivityEntry['icon'] (types/adminUser.ts) so this
+// lookup is exhaustive — TS would otherwise allow indexing with a key this
+// object doesn't have, which is exactly what error TS7053 was catching.
+// Only 'book' / 'star' / 'check' are ever produced by the current mock data,
+// but the type permits the other four, so they're covered here too.
 const ACTIVITY_ICON = {
   book: { Icon: BookOpen, bg: '#DBEAFE', color: '#2563EB' },
   star: { Icon: Star, bg: '#FEF3C7', color: '#D97706' },
   check: { Icon: CheckCircle2, bg: '#D1FAE5', color: '#059669' },
+  upload: { Icon: UploadCloud, bg: '#F5F3FF', color: '#7C3AED' },
+  message: { Icon: MessageSquare, bg: '#FCE7F3', color: '#DB2777' },
+  calendar: { Icon: Calendar, bg: '#FFEDD5', color: '#EA580C' },
+  bell: { Icon: Bell, bg: '#FEF9C3', color: '#CA8A04' },
 } as const
 
 interface UserProfileModalProps {
@@ -152,8 +162,12 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const [showDelete, setShowDelete] = useState(false)
   const [showMessage, setShowMessage] = useState(false)
 
-  const learnerStats = user.role === 'learner' ? getMockLearnerStats(user) : null
-  const trainerStats = user.role === 'trainer' ? getMockTrainerStats(user) : null
+  // UserRole is 'Learner' | 'Trainer' | 'Admin Asst' | 'Super Admin' —
+  // capitalized, two admin variants, no lowercase 'admin'. Matches
+  // types/adminUser.ts exactly (previously compared against lowercase
+  // 'learner'/'trainer', which the type can never satisfy).
+  const learnerStats = user.role === 'Learner' ? getMockLearnerStats(user) : null
+  const trainerStats = user.role === 'Trainer' ? getMockTrainerStats(user) : null
 
   function handleDeactivateConfirm(_payload: DeactivatePayload) {
     const nextStatus: UserStatus = status === 'active' ? 'inactive' : 'active'
@@ -190,8 +204,8 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
               <div>
                 <div className="up-name-row">
                   <h3 className="up-name">{user.name}</h3>
-                  <span className={`up-role-badge ${user.role}`}>
-                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                  <span className={`up-role-badge ${user.role.replace(/\s+/g, '-')}`}>
+                    {user.role}
                   </span>
                   <span className={`up-status-badge ${status}`}>
                     <span className="up-status-dot" />
@@ -243,7 +257,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
               <div className="up-section">
                 <h4 className="up-section-title">Account details</h4>
                 <DetailRow label="Email" value={user.email} />
-                <DetailRow label="Role" value={user.role.charAt(0).toUpperCase() + user.role.slice(1)} />
+                <DetailRow label="Role" value={user.role} />
                 <DetailRow label="Status" value={status === 'active' ? 'Active' : 'Inactive'} />
                 <DetailRow label="Joined" value={formatDate(user.joined_at)} />
                 <DetailRow label="Last active" value={user.last_active} />

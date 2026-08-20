@@ -44,6 +44,7 @@ import SettingsPage from './pages/app/SettingsPage.tsx'
 import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
 import HelpSupportPage from './pages/app/HelpSupportPage'
 import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
+import TrainerCommunityPage from './pages/app/trainer/TrainerCommunityPage'
 //admin pages
 import AdminRevenuePage from './pages/admin/AdminRevenuePage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
@@ -51,6 +52,7 @@ import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AdminCoursesPage from './pages/admin/AdminCoursesPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage.tsx'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage.tsx'
+import AdminCommunityPage from './pages/admin/AdminCommunityPage.tsx'
 
 
 interface ProtectedRouteProps {
@@ -243,6 +245,7 @@ function App() {
   }
 />
 <Route path={ROUTES.TRAINER_BOOKINGS} element={<TrainerBookingsPage />} />
+<Route path={ROUTES.TRAINER_COMMUNITY} element={<TrainerCommunityPage />} />
 <Route
   path={ROUTES.TRAINER_LIVE_CLASSES}
   element={
@@ -378,6 +381,9 @@ function App() {
           <AdminSettingsPage />
         }
         />
+        <Route path={ROUTES.ADMIN_COMMUNITY} element={<AdminCommunityPage />} />
+        <Route path="/admin/courses/create" element={<AddCoursePage />} />
+<Route path="/admin/courses/:id/edit" element={<AddCoursePage />} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

@@ -27,7 +27,7 @@ const PAGE_CSS = `
   .rv-status-tabs { display: flex; gap: 0.4rem; background: #F9FAFB; border-radius: 0.75rem; padding: 0.3rem; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
   .rv-status-tabs::-webkit-scrollbar { display: none; }
   .rv-status-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 0.6rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-  .rv-status-tab.active { background: #2563EB; color: #fff; }
+  .rv-status-tab.active { background: #2492EB; color: #fff; }
   .rv-search-wrap { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.75rem; padding: 0.6rem 1rem; }
   .rv-search-wrap input { flex: 1; background: none; border: none; outline: none; font-size: 0.875rem; color: #111; }
   .rv-search-wrap input::placeholder { color: #9CA3AF; }

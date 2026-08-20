@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { X, Tag, BookOpen } from 'lucide-react'
-import type { CourseSummary } from '../../types/adminCourse'
+import { X, Tag, BookOpen, AlertCircle } from 'lucide-react'
+import type { AdminCourseRow } from '../../types/adminCourse'
 
 export const SET_PRICE_MODAL_CSS = `
   .sp-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1100; padding: 1rem; }
@@ -22,6 +22,9 @@ export const SET_PRICE_MODAL_CSS = `
   .sp-free-toggle { margin-top: 0.6rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #6B7280; }
   .sp-free-toggle button { border: none; background: none; color: #2492EB; font-weight: 700; cursor: pointer; padding: 0; font-size: 0.8rem; }
 
+  .sp-error { display: flex; align-items: flex-start; gap: 0.5rem; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.82rem; line-height: 1.45; margin-bottom: 1.25rem; }
+  .sp-error svg { flex-shrink: 0; margin-top: 0.1rem; }
+
   .sp-actions { display: flex; gap: 0.6rem; }
   .sp-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .sp-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
@@ -30,21 +33,31 @@ export const SET_PRICE_MODAL_CSS = `
 `
 
 interface SetPriceModalProps {
-  course: CourseSummary
+  course: AdminCourseRow
   onClose: () => void
-  onConfirm: (newPrice: number | null) => void
+  // Kobo, matching UpdateCoursePayload.price_kobo — null means "make free".
+  // The input field itself stays in naira for a sane admin UX; conversion
+  // happens at submit time.
+  onConfirm: (newPriceKobo: number | null) => void
+  // Shown inline — this modal's overlay sits above the rest of the page,
+  // so a page-level banner behind it would be invisible even when set.
+  error?: string | null
+  submitting?: boolean
 }
 
-export default function SetPriceModal({ course, onClose, onConfirm }: SetPriceModalProps) {
-  const [priceInput, setPriceInput] = useState(course.price != null ? String(course.price) : '')
-  const [isFree, setIsFree] = useState(course.price == null)
+export default function SetPriceModal({
+  course, onClose, onConfirm, error = null, submitting = false,
+}: SetPriceModalProps) {
+  const initialNaira = course.is_free ? '' : String(course.price_kobo / 100)
+  const [priceInput, setPriceInput] = useState(initialNaira)
+  const [isFree, setIsFree] = useState(course.is_free)
 
-  const numericPrice = Number(priceInput)
-  const canSave = isFree || (priceInput.trim() !== '' && !isNaN(numericPrice) && numericPrice >= 0)
+  const numericNaira = Number(priceInput)
+  const canSave = !submitting && (isFree || (priceInput.trim() !== '' && !isNaN(numericNaira) && numericNaira >= 0))
 
   function handleSave() {
     if (!canSave) return
-    onConfirm(isFree ? null : numericPrice)
+    onConfirm(isFree ? null : Math.round(numericNaira * 100))
   }
 
   return (
@@ -58,7 +71,7 @@ export default function SetPriceModal({ course, onClose, onConfirm }: SetPriceMo
               </div>
               <div style={{ minWidth: 0 }}>
                 <h3 className="sp-title">{course.title}</h3>
-                <p className="sp-sub">{course.trainer.name}</p>
+                <p className="sp-sub">{course.trainer.full_name}</p>
               </div>
             </div>
             <button className="sp-close" onClick={onClose} aria-label="Close" type="button">
@@ -97,12 +110,19 @@ export default function SetPriceModal({ course, onClose, onConfirm }: SetPriceMo
             </>
           )}
 
+          {error && (
+            <div className="sp-error">
+              <AlertCircle size={15} />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="sp-actions">
-            <button className="sp-btn cancel" onClick={onClose} type="button">
+            <button className="sp-btn cancel" onClick={onClose} type="button" disabled={submitting}>
               Cancel
             </button>
             <button className="sp-btn confirm" onClick={handleSave} disabled={!canSave} type="button">
-              <Tag size={15} /> Save price
+              <Tag size={15} /> {submitting ? 'Saving…' : 'Save price'}
             </button>
           </div>
         </div>

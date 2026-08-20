@@ -5,23 +5,6 @@ import {
   Award, Paperclip, ClipboardList, Image as ImageIcon,
 } from 'lucide-react'
 
-// ─────────────────────────────────────────────────────────────────────────
-// Maps to the trainer assignments API (see trainerAssignmentsAPI in
-// services/api.ts): title, module_id, description, instructions, deadline,
-// is_final, rubric. `onSave` still just hands the draft back to the parent
-// wizard (AddCoursePage.tsx), which converts it to that payload — via
-// draftToRubric/deadlineToISOString below — and calls the API once the
-// lesson's module id is known. Nothing in this modal needs to change if
-// that call site changes.
-//
-// Everything below "Resources & Templates" in the UI (cover images,
-// "what you'll do" checklist, scenarios, deliverables, resource files,
-// word count, accepted file types) has no equivalent field in the current
-// backend contract. They're kept in local state so the trainer's input
-// isn't silently lost, but they are NOT sent anywhere yet — only
-// title / description / instructions / deadline / is_final / rubric are.
-// Revisit this if/when the backend adds fields for them.
-// ─────────────────────────────────────────────────────────────────────────
 
 export type GradingCriterionDraft = {
   id: string
@@ -38,12 +21,23 @@ export type AssignmentResourceDraft = {
   ext: string
 }
 
+export type AssignmentRequirementDraft = {
+  id: string
+  label: string
+  allowedFileTypes: string[]
+  maxBytesMb: string
+  required: boolean
+  namingHint: string
+}
+
 export type AssignmentDraft = {
   title: string
-  description: string
+  description: string // local-only — not sent, no confirmed field for it
   instructions: string
   deadline: string // value of a <input type="datetime-local"> — see deadlineToISOString()
   isFinal: boolean
+  maxAttempts: string // confirmed field: max_attempts
+  acceptLate: boolean // confirmed field: accept_late
   coverImages: File[]
   whatYoullDo: string[]
   scenarios: string[]
@@ -53,6 +47,7 @@ export type AssignmentDraft = {
   wordCountMin: string
   wordCountMax: string
   acceptedFileTypes: string[]
+  requirements: AssignmentRequirementDraft[]
 }
 
 const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'mp4']
@@ -61,13 +56,27 @@ function makeId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
+function makeRequirementDraft(title = 'Submission file', types: string[] = ['pdf', 'docx']): AssignmentRequirementDraft {
+  return {
+    id: makeId(),
+    label: title.trim() || 'Submission file',
+    allowedFileTypes: types.length ? Array.from(new Set(types.map((t) => t.trim().toLowerCase()).filter(Boolean))) : ['pdf', 'docx'],
+    maxBytesMb: '20',
+    required: true,
+    namingHint: 'Use your name and assignment title in the filename.',
+  }
+}
+
 export function emptyAssignmentDraft(): AssignmentDraft {
+  const defaultTypes = ['pdf', 'docx']
   return {
     title: '',
     description: '',
     instructions: '',
     deadline: '',
     isFinal: false,
+    maxAttempts: '1',
+    acceptLate: false,
     coverImages: [],
     whatYoullDo: [''],
     scenarios: [''],
@@ -76,7 +85,8 @@ export function emptyAssignmentDraft(): AssignmentDraft {
     resources: [],
     wordCountMin: '',
     wordCountMax: '',
-    acceptedFileTypes: ['pdf', 'docx'],
+    acceptedFileTypes: defaultTypes,
+    requirements: [makeRequirementDraft('Submission file', defaultTypes)],
   }
 }
 
@@ -100,46 +110,65 @@ function extColor(ext: string): { bg: string; fg: string } {
 
 // ─── Draft → API payload helpers ───────────────────────────────────────────
 
-function slugifyCriterion(text: string, used: Set<string>): string {
-  const base =
-    text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'criterion'
-  let key = base
-  let i = 2
-  while (used.has(key)) {
-    key = `${base}_${i}`
-    i += 1
-  }
-  used.add(key)
-  return key
-}
-
-/** Sum of all grading-criteria weights — the backend requires this to equal 100. */
-export function rubricWeightTotal(draft: AssignmentDraft): number {
+/** Sum of all grading-criteria max_points — kept as a UX nudge toward 100, same as before. Not a confirmed backend requirement for the new shape; revisit if the backend rejects/accepts totals other than 100. */
+export function gradingCriteriaTotal(draft: AssignmentDraft): number {
   return draft.gradingCriteria.reduce((sum, c) => sum + (Number(c.points) || 0), 0)
 }
 
-/** Converts the editable grading-criteria rows into the rubric shape the API expects. */
-export function draftToRubric(draft: AssignmentDraft): Record<string, { weight: number; description: string }> {
-  const rubric: Record<string, { weight: number; description: string }> = {}
-  const used = new Set<string>()
-  draft.gradingCriteria
+/** Converts the editable grading-criteria rows into the [{ label, max_points }] shape grading_criteria expects. */
+export function draftToGradingCriteria(draft: AssignmentDraft): Array<{ label: string; max_points: number }> {
+  return draft.gradingCriteria
     .filter((c) => c.criterion.trim())
-    .forEach((c) => {
-      const key = slugifyCriterion(c.criterion, used)
-      rubric[key] = { weight: Number(c.points) || 0, description: c.description.trim() }
-    })
-  return rubric
+    .map((c) => ({
+      label: c.criterion.trim(),
+      max_points: Number(c.points) || 0,
+    }))
 }
 
-/**
- * `draft.deadline` comes from a <input type="datetime-local"> value
- * ("YYYY-MM-DDTHH:mm"), interpreted in the browser's local time zone.
- * The API wants a full ISO-8601 timestamp with an explicit offset.
- */
+
 export function deadlineToISOString(localValue: string): string {
   if (!localValue) return ''
   const date = new Date(localValue)
   return date.toISOString()
+}
+
+/** max_attempts is a plain integer field on the assignment — parse defensively, default to 1. */
+export function draftToMaxAttempts(draft: AssignmentDraft): number {
+  const n = Number(draft.maxAttempts)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1
+}
+
+export function buildAssignmentRequirements(draft: AssignmentDraft): Array<{
+  label: string
+  allowed_file_types: string
+  max_bytes: number
+  required: boolean
+  order: number
+  naming_hint: string
+}> {
+  const requirementDrafts = draft.requirements?.length
+    ? draft.requirements
+    : [{
+        id: makeId(),
+        label: draft.title.trim() || 'Submission file',
+        allowedFileTypes: draft.acceptedFileTypes.length ? draft.acceptedFileTypes : ['pdf', 'docx'],
+        maxBytesMb: '20',
+        required: true,
+        namingHint: 'Use your name and assignment title in the filename.',
+      }]
+
+  return requirementDrafts.map((requirement, index) => {
+    const normalized = Array.from(new Set((requirement.allowedFileTypes.length ? requirement.allowedFileTypes : draft.acceptedFileTypes).map((type) => type.trim().toLowerCase()).filter(Boolean)))
+    const parsedMb = Number(requirement.maxBytesMb)
+    return {
+      label: requirement.label.trim() || `Submission file ${index + 1}`,
+      allowed_file_types: normalized.join(','),
+      max_bytes: Number.isFinite(parsedMb) && parsedMb > 0 ? parsedMb * 1024 * 1024 : 20 * 1024 * 1024,
+      required: requirement.required,
+      order: index + 1,
+      naming_hint: requirement.namingHint.trim() || 'Use your name and assignment title in the filename.',
+    }
+  })
 }
 
 const MODAL_CSS = `
@@ -248,6 +277,23 @@ const MODAL_CSS = `
   .acm-filetype-row { display: flex; flex-wrap: wrap; gap: 8px; }
   .acm-filetype-chip { box-sizing: border-box; padding: 0 12px; height: 32px; border-radius: 14px; border: 1px solid #EBEBEB; background: #fff; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; color: #99A1AF; cursor: pointer; }
   .acm-filetype-chip.active { background: #E9F5FF; border-color: #2492EB; color: #2492EB; }
+
+  .acm-slot-list { display: flex; flex-direction: column; gap: 16px; }
+  .acm-slot-card { border: 1px solid #EBEBEB; background: #FAFAFA; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .acm-slot-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .acm-slot-head-title { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 12px; color: #2B2B2C; }
+  .acm-slot-required { display: inline-flex; align-items: center; gap: 6px; font-family: 'Sora', sans-serif; font-size: 11px; color: #616873; }
+  .acm-slot-required input { accent-color: #2492EB; }
+  .acm-slot-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
+  .acm-slot-input { box-sizing: border-box; width: 100%; background: #fff; border: 1px solid #EBEBEB; border-radius: 10px; padding: 0 10px; height: 36px; font-family: 'Sora', sans-serif; font-weight: 400; font-size: 12px; color: #2B2B2C; }
+  .acm-slot-size-wrap { position: relative; }
+  .acm-slot-size-wrap input { padding-right: 32px; }
+  .acm-slot-size-suffix { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: 'Sora', sans-serif; font-size: 10px; color: #99A1AF; }
+  .acm-slot-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .acm-slot-remove { border: none; background: none; color: #99A1AF; display: flex; align-items: center; gap: 4px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11px; cursor: pointer; }
+  .acm-slot-remove:hover { color: #DC2626; }
+
+  .acm-unsent-badge { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 999px; padding: 2px 8px; }
 
   /* footer */
   .acm-footer { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 20px 24px; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
@@ -363,9 +409,9 @@ export default function AssignmentCreatorModal({
   function removeCriterion(id: string) {
     setDraft((d) => ({ ...d, gradingCriteria: d.gradingCriteria.filter((c) => c.id !== id) }))
   }
-  const totalPoints = rubricWeightTotal(draft)
-  const hasCriteria = draft.gradingCriteria.some((c) => c.criterion.trim())
-  const rubricValid = !hasCriteria || totalPoints === 100
+  const totalPoints = gradingCriteriaTotal(draft)
+  
+  const criteriaValid = true
 
   function addCoverImages(files: FileList | null) {
     if (!files) return
@@ -390,12 +436,26 @@ export default function AssignmentCreatorModal({
     setDraft((d) => ({ ...d, resources: d.resources.filter((r) => r.id !== id) }))
   }
 
-  function toggleFileType(type: string) {
+  function updateRequirement(id: string, patch: Partial<AssignmentRequirementDraft>) {
     setDraft((d) => ({
       ...d,
-      acceptedFileTypes: d.acceptedFileTypes.includes(type)
-        ? d.acceptedFileTypes.filter((t) => t !== type)
-        : [...d.acceptedFileTypes, type],
+      requirements: d.requirements.map((requirement) => requirement.id === id ? { ...requirement, ...patch } : requirement),
+    }))
+  }
+
+  function addRequirement() {
+    setDraft((d) => ({
+      ...d,
+      requirements: [...d.requirements, makeRequirementDraft(d.title.trim() || 'Submission file', d.acceptedFileTypes)],
+    }))
+  }
+
+  function removeRequirement(id: string) {
+    setDraft((d) => ({
+      ...d,
+      requirements: d.requirements.length > 1
+        ? d.requirements.filter((requirement) => requirement.id !== id)
+        : d.requirements,
     }))
   }
 
@@ -403,7 +463,10 @@ export default function AssignmentCreatorModal({
   const deadlineMissing = !draft.deadline
   const deadlineInPast = !!deadlineDate && deadlineDate.getTime() < Date.now()
 
-  const canSave = draft.title.trim().length > 0 && !deadlineMissing && !deadlineInPast && rubricValid
+  const maxAttemptsNum = Number(draft.maxAttempts)
+  const maxAttemptsInvalid = draft.maxAttempts.trim() !== '' && (!Number.isFinite(maxAttemptsNum) || maxAttemptsNum < 1)
+
+  const canSave = draft.title.trim().length > 0 && !deadlineMissing && !deadlineInPast && criteriaValid && !maxAttemptsInvalid
 
   function handleSave() {
     if (!canSave) return
@@ -420,7 +483,7 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-body">
-          {/* Assignment title / Module / Course / Deadline / Final */}
+          {/* Assignment title / Module / Course / Deadline / Max attempts / Accept late / Final */}
           <div className="acm-top-fields">
             <div className="acm-field-half">
               <span className="acm-field-label">Assignment title</span>
@@ -441,11 +504,13 @@ export default function AssignmentCreatorModal({
             </div>
 
             <div className="acm-field-full">
-              <span className="acm-field-label">Short description</span>
+              <span className="acm-field-label">
+                Short description
+              </span>
               <textarea
                 className="acm-textarea"
                 style={{ minHeight: 60 }}
-                placeholder="One or two sentences summarizing the assignment"
+                placeholder="One or two sentences summarizing the assignment (kept here for your reference — no backend field for it yet)"
                 value={draft.description}
                 onChange={(e) => update('description', e.target.value)}
               />
@@ -460,6 +525,34 @@ export default function AssignmentCreatorModal({
                 onChange={(e) => update('deadline', e.target.value)}
               />
               {deadlineInPast && <span className="acm-field-error">Deadline must be in the future.</span>}
+            </div>
+
+            <div className="acm-field-half">
+              <span className="acm-field-label">Max attempts</span>
+              <input
+                type="number"
+                min={1}
+                className="acm-input"
+                placeholder="e.g. 3"
+                value={draft.maxAttempts}
+                onChange={(e) => update('maxAttempts', e.target.value.replace(/[^0-9]/g, ''))}
+              />
+              {maxAttemptsInvalid && <span className="acm-field-error">Enter a number of 1 or more.</span>}
+            </div>
+
+            <div className="acm-toggle-field">
+              <div className="acm-toggle-labels">
+                <span className="acm-toggle-title">Accept late submissions</span>
+                <span className="acm-toggle-sub">Learners can still submit after the deadline (flagged as late)</span>
+              </div>
+              <label className="acm-toggle">
+                <input
+                  type="checkbox"
+                  checked={draft.acceptLate}
+                  onChange={(e) => update('acceptLate', e.target.checked)}
+                />
+                <span className="track" />
+              </label>
             </div>
 
             <div className="acm-toggle-field">
@@ -602,14 +695,14 @@ export default function AssignmentCreatorModal({
               <div className="acm-section-icon"><Award size={15} /></div>
               <div>
                 <div className="acm-section-title">Grading criteria</div>
-                <div className="acm-section-sub">Breakdown of how submissions are scored —must add up to 100</div>
+                <div className="acm-section-sub">Breakdown of how submissions are scored</div>
               </div>
             </div>
             <div className="acm-grading-table">
               <div className="acm-grading-head">
                 <span>Criterion</span>
                 <span>Description</span>
-                <span>Weight %</span>
+                <span>Max points</span>
                 <span />
               </div>
               {draft.gradingCriteria.map((c) => (
@@ -642,8 +735,8 @@ export default function AssignmentCreatorModal({
                 <button className="acm-grading-add-btn" onClick={addCriterion}>
                   <Plus size={12} /> Add criterion
                 </button>
-                <span className={`acm-grading-total${hasCriteria ? (totalPoints === 100 ? ' ok' : ' warn') : ''}`}>
-                  {totalPoints} / 100
+                <span className="acm-grading-total">
+                  {totalPoints} pt{totalPoints === 1 ? '' : 's'} total
                 </span>
               </div>
             </div>
@@ -654,8 +747,10 @@ export default function AssignmentCreatorModal({
             <div className="acm-section-head">
               <div className="acm-section-icon"><Paperclip size={15} /></div>
               <div>
-                <div className="acm-section-title">Resources &amp; Templates</div>
-                <div className="acm-section-sub">Files and links learners can download before starting </div>
+                <div className="acm-section-title">
+                  Resources &amp; Templates
+                </div>
+                <div className="acm-section-sub">Files and links learners can download before starting</div>
               </div>
             </div>
             <div className="acm-section-card">
@@ -696,11 +791,91 @@ export default function AssignmentCreatorModal({
             <div className="acm-section-head">
               <div className="acm-section-icon"><ClipboardList size={15} /></div>
               <div>
-                <div className="acm-section-title">Submission requirements</div>
-                <div className="acm-section-sub">Rules and constraints for learner submissions </div>
+                <div className="acm-section-title">
+                  Submission requirements
+                </div>
+                <div className="acm-section-sub">Rules and constraints for learner submissions — no confirmed backend field yet</div>
               </div>
             </div>
             <div className="acm-section-card">
+              <div>
+                <div className="acm-cover-label" style={{ marginBottom: 8 }}>Submission slots</div>
+                <div className="acm-slot-list">
+                  {draft.requirements.map((requirement, index) => (
+                    <div className="acm-slot-card" key={requirement.id}>
+                      <div className="acm-slot-head">
+                        <span className="acm-slot-head-title">Slot {index + 1}</span>
+                        <label className="acm-slot-required">
+                          <input
+                            type="checkbox"
+                            checked={requirement.required}
+                            onChange={(e) => updateRequirement(requirement.id, { required: e.target.checked })}
+                          />
+                          Required
+                        </label>
+                      </div>
+
+                      <div className="acm-slot-grid">
+                        <input
+                          className="acm-slot-input"
+                          value={requirement.label}
+                          onChange={(e) => updateRequirement(requirement.id, { label: e.target.value })}
+                          placeholder="e.g. Proposal document"
+                        />
+                        <div className="acm-slot-size-wrap">
+                          <input
+                            className="acm-slot-input"
+                            type="number"
+                            min={1}
+                            value={requirement.maxBytesMb}
+                            onChange={(e) => updateRequirement(requirement.id, { maxBytesMb: e.target.value.replace(/[^0-9]/g, '') })}
+                            placeholder="20"
+                          />
+                          <span className="acm-slot-size-suffix">MB</span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="acm-slot-input"
+                        value={requirement.namingHint}
+                        onChange={(e) => updateRequirement(requirement.id, { namingHint: e.target.value })}
+                        placeholder="Use your name and assignment title in the filename."
+                      />
+
+                      <div>
+                        <div className="acm-cover-label" style={{ marginBottom: 8 }}>Accepted file types</div>
+                        <div className="acm-filetype-row">
+                          {FILE_TYPE_OPTIONS.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              className={`acm-filetype-chip${requirement.allowedFileTypes.includes(type) ? ' active' : ''}`}
+                              onClick={() => {
+                                const nextList = requirement.allowedFileTypes.includes(type)
+                                  ? requirement.allowedFileTypes.filter((t) => t !== type)
+                                  : [...requirement.allowedFileTypes, type]
+                                updateRequirement(requirement.id, { allowedFileTypes: nextList })
+                              }}
+                            >
+                              .{type}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="acm-slot-actions">
+                        <button type="button" className="acm-slot-remove" onClick={() => removeRequirement(requirement.id)}>
+                          <Trash2 size={12} /> Remove slot
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="acm-add-item-btn" onClick={addRequirement} style={{ marginTop: 12 }}>
+                  <Plus size={12} /> Add another file slot
+                </button>
+              </div>
+
               <div>
                 <div className="acm-cover-label" style={{ marginBottom: 8 }}>Word count range</div>
                 <div className="acm-wc-row">
@@ -728,32 +903,16 @@ export default function AssignmentCreatorModal({
                   <span className="acm-wc-words">words</span>
                 </div>
               </div>
-
-              <div>
-                <div className="acm-cover-label" style={{ marginBottom: 8 }}>Accepted file types</div>
-                <div className="acm-filetype-row">
-                  {FILE_TYPE_OPTIONS.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`acm-filetype-chip${draft.acceptedFileTypes.includes(type) ? ' active' : ''}`}
-                      onClick={() => toggleFileType(type)}
-                    >
-                      .{type}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
         <div className="acm-footer">
-          {!rubricValid && (
-            <span className="acm-footer-warning">Grading weights must add up to 100 before saving.</span>
-          )}
           {deadlineMissing && (
             <span className="acm-footer-warning">Set a deadline before saving.</span>
+          )}
+          {maxAttemptsInvalid && (
+            <span className="acm-footer-warning">Max attempts must be 1 or more.</span>
           )}
           <button className="acm-btn-cancel" onClick={onClose}>Cancel</button>
           <button className="acm-btn-save" onClick={handleSave} disabled={!canSave}>

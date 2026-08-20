@@ -77,6 +77,7 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   TRAINER_BOOKINGS: '/trainer/bookings',
   TRAINER_ANALYTICS: '/trainer/analytics',
   TRAINER_NOTIFICATIONS: '/trainer/notifications',
+  TRAINER_COMMUNITY: '/trainer/community',
 
 // ===========================
 // ADMIN ROUTES (Authenticated admins only)
@@ -90,7 +91,7 @@ ADMIN_USERS: '/admin/users',
 ADMIN_REVENUE: '/admin/revenue', 
 ADMIN_COURSES: '/admin/courses',  
 ADMIN_SETTINGS: '/admin/settings', 
-
+ADMIN_COMMUNITY: '/admin/community',
   // ===========================
   // ERROR PAGES
   // ===========================
@@ -320,6 +321,7 @@ liveSessionJoin: (id: string | number) =>
   trainerBookings: () => ROUTES.TRAINER_BOOKINGS,
   trainerAnalytics: () => ROUTES.TRAINER_ANALYTICS,
 trainerNotifications: () => ROUTES.TRAINER_NOTIFICATIONS,
+trainerCommunity: () => ROUTES.TRAINER_COMMUNITY,
   // Admin routes
  
   adminDashboard: () => ROUTES.ADMIN_DASHBOARD,
@@ -331,6 +333,7 @@ adminSignup: () => ROUTES.ADMIN_SIGNUP,
 adminResetPassword: () => ROUTES.ADMIN_RESET_PASSWORD,
 adminForgotPassword: () => ROUTES.ADMIN_FORGOT_PASSWORD,
 adminSettings: () => ROUTES.ADMIN_SETTINGS,
+adminCommunity:() => ROUTES.ADMIN_COMMUNITY,
 
   // Error routes
   notFound: () => ROUTES.NOT_FOUND,

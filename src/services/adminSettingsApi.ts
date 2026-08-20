@@ -1,90 +1,129 @@
-import type { AxiosError } from 'axios'
-import { apiClient } from './api'
+// services/adminSettingsApi.ts
+import { apiClient, parseApiError } from './api' // adjust path/names to match your actual client
 import type {
-  SettingsSectionsResponse,
-  SystemSettings,
-  PatchedSystemSettings,
-  PaginatedSettingsAuditEntryList,
-  SettingsAuditLogParams,
+  SystemSettings, PatchedSystemSettings, AdminProfile, AdminSession, AuditLogPage,
 } from '../types/adminSettings'
 
-interface ApiErrorResponse {
-  detail?: string
-  [key: string]: unknown
-}
+export type ApiResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; statusCode?: number }
 
-function parseAdminError(error: unknown, fallback: string): { message: string; statusCode?: number } {
-  const err = error as AxiosError<ApiErrorResponse>
-  const data = err.response?.data
-  const statusCode = err.response?.status
-  let message = fallback
-  if (data?.detail && typeof data.detail === 'string') {
-    message = data.detail
-  } else if (data) {
-    const firstKey = Object.keys(data).find((k) => k !== 'code')
-    if (firstKey) {
-      const val = data[firstKey]
-      if (Array.isArray(val)) message = val[0]
-      else if (typeof val === 'string') message = val
-    }
-  }
-  return { message, statusCode }
-}
-
-function buildAuditQuery(params?: SettingsAuditLogParams): string {
-  const query = new URLSearchParams()
-  if (params?.changed_by) query.set('changed_by', params.changed_by)
-  if (params?.field_name) query.set('field_name', params.field_name)
-  if (params?.page) query.set('page', String(params.page))
-  if (params?.page_size) query.set('page_size', String(params.page_size))
-  return query.toString()
-}
+const NO_OP_MESSAGE = 'No settings were changed.'
 
 export const adminSettingsAPI = {
-  /** GET /v1/admin/settings/sections/ — panel layout (sidebar + which field keys belong to each) */
-  getSections: async () => {
+  async getSettings(): Promise<ApiResult<SystemSettings>> {
     try {
-      const response = await apiClient.get<SettingsSectionsResponse>('/v1/admin/settings/sections/')
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseAdminError(error, 'Failed to load settings layout')
-      return { success: false as const, error: message, statusCode }
+      const res = await apiClient.get<SystemSettings>('/v1/admin/settings/')
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to load settings')
+      return { success: false, error: message, statusCode }
     }
   },
 
-  /** GET /v1/admin/settings/ — never 404s, row exists with defaults */
-  getSettings: async () => {
+  // payload should already be filtered to backend-confirmed keys only (see
+  // AdminSettingsPage's `available` filtering before calling this).
+  async updateSettings(payload: PatchedSystemSettings): Promise<ApiResult<SystemSettings>> {
     try {
-      const response = await apiClient.get<SystemSettings>('/v1/admin/settings/')
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseAdminError(error, 'Failed to load settings')
-      return { success: false as const, error: message, statusCode }
+      const res = await apiClient.patch<SystemSettings>('/v1/admin/settings/', payload)
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to update settings')
+      if (statusCode === 409) {
+        return { success: false, error: NO_OP_MESSAGE, statusCode: 409 }
+      }
+      return { success: false, error: message, statusCode }
     }
   },
 
-  /** PATCH /v1/admin/settings/ — send only changed fields, optional `reason` for the audit log */
-  updateSettings: async (changes: PatchedSystemSettings) => {
+  async getAuditLog(params?: { field_name?: string; page?: number; page_size?: number }): Promise<ApiResult<AuditLogPage>> {
     try {
-      const response = await apiClient.patch<SystemSettings>('/v1/admin/settings/', changes)
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseAdminError(error, 'Failed to save settings')
-      return { success: false as const, error: message, statusCode }
+      const res = await apiClient.get<AuditLogPage>('/v1/admin/settings/audit-log/', { params })
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to load audit log')
+      return { success: false, error: message, statusCode }
+    }
+  },
+}
+
+export const NO_OP_ERROR_MESSAGE = NO_OP_MESSAGE
+
+// ── Admin's own profile — endpoints below remain UNCONFIRMED placeholders.
+// Only /admin/settings/, /admin/settings/audit-log/, /admin/settings/sections/,
+// and the admin-recovery group have been verified against Swagger so far.
+// Nothing under /admin/profile/ has been confirmed to exist. Treat this whole
+// block as provisional until a backend dev confirms real paths — the Profile
+// tab shows an "unconfirmed" banner and its Save/Update actions should be
+// expected to fail until then.
+export const adminProfileAPI = {
+  async getProfile(): Promise<ApiResult<AdminProfile>> {
+    try {
+      const res = await apiClient.get<AdminProfile>('/admin/profile/')
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to load profile')
+      return { success: false, error: message, statusCode }
     }
   },
 
-  /** GET /v1/admin/settings/audit-log/ — paginated, newest first */
-  getAuditLog: async (params?: SettingsAuditLogParams) => {
+  async updateProfile(payload: Partial<Pick<AdminProfile, 'full_name' | 'email' | 'phone'>>): Promise<ApiResult<AdminProfile>> {
     try {
-      const qs = buildAuditQuery(params)
-      const response = await apiClient.get<PaginatedSettingsAuditEntryList>(
-        `/v1/admin/settings/audit-log/${qs ? `?${qs}` : ''}`,
-      )
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseAdminError(error, 'Failed to load settings history')
-      return { success: false as const, error: message, statusCode }
+      const res = await apiClient.patch<AdminProfile>('/admin/profile/', payload)
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to update profile')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  async changePassword(payload: { current_password: string; new_password: string }): Promise<ApiResult<{ message: string }>> {
+    try {
+      const res = await apiClient.post<{ message: string }>('/admin/profile/change-password/', payload)
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to change password')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  async setTwoFactor(enabled: boolean): Promise<ApiResult<{ two_factor_enabled: boolean }>> {
+    try {
+      const res = await apiClient.patch<{ two_factor_enabled: boolean }>('/admin/profile/two-factor/', { enabled })
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to update two-factor settings')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  async setSessionTimeout(minutes: number): Promise<ApiResult<{ session_timeout_minutes: number }>> {
+    try {
+      const res = await apiClient.patch<{ session_timeout_minutes: number }>('/admin/profile/', { session_timeout_minutes: minutes })
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to update session timeout')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  async getSessions(): Promise<ApiResult<AdminSession[]>> {
+    try {
+      const res = await apiClient.get<AdminSession[]>('/admin/profile/sessions/')
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to load sessions')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  async revokeSession(sessionId: string): Promise<ApiResult<{ revoked: boolean }>> {
+    try {
+      const res = await apiClient.delete<{ revoked: boolean }>(`/admin/profile/sessions/${sessionId}/`)
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to revoke session')
+      return { success: false, error: message, statusCode }
     }
   },
 }

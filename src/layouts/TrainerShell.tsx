@@ -103,23 +103,43 @@ export const SHELL_CSS = `
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; position: relative; }
-  .tab-item.active { color: #2563EB; }
+  .tab-item.active { color: #2492EB; }
   .tab-item .tab-badge { position: absolute; top: 2px; right: calc(50% - 18px); background: #F59E0B; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 999px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
 
   @media (max-width: 640px) {
-    .sidebar { display: none; }
-    .search-wrap { display: none; }
-    .navbar { padding: 0 1rem; }
-    .navbar-logo img { height: 1.35rem; width: auto; }
-    .navbar-page-subtitle { display: none; }
-    .mobile-tabbar { display: block; }
-  }
+  .sidebar { display: none; }
+  .search-wrap { display: none; }
+  .navbar { padding: 0 1rem; }
+  .navbar-logo img { height: 1.35rem; width: auto; }
+  .navbar-page-subtitle { display: none; }
+  .mobile-tabbar { display: block; }
+  .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }  
+}
 `
 
 interface TrainerShellProps {
   children: React.ReactNode
   /** When set, replaces the logo/search/bell/profile row with a back button + title/subtitle. */
   pageHeader?: { title: string; subtitle?: string; onBack: () => void }
+}
+
+function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; initials: string; className: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+
+  if (avatarUrl && !imgFailed) {
+    return (
+      <div className={className}>
+        <img
+          src={avatarUrl}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  return <div className={className}>{initials}</div>
 }
 
 export default function TrainerShell({ children, pageHeader }: TrainerShellProps) {
@@ -158,6 +178,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
+  const avatarUrl = user.avatar_url ?? null
   const activeRoute = navItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
 
   function handleNav(key: string, route: string) {
@@ -254,13 +275,13 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
                     aria-expanded={profileOpen}
                     aria-label="Open profile menu"
                   >
-                    <div className="topbar-avatar">{initials}</div>
+                    <Avatar avatarUrl={avatarUrl} initials={initials} className="topbar-avatar" />
                     <ChevronDown size={16} className={`profile-chevron${profileOpen ? ' open' : ''}`} />
                   </button>
                   {profileOpen && (
                     <div className="profile-dropdown" role="menu">
                       <div className="profile-dropdown-header">
-                        <div className="user-avatar">{initials}</div>
+                        <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
                         <div style={{ overflow: 'hidden' }}>
                           <div className="profile-dropdown-name">{user.name || user.email}</div>
                           <div className="profile-dropdown-email">{user.email}</div>
@@ -327,7 +348,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
 })}
             </nav>
             <div className="sidebar-user">
-              <div className="user-avatar">{initials}</div>
+              <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
               <div className="user-text">
                 <div className="user-name">{user.name || user.email}</div>
                 <div className="user-email">{user.email}</div>

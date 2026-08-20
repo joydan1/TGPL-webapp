@@ -13,10 +13,13 @@ import {
   trainerAssignmentsAPI,
   type CourseLevel,
   type CreateTrainerAssignmentPayload,
+  type TrainerAssignmentDetail,
 } from '../../../../services/api'
 import AssignmentCreatorModal, {
   type AssignmentDraft,
-  draftToRubric,
+  buildAssignmentRequirements,
+  draftToGradingCriteria,
+  draftToMaxAttempts,
   deadlineToISOString,
 } from '../../../../components/AssignmentCreationModal'
 
@@ -42,9 +45,6 @@ type Lesson = {
   videoUploaded: boolean
   materialsUploaded: boolean
   assignment: AssignmentDraft | null
-  // Id of the assignment once it's been saved to the trainer assignments
-  // API (module-scoped, not lesson-scoped — see saveCurriculumAndContinue).
-  // null until the first successful create.
   assignmentRemoteId: string | null
 }
 
@@ -96,6 +96,77 @@ function emptyLesson(): Lesson {
     assignment: null,
     assignmentRemoteId: null,
   }
+}
+
+function normalizeAssignmentDraft(detail: TrainerAssignmentDetail | null): AssignmentDraft | null {
+  if (!detail) return null
+
+  const gradingCriteria = (detail.grading_criteria ?? []).map((c) => ({
+    id: makeId(),
+    criterion: c.label,
+    description: '',
+    points: String(c.max_points ?? 0),
+  }))
+
+  const fileTypes = detail.requirements?.length
+    ? Array.from(new Set(detail.requirements.flatMap((req) => (req.allowed_file_types || '').split(',').map((type) => type.trim().toLowerCase()).filter(Boolean))))
+    : ['pdf', 'docx']
+
+  const requirementDrafts = (detail.requirements ?? []).length
+    ? detail.requirements!.map((req, index) => ({
+        id: makeId(),
+        label: req.label || `Submission file ${index + 1}`,
+        allowedFileTypes: Array.from(new Set((req.allowed_file_types || '').split(',').map((type) => type.trim().toLowerCase()).filter(Boolean))) || fileTypes,
+        maxBytesMb: String(Math.max(1, Math.round((req.max_bytes || 20 * 1024 * 1024) / (1024 * 1024)))),
+        required: req.required,
+        namingHint: req.naming_hint || 'Use your name and assignment title in the filename.',
+      }))
+    : [{
+        id: makeId(),
+        label: detail.title || 'Submission file',
+        allowedFileTypes: fileTypes,
+        maxBytesMb: '20',
+        required: true,
+        namingHint: 'Use your name and assignment title in the filename.',
+      }]
+
+  return {
+    title: detail.title ?? '',
+    description: '',
+    instructions: detail.instructions ?? '',
+    deadline: detail.deadline ? new Date(detail.deadline).toISOString().slice(0, 16) : '',
+    isFinal: Boolean(detail.is_final),
+    maxAttempts: String(detail.max_attempts ?? 1),
+    acceptLate: Boolean(detail.accept_late),
+    coverImages: [],
+    whatYoullDo: [''],
+    scenarios: [''],
+    deliverables: [''],
+    gradingCriteria: gradingCriteria.length ? gradingCriteria : [{ id: makeId(), criterion: '', description: '', points: '' }],
+    resources: [],
+    wordCountMin: '',
+    wordCountMax: '',
+    acceptedFileTypes: fileTypes,
+    // Note: requirement drafts get fresh local ids here (makeId()), not the
+    // backend requirement id — see the comment in saveCurriculumAndContinue()
+    // for why that means edits to an already-saved assignment don't re-sync
+    // existing requirement rows.
+    requirements: requirementDrafts,
+  }
+}
+ 
+function findSavedAssignment(moduleAssignments: TrainerAssignmentDetail[], moduleTitle?: string, lessonTitle?: string) {
+  if (!moduleAssignments.length) return null
+
+  const normalizedLessonTitle = lessonTitle?.trim().toLowerCase() ?? ''
+  const normalizedModuleTitle = moduleTitle?.trim().toLowerCase() ?? ''
+
+  return moduleAssignments.find((assignment) => {
+    const aModule = assignment.module?.title?.trim().toLowerCase() ?? (assignment as any).module_title?.trim().toLowerCase() ?? ''
+    const aTitle = assignment.title?.trim().toLowerCase() ?? ''
+    return (!normalizedLessonTitle || aTitle.includes(normalizedLessonTitle) || aTitle === normalizedLessonTitle)
+      && (!normalizedModuleTitle || aModule === normalizedModuleTitle || aModule.includes(normalizedModuleTitle))
+  }) ?? moduleAssignments[0]
 }
 
 const initialForm: CourseForm = {
@@ -220,13 +291,13 @@ const PAGE_CSS = `
   .ac-preview-ctrl-btn.primary { width: 52px; height: 52px; background: rgba(0,0,0,0.4); }
   .ac-preview-video-bottom { display: flex; flex-direction: column; gap: 0.5rem; }
   .ac-preview-progress { height: 4px; border-radius: 999px; background: rgba(255,255,255,0.3); position: relative; }
-  .ac-preview-progress-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 30%; background: #2563EB; border-radius: 999px; }
+  .ac-preview-progress-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 30%; background: #2492EB; border-radius: 999px; }
   .ac-preview-video-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; }
   .ac-preview-video-icons { display: flex; align-items: center; gap: 0.6rem; }
   .ac-preview-auto { font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; padding: 0.05rem 0.35rem; }
 
   .ac-preview-info { padding: 1.1rem 1.25rem; }
-  .ac-preview-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
+  .ac-preview-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2492EB; font-weight: 700; }
   .ac-preview-title { margin: 0.3rem 0 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
   .ac-preview-sub { margin: 0.35rem 0 0; color: #6B7280; font-size: 0.875rem; }
   .ac-preview-badges { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.85rem; }
@@ -279,12 +350,6 @@ export default function AddCoursePage() {
   const { id } = useParams<{ id: string }>()
   const isEditMode = Boolean(id)
 
-  // This wizard is shared between the trainer flow and the admin flow —
-  // same form, same steps, same API calls. Only the shell chrome and the
-  // "where do Back / Save draft / Publish success send you" routes differ,
-  // and both are derived from the URL prefix rather than a prop, so the
-  // same <AddCoursePage/> component can be mounted at both
-  // /trainer/courses/(add|:id/edit) and /admin/courses/(new|:id/edit).
   const isAdmin = location.pathname.startsWith('/admin')
   const Shell = isAdmin ? AdminShell : TrainerShell
   const coursesListRoute = isAdmin ? '/admin/courses' : ROUTES.TRAINER_COURSES
@@ -295,9 +360,7 @@ export default function AddCoursePage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   const [courseId, setCourseId] = useState<string | null>(id ?? null)
-  // The trainer assignments API is slug-scoped (/v1/trainer/courses/<slug>/assignments/),
-  // unlike the rest of this wizard which works off the course's UUID — so we
-  // track both once the draft exists.
+  
   const [courseSlug, setCourseSlug] = useState<string | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -309,9 +372,6 @@ export default function AddCoursePage() {
   // Which lesson's assignment modal is open (null = closed).
   const [assignmentModalLessonId, setAssignmentModalLessonId] = useState<string | null>(null)
 
-  // Real video preview for the review step — resolves to whichever lesson
-  // has a video (a freshly picked File, or an already-uploaded one when
-  // editing), and creates/revokes an object URL for File-based previews.
   const previewLesson = form.lessons.find((l) => l.videoFile) ?? form.lessons.find((l) => l.existingVideoUrl)
   const [previewVideoSrc, setPreviewVideoSrc] = useState<string | null>(null)
 
@@ -355,51 +415,56 @@ export default function AddCoursePage() {
 
       const draft = draftRes.data
 
-      // NOTE: this wizard's curriculum step supports a single module.
-      // If a course has more than one module, only the first module's
-      // lessons are loaded here. Flag it if that's a real scenario for
-      // any existing courses — we'd need to extend the curriculum step
-      // to handle multiple modules.
-      const firstModule = curriculumRes.success ? curriculumRes.data[0] : undefined
-      const curriculumLessons = firstModule?.lessons ?? []
+      const curriculumModules = curriculumRes.success ? curriculumRes.data : []
+      const curriculumLessons = curriculumModules.flatMap((module) =>
+        module.lessons.map((lesson) => ({ ...lesson, moduleId: module.id })),
+      )
 
-      // The curriculum tree endpoint (getCurriculum) only returns lightweight
-      // per-lesson fields — id, title, order, duration_seconds,
-      // duration_display, is_preview. It never includes `video_url` or
-      // `resource_keys`, even when they exist server-side. Those only come
-      // back from the per-lesson detail endpoint, so we fetch each lesson
-      // individually (in parallel) right after the tree loads. This is what
-      // actually lets edit mode see previously-uploaded video/materials.
       const lessonDetailResults = await Promise.all(
-        curriculumLessons.map((l) => coursesManageAPI.getLesson(l.id)),
+        curriculumLessons.map((lesson) => coursesManageAPI.getLesson(lesson.id)),
       )
 
       if (cancelled) return
 
-      const prefilledLessons: Lesson[] = curriculumLessons.map((l, i) => {
-        const detailRes = lessonDetailResults[i]
-        const detail = detailRes.success ? detailRes.data : null
+      const assignmentsByModule = new Map<string, TrainerAssignmentDetail[]>()
+      if (draft.slug) {
+        const assignmentsRes = await trainerAssignmentsAPI.list(draft.slug)
+        if (assignmentsRes.success) {
+          const assignmentDetails = await Promise.all(
+            assignmentsRes.data.map((assignment) => trainerAssignmentsAPI.get(draft.slug, assignment.id)),
+          )
+
+          assignmentDetails.forEach((result) => {
+            if (!result.success) return
+            const detail = result.data as TrainerAssignmentDetail & { module_id?: string }
+            const moduleId = detail.module?.id ?? detail.module_id ?? null
+            if (!moduleId) return
+            const existing = assignmentsByModule.get(moduleId) ?? []
+            assignmentsByModule.set(moduleId, [...existing, detail])
+          })
+        }
+      }
+
+      const prefilledLessons: Lesson[] = curriculumLessons.map((lesson) => {
+        const detailRes = lessonDetailResults.find((result) => result.success && result.data.id === lesson.id)
+        const detail = detailRes?.success ? detailRes.data : null
+        const moduleAssignments = assignmentsByModule.get(lesson.moduleId) ?? []
+        const loadedAssignment = findSavedAssignment(moduleAssignments, undefined, lesson.title) ? normalizeAssignmentDraft(findSavedAssignment(moduleAssignments, undefined, lesson.title)) : null
+        const rawVideoUrl = (lesson as any).video_url ?? (lesson as any).videoUrl ?? (detail as any)?.video_url ?? (detail as any)?.videoUrl ?? null
 
         return {
           id: makeId(),
-          remoteId: l.id,
-          title: l.title ?? '',
+          remoteId: lesson.id,
+          title: lesson.title ?? '',
           description: detail?.body ?? '',
           videoFile: null,
-          existingVideoUrl: detail?.video_url ?? null,
+          existingVideoUrl: rawVideoUrl,
           materialFiles: [],
           existingMaterialsCount: detail?.resource_keys?.length ?? 0,
-          // Existing lessons already have their media saved server-side;
-          // we only re-upload if the user picks a new file in this session.
-          videoUploaded: true,
+          videoUploaded: !!rawVideoUrl,
           materialsUploaded: true,
-          // The trainer assignments list endpoint isn't queried here, so
-          // an existing assignment on this lesson's module won't show
-          // pre-filled — it'll just look like the lesson has none yet.
-          // Wire up trainerAssignmentsAPI.list(courseSlug) here if/when
-          // edit mode needs to surface existing assignments.
-          assignment: null,
-          assignmentRemoteId: null,
+          assignment: loadedAssignment,
+          assignmentRemoteId: loadedAssignment ? (moduleAssignments[0]?.id ?? null) : null,
         }
       })
 
@@ -426,7 +491,7 @@ export default function AddCoursePage() {
 
       setCourseId(id as string)
       setCourseSlug(draft.slug ?? null)
-      if (firstModule) setModuleId(firstModule.id)
+      if (curriculumModules[0]) setModuleId(curriculumModules[0].id)
       setLoading(false)
     }
 
@@ -481,15 +546,7 @@ export default function AddCoursePage() {
       if (result.data.slug) setCourseSlug(result.data.slug)
     }
 
-    // NOTE: cover image is intentionally NOT uploaded here.
-    // The presign endpoint (coursesManageAPI.uploadFile) is lesson-scoped —
-    // its schema requires `lesson_id` and its 404 case is literally "Lesson
-    // not found." There is no course-level target or course_id parameter
-    // documented for it, and 'course_cover' isn't a valid `target` choice.
-    // Confirm the real endpoint for course cover uploads (likely a separate
-    // route, e.g. multipart on the course draft PATCH, or its own
-    // /cover/ endpoint) before wiring this up — guessing another target
-    // string here would just trade one 400 for another.
+    
 
     setSaving(false)
     setStep(2)
@@ -533,7 +590,8 @@ export default function AddCoursePage() {
       setModuleId(activeModuleId)
     }
 
-    for (const lesson of form.lessons) {
+    for (let i = 0; i < form.lessons.length; i++) {
+      const lesson = form.lessons[i]
       if (!lesson.title.trim()) continue
 
       let remoteId = lesson.remoteId
@@ -595,41 +653,82 @@ export default function AddCoursePage() {
         }
       }
 
-      // Assignments live on the trainer assignments API (module-scoped, not
-      // lesson-scoped — see the Lesson.assignmentRemoteId comment above).
-      // We save it here, right after this lesson's own save succeeds, using
-      // the module id resolved above and the course's slug.
+     
       let assignmentRemoteId = lesson.assignmentRemoteId
+      const isNewAssignment = !assignmentRemoteId
 
       if (lesson.assignment) {
-        if (!courseSlug) {
-          setSaveError('Missing course reference — please reload the page and try again.')
-          setSaving(false)
-          return
-        }
+  if (!courseSlug) {
+    setSaveError('Missing course reference — please reload the page and try again.')
+    setSaving(false)
+    return
+  }
 
-        const payload: CreateTrainerAssignmentPayload = {
-          title: lesson.assignment.title,
-          module_id: activeModuleId,
-          description: lesson.assignment.description,
-          instructions: lesson.assignment.instructions,
-          deadline: deadlineToISOString(lesson.assignment.deadline),
-          is_final: lesson.assignment.isFinal,
-          rubric: draftToRubric(lesson.assignment),
-        }
+  const payload: CreateTrainerAssignmentPayload = {
+    module_id: activeModuleId,
+    title: lesson.assignment.title,
+    instructions: lesson.assignment.instructions,
+    deadline: deadlineToISOString(lesson.assignment.deadline),
+    max_attempts: draftToMaxAttempts(lesson.assignment),
+    accept_late: lesson.assignment.acceptLate,
+    grading_criteria: draftToGradingCriteria(lesson.assignment),
+    is_final: lesson.assignment.isFinal,
+    order: i + 1, // position within this module's assignment list
+  
+  }
 
-        const assignmentResult = assignmentRemoteId
-          ? await trainerAssignmentsAPI.update(courseSlug, assignmentRemoteId, payload)
-          : await trainerAssignmentsAPI.create(courseSlug, payload)
+  const assignmentResult = assignmentRemoteId
+    ? await trainerAssignmentsAPI.update(courseSlug, assignmentRemoteId, payload)
+    : await trainerAssignmentsAPI.create(courseSlug, payload)
 
-        if (!assignmentResult.success) {
-          setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
-          setSaving(false)
-          return
-        }
+  if (!assignmentResult.success) {
+    setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
+    setSaving(false)
+    return
+  }
 
-        assignmentRemoteId = assignmentResult.data.id
+  assignmentRemoteId = assignmentResult.data.id
+
+  // Submission requirement slots — only push these the first time this
+  // assignment is created. Requirement drafts don't carry the backend's
+  // requirement id (normalizeAssignmentDraft() re-generates local ids on
+  // load), so on a later edit we can't tell which draft row maps to which
+  // existing server row; re-creating them all here would duplicate slots
+  // every time a trainer re-saves the curriculum step. The backend also
+  // locks requirement writes with a 409 once any submission exists on the
+  // assignment, which listRequirements-and-skip below respects naturally.
+  // TODO: to support real per-slot editing after first save, requirement
+  // drafts need to carry their backend id end-to-end.
+  let shouldCreateRequirements = isNewAssignment
+  if (!isNewAssignment) {
+    const existingReqs = await trainerAssignmentsAPI.listRequirements(courseSlug, assignmentRemoteId)
+    shouldCreateRequirements = existingReqs.success && existingReqs.data.length === 0
+  }
+
+  if (shouldCreateRequirements) {
+    const requirementPayloads = buildAssignmentRequirements(lesson.assignment)
+    for (const reqPayload of requirementPayloads) {
+      const reqResult = await trainerAssignmentsAPI.createRequirement(courseSlug, assignmentRemoteId, reqPayload)
+      if (!reqResult.success) {
+        setSaveError(reqResult.error || `Failed to save a submission requirement for "${lesson.title}".`)
+        setSaving(false)
+        return
       }
+    }
+  }
+
+  for (const resource of lesson.assignment.resources) {
+    const resResult = await trainerAssignmentsAPI.createResource(courseSlug, assignmentRemoteId, {
+      title: resource.title,
+      file: resource.file,
+    })
+    if (!resResult.success) {
+      setSaveError(resResult.error || `Failed to upload "${resource.title}" for "${lesson.title}".`)
+      setSaving(false)
+      return
+    }
+  }
+}
 
       updateLesson(lesson.id, {
         remoteId,
