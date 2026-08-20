@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings,
   Search, Bell, ChevronDown,Calendar, ChevronLeft,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, MessageCircle,
   LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
@@ -15,6 +15,7 @@ export const NAV_ITEMS = [
   { key: 'home',      label: 'Home',         Icon: Home          },
   { key: 'courses',   label: 'Courses',      Icon: BookOpen      },
   { key: 'bookings',  label: 'Bookings',     Icon: Calendar      },
+  { key: 'community', label: 'Community',    Icon: MessageCircle },
   { key: 'live',      label: 'Live Classes', Icon: Radio         },
   { key: 'settings',  label: 'Settings',     Icon: Settings      },
 ]
@@ -42,13 +43,13 @@ export const SHELL_CSS = `
   .search-wrap input::placeholder { color: #9CA3AF; }
   .topbar-bell { width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative; transition: background 0.15s; }
   .topbar-bell:hover { background: #F3F4F6; }
-  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
+  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2492EB; }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
 
   /* ── Page header (replaces navbar content on sub-pages like Settings) ── */
   .navbar-page-header { display: flex; align-items: center; gap: 0.875rem; }
   .navbar-page-back { background: none; border: none; cursor: pointer; color: #111; padding: 0.25rem; display: flex; align-items: center; flex-shrink: 0; }
-  .navbar-page-back:hover { color: #2563EB; }
+  .navbar-page-back:hover { color: #2492EB; }
   .navbar-page-title { font-size: 1.0625rem; font-weight: 700; color: #111; line-height: 1.2; }
   .navbar-page-subtitle { font-size: 0.75rem; color: #6B7280; line-height: 1.2; margin-top: 1px; }
 
@@ -77,7 +78,7 @@ export const SHELL_CSS = `
   .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; }
   .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
   .nav-item:hover { background: #F9FAFB; color: #111; }
-  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+  .nav-item.active { background: #EFF6FF; color: #2492EB; font-weight: 600; }
   .nav-item .nav-label { flex: 1; }
   .nav-item .nav-chevron { transition: transform 0.18s ease; flex-shrink: 0; }
   .nav-item .nav-chevron.open { transform: rotate(180deg); }
@@ -107,7 +108,7 @@ export const SHELL_CSS = `
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
-  .tab-item.active { color: #2563EB; }
+  .tab-item.active { color: #2492EB; }
 
   @media (max-width: 640px) {
     .sidebar { display: none; }
@@ -123,8 +124,7 @@ interface AppShellProps {
   children: React.ReactNode
   activeNav?: string
   onNavChange?: (key: string) => void
-  /** When set, replaces the entire navbar row (logo + search + bell + profile)
-   *  with a back button + title/subtitle. Used by SettingsLayout sub-pages. */
+
   pageHeader?: { title: string; subtitle?: string; onBack: () => void }
 }
 
@@ -174,6 +174,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
     if (key === 'myCourse') navigate(ROUTES.COURSES)
     if (key === 'courses')  navigate(ROUTES.COURSES)
     if (key === 'live')     navigate(ROUTES.LIVE_SESSIONS)
+      if (key === 'community') navigate(ROUTES.COMMUNITY)
   }
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

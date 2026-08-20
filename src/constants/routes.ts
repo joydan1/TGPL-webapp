@@ -29,6 +29,7 @@ export const ROUTES = {
   COURSES: '/courses',
   COURSE_DETAIL: '/courses/:slug',
   CHECKOUT: '/checkout',
+COMMUNITY: '/community',
   COURSE_LEARN: '/courses/:slug/learn/:lessonId',
   COURSE_ASSIGNMENTS: '/courses/:slug/assignments',
   ASSIGNMENT_DETAIL: '/assignments/:id',
@@ -89,7 +90,8 @@ ADMIN_RESET_PASSWORD: '/admin/reset-password',
 ADMIN_FORGOT_PASSWORD: '/admin/forgot-password',
 ADMIN_USERS: '/admin/users',        
 ADMIN_REVENUE: '/admin/revenue', 
-ADMIN_COURSES: '/admin/courses',  
+ADMIN_COURSES: '/admin/courses', 
+ADMIN_COURSE_MANAGE: 'admin/courses/:slug/manage', 
 ADMIN_SETTINGS: '/admin/settings', 
 ADMIN_COMMUNITY: '/admin/community',
   // ===========================
@@ -135,7 +137,7 @@ export const ROUTE_GROUPS = {
     ROUTES.ADMIN_DASHBOARD,
     ROUTES.ADMIN_USERS,
     ROUTES.ADMIN_REVENUE,
-
+    
     ROUTES.ADMIN_LOGIN,
   ],
 } as const
@@ -267,6 +269,7 @@ export const RouteBuilder = {
   signup: () => ROUTES.SIGNUP,
   onboarding: () => ROUTES.ONBOARDING,
   dashboard: () => ROUTES.DASHBOARD,
+community: () => ROUTES.COMMUNITY,
   course: (slug: string) => getRoute(ROUTES.COURSE_DETAIL, { slug }),
 courseLearn: (slug: string, lessonId: string | number) =>
   getRoute(ROUTES.COURSE_LEARN, { slug, lessonId }),
@@ -328,6 +331,7 @@ trainerCommunity: () => ROUTES.TRAINER_COMMUNITY,
 adminRevenue: () => ROUTES.ADMIN_REVENUE,
 adminUsers: () => ROUTES.ADMIN_USERS,
 adminCourses: () => ROUTES.ADMIN_COURSES,
+adminCourseManage: () => ROUTES.ADMIN_COURSE_MANAGE,
 adminLogin: () => ROUTES.ADMIN_LOGIN,
 adminSignup: () => ROUTES.ADMIN_SIGNUP,
 adminResetPassword: () => ROUTES.ADMIN_RESET_PASSWORD,

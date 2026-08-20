@@ -138,9 +138,10 @@ export function draftToMaxAttempts(draft: AssignmentDraft): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1
 }
 
+/** allowed_file_types is a confirmed array field — do NOT join it into a comma string. */
 export function buildAssignmentRequirements(draft: AssignmentDraft): Array<{
   label: string
-  allowed_file_types: string
+  allowed_file_types: string[]
   max_bytes: number
   required: boolean
   order: number
@@ -162,7 +163,7 @@ export function buildAssignmentRequirements(draft: AssignmentDraft): Array<{
     const parsedMb = Number(requirement.maxBytesMb)
     return {
       label: requirement.label.trim() || `Submission file ${index + 1}`,
-      allowed_file_types: normalized.join(','),
+      allowed_file_types: normalized,
       max_bytes: Number.isFinite(parsedMb) && parsedMb > 0 ? parsedMb * 1024 * 1024 : 20 * 1024 * 1024,
       required: requirement.required,
       order: index + 1,
@@ -238,6 +239,8 @@ const MODAL_CSS = `
   .acm-add-item-btn:hover { background: #EFF6FF; }
   .acm-add-item-btn.muted { border-color: #D1D5DB; color: #99A1AF; }
   .acm-add-item-btn.muted:hover { background: #FAFAFA; }
+  .acm-add-item-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .acm-add-item-btn:disabled:hover { background: none; }
 
   /* grading table */
   .acm-grading-table { box-sizing: border-box; border: 1px solid #EBEBEB; border-radius: 14px; overflow: hidden; }
@@ -277,6 +280,7 @@ const MODAL_CSS = `
   .acm-filetype-row { display: flex; flex-wrap: wrap; gap: 8px; }
   .acm-filetype-chip { box-sizing: border-box; padding: 0 12px; height: 32px; border-radius: 14px; border: 1px solid #EBEBEB; background: #fff; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; color: #99A1AF; cursor: pointer; }
   .acm-filetype-chip.active { background: #E9F5FF; border-color: #2492EB; color: #2492EB; }
+  .acm-filetype-chip:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .acm-slot-list { display: flex; flex-direction: column; gap: 16px; }
   .acm-slot-card { border: 1px solid #EBEBEB; background: #FAFAFA; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
@@ -286,14 +290,19 @@ const MODAL_CSS = `
   .acm-slot-required input { accent-color: #2492EB; }
   .acm-slot-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
   .acm-slot-input { box-sizing: border-box; width: 100%; background: #fff; border: 1px solid #EBEBEB; border-radius: 10px; padding: 0 10px; height: 36px; font-family: 'Sora', sans-serif; font-weight: 400; font-size: 12px; color: #2B2B2C; }
+  .acm-slot-input:disabled { opacity: 0.6; cursor: not-allowed; }
   .acm-slot-size-wrap { position: relative; }
   .acm-slot-size-wrap input { padding-right: 32px; }
   .acm-slot-size-suffix { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: 'Sora', sans-serif; font-size: 10px; color: #99A1AF; }
   .acm-slot-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .acm-slot-remove { border: none; background: none; color: #99A1AF; display: flex; align-items: center; gap: 4px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11px; cursor: pointer; }
   .acm-slot-remove:hover { color: #DC2626; }
+  .acm-slot-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+  .acm-slot-remove:disabled:hover { color: #99A1AF; }
 
   .acm-unsent-badge { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 999px; padding: 2px 8px; }
+
+  .acm-lock-banner { display: flex; align-items: center; gap: 8px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 12px; padding: 10px 14px; font-family: 'Sora', sans-serif; font-weight: 500; font-size: 12px; color: #92400E; }
 
   /* footer */
   .acm-footer { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 20px 24px; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
@@ -365,12 +374,19 @@ export default function AssignmentCreatorModal({
   courseTitle,
   moduleTitle,
   initialData,
+  requirementsLocked = false,
   onClose,
   onSave,
 }: {
   courseTitle: string
   moduleTitle: string
   initialData: AssignmentDraft | null
+  /** Pass true when the assignment being edited already has submissions
+   *  (e.g. submission_count > 0 from TrainerAssignmentListItem/Detail).
+   *  The backend returns 409 on requirement create/update/delete once
+   *  any submission exists, so the add/edit/delete UI is disabled here
+   *  to match, rather than letting the user hit the error. */
+  requirementsLocked?: boolean
   onClose: () => void
   onSave: (draft: AssignmentDraft) => void
 }) {
@@ -410,7 +426,7 @@ export default function AssignmentCreatorModal({
     setDraft((d) => ({ ...d, gradingCriteria: d.gradingCriteria.filter((c) => c.id !== id) }))
   }
   const totalPoints = gradingCriteriaTotal(draft)
-  
+
   const criteriaValid = true
 
   function addCoverImages(files: FileList | null) {
@@ -437,6 +453,7 @@ export default function AssignmentCreatorModal({
   }
 
   function updateRequirement(id: string, patch: Partial<AssignmentRequirementDraft>) {
+    if (requirementsLocked) return
     setDraft((d) => ({
       ...d,
       requirements: d.requirements.map((requirement) => requirement.id === id ? { ...requirement, ...patch } : requirement),
@@ -444,6 +461,7 @@ export default function AssignmentCreatorModal({
   }
 
   function addRequirement() {
+    if (requirementsLocked) return
     setDraft((d) => ({
       ...d,
       requirements: [...d.requirements, makeRequirementDraft(d.title.trim() || 'Submission file', d.acceptedFileTypes)],
@@ -451,6 +469,7 @@ export default function AssignmentCreatorModal({
   }
 
   function removeRequirement(id: string) {
+    if (requirementsLocked) return
     setDraft((d) => ({
       ...d,
       requirements: d.requirements.length > 1
@@ -794,10 +813,18 @@ export default function AssignmentCreatorModal({
                 <div className="acm-section-title">
                   Submission requirements
                 </div>
-                <div className="acm-section-sub">Rules and constraints for learner submissions — no confirmed backend field yet</div>
+                <div className="acm-section-sub">
+                  Rules and constraints for learner submissions
+                  {requirementsLocked && ' — locked because a submission already exists for this assignment'}
+                </div>
               </div>
             </div>
             <div className="acm-section-card">
+              {requirementsLocked && (
+                <div className="acm-lock-banner">
+                  Submission slots can't be added, edited, or removed once learners have started submitting.
+                </div>
+              )}
               <div>
                 <div className="acm-cover-label" style={{ marginBottom: 8 }}>Submission slots</div>
                 <div className="acm-slot-list">
@@ -809,6 +836,7 @@ export default function AssignmentCreatorModal({
                           <input
                             type="checkbox"
                             checked={requirement.required}
+                            disabled={requirementsLocked}
                             onChange={(e) => updateRequirement(requirement.id, { required: e.target.checked })}
                           />
                           Required
@@ -819,6 +847,7 @@ export default function AssignmentCreatorModal({
                         <input
                           className="acm-slot-input"
                           value={requirement.label}
+                          disabled={requirementsLocked}
                           onChange={(e) => updateRequirement(requirement.id, { label: e.target.value })}
                           placeholder="e.g. Proposal document"
                         />
@@ -828,6 +857,7 @@ export default function AssignmentCreatorModal({
                             type="number"
                             min={1}
                             value={requirement.maxBytesMb}
+                            disabled={requirementsLocked}
                             onChange={(e) => updateRequirement(requirement.id, { maxBytesMb: e.target.value.replace(/[^0-9]/g, '') })}
                             placeholder="20"
                           />
@@ -838,6 +868,7 @@ export default function AssignmentCreatorModal({
                       <input
                         className="acm-slot-input"
                         value={requirement.namingHint}
+                        disabled={requirementsLocked}
                         onChange={(e) => updateRequirement(requirement.id, { namingHint: e.target.value })}
                         placeholder="Use your name and assignment title in the filename."
                       />
@@ -849,6 +880,7 @@ export default function AssignmentCreatorModal({
                             <button
                               key={type}
                               type="button"
+                              disabled={requirementsLocked}
                               className={`acm-filetype-chip${requirement.allowedFileTypes.includes(type) ? ' active' : ''}`}
                               onClick={() => {
                                 const nextList = requirement.allowedFileTypes.includes(type)
@@ -864,14 +896,25 @@ export default function AssignmentCreatorModal({
                       </div>
 
                       <div className="acm-slot-actions">
-                        <button type="button" className="acm-slot-remove" onClick={() => removeRequirement(requirement.id)}>
+                        <button
+                          type="button"
+                          className="acm-slot-remove"
+                          disabled={requirementsLocked}
+                          onClick={() => removeRequirement(requirement.id)}
+                        >
                           <Trash2 size={12} /> Remove slot
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button type="button" className="acm-add-item-btn" onClick={addRequirement} style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="acm-add-item-btn"
+                  disabled={requirementsLocked}
+                  onClick={addRequirement}
+                  style={{ marginTop: 12 }}
+                >
                   <Plus size={12} /> Add another file slot
                 </button>
               </div>

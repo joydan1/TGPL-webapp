@@ -107,20 +107,26 @@ function normalizeAssignmentDraft(detail: TrainerAssignmentDetail | null): Assig
     description: '',
     points: String(c.max_points ?? 0),
   }))
-
-  const fileTypes = detail.requirements?.length
-    ? Array.from(new Set(detail.requirements.flatMap((req) => (req.allowed_file_types || '').split(',').map((type) => type.trim().toLowerCase()).filter(Boolean))))
+const fileTypes = detail.requirements?.length
+    ? Array.from(new Set(detail.requirements.flatMap((req) =>
+        (req.allowed_file_types || []).map((type) => type.trim().toLowerCase()).filter(Boolean)
+      )))
     : ['pdf', 'docx']
 
   const requirementDrafts = (detail.requirements ?? []).length
-    ? detail.requirements!.map((req, index) => ({
-        id: makeId(),
-        label: req.label || `Submission file ${index + 1}`,
-        allowedFileTypes: Array.from(new Set((req.allowed_file_types || '').split(',').map((type) => type.trim().toLowerCase()).filter(Boolean))) || fileTypes,
-        maxBytesMb: String(Math.max(1, Math.round((req.max_bytes || 20 * 1024 * 1024) / (1024 * 1024)))),
-        required: req.required,
-        namingHint: req.naming_hint || 'Use your name and assignment title in the filename.',
-      }))
+    ? detail.requirements!.map((req, index) => {
+        const normalizedTypes = Array.from(
+          new Set((req.allowed_file_types || []).map((type) => type.trim().toLowerCase()).filter(Boolean))
+        )
+        return {
+          id: makeId(),
+          label: req.label || `Submission file ${index + 1}`,
+          allowedFileTypes: normalizedTypes.length ? normalizedTypes : fileTypes,
+          maxBytesMb: String(Math.max(1, Math.round((req.max_bytes || 20 * 1024 * 1024) / (1024 * 1024)))),
+          required: req.required,
+          namingHint: req.naming_hint || 'Use your name and assignment title in the filename.',
+        }
+      })
     : [{
         id: makeId(),
         label: detail.title || 'Submission file',
@@ -689,16 +695,7 @@ export default function AddCoursePage() {
 
   assignmentRemoteId = assignmentResult.data.id
 
-  // Submission requirement slots — only push these the first time this
-  // assignment is created. Requirement drafts don't carry the backend's
-  // requirement id (normalizeAssignmentDraft() re-generates local ids on
-  // load), so on a later edit we can't tell which draft row maps to which
-  // existing server row; re-creating them all here would duplicate slots
-  // every time a trainer re-saves the curriculum step. The backend also
-  // locks requirement writes with a 409 once any submission exists on the
-  // assignment, which listRequirements-and-skip below respects naturally.
-  // TODO: to support real per-slot editing after first save, requirement
-  // drafts need to carry their backend id end-to-end.
+
   let shouldCreateRequirements = isNewAssignment
   if (!isNewAssignment) {
     const existingReqs = await trainerAssignmentsAPI.listRequirements(courseSlug, assignmentRemoteId)

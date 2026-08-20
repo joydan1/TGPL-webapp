@@ -134,11 +134,6 @@ function normalizeGradingCriteria(
   return []
 }
 
-// ─── Size formatting helpers ───────────────────────────────────────────────
-// toMB() gives the per-requirement figure shown in the modal (exact limit for
-// that specific upload slot). formatMaxFileSize() gives the panel-wide figure
-// shown before the learner opens the modal — a range when slots differ, so
-// nobody is told a bigger number than the slot they'll actually use allows.
 
 function toMB(bytes: number): number {
   return Math.round(bytes / (1024 * 1024))
@@ -159,7 +154,7 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
     : [{
         id: 'default-submission-slot',
         label: 'Submission file',
-        allowed_file_types: 'pdf,docx',
+        allowed_file_types: ['pdf', 'docx'],
         max_bytes: 20 * 1024 * 1024,
         required: true,
         order: 1,
@@ -489,14 +484,13 @@ function SubmissionModal({
     setFilesByRequirement((prev) => ({ ...prev, [reqId]: file }))
   }
 
-  function acceptAttr(allowedTypes: string): string {
-    return allowedTypes
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .map((t) => (t.startsWith('.') ? t : `.${t}`))
-      .join(',')
-  }
+  function acceptAttr(allowedTypes: string[]): string {
+  return allowedTypes
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => (t.startsWith('.') ? t : `.${t}`))
+    .join(',')
+}
 
   const missingRequired = requirements.filter((r) => r.required && !filesByRequirement[r.id])
   const filledCount = requirements.filter((r) => filesByRequirement[r.id]).length

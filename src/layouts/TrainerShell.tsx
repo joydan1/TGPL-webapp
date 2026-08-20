@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Star, Radio, Settings,
   Search, Bell, ChevronDown, ChevronLeft,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, MessageCircle,
   LogOut, User as UserIcon, Shield, HelpCircle, Award, Calendar,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
@@ -169,6 +169,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   const navItems = [
     { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
     { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
+    {key: 'community',  label: 'Community', route: ROUTES.TRAINER_COMMUNITY, Icon: MessageCircle },
     { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star,   badge: pendingReviewsCount || undefined },
     { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
      { key: 'bookings', label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,    Icon: Calendar },

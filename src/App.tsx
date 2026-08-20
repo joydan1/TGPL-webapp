@@ -24,6 +24,7 @@ import CourseCatalogPage from './pages/app/CourseCatalgue'
 import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
 import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
 import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
+import CommunityPage from './pages/app/CommunityPage'
 import AssignmentDetailPage from './pages/app/CourseCatalgue/AssignmentDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
@@ -53,6 +54,7 @@ import AdminCoursesPage from './pages/admin/AdminCoursesPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage.tsx'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage.tsx'
 import AdminCommunityPage from './pages/admin/AdminCommunityPage.tsx'
+import AdminCourseManagePage from './pages/admin/AdminCourseManagePage'
 
 
 interface ProtectedRouteProps {
@@ -169,7 +171,14 @@ function App() {
     </ProtectedRoute>
   }
 />
-        
+<Route
+path={ROUTES.COMMUNITY}
+element={
+  <ProtectedRoute>
+<CommunityPage />
+</ProtectedRoute>
+}
+/>
         <Route
           path={ROUTES.CHECKOUT}
           element={
@@ -383,7 +392,7 @@ function App() {
         />
         <Route path={ROUTES.ADMIN_COMMUNITY} element={<AdminCommunityPage />} />
         <Route path="/admin/courses/create" element={<AddCoursePage />} />
-<Route path="/admin/courses/:id/edit" element={<AddCoursePage />} />
+<Route path="/admin/courses/:slug/edit" element={<AdminCourseManagePage />} />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

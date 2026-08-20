@@ -1873,12 +1873,10 @@ export interface AssignmentResource {
 export interface AssignmentRequirement {
   id: string
   label: string
-  allowed_file_types: string
+  allowed_file_types: string[]
   max_bytes: number
   required: boolean
   order: number
-  // Display guidance only — the backend never validates filenames against
-  // this. Type/content-type and size are the only enforced rules.
   naming_hint: string
 }
 
@@ -2002,7 +2000,7 @@ export const assignmentsAPI = {
         : [{
             id: 'default-submission-slot',
             label: 'Submission file',
-            allowed_file_types: 'pdf,docx',
+             allowed_file_types: ['pdf', 'docx'],
             max_bytes: 20 * 1024 * 1024,
             required: true,
             order: 1,
@@ -2117,23 +2115,16 @@ export interface TrainerGradingCriterion {
   max_points: number
 }
 
-export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
-  instructions: string
-  grading_criteria: TrainerGradingCriterion[]
-  max_attempts: number
-  accept_late: boolean
-  created_by: string
-}
-
 export interface CreateTrainerAssignmentPayload {
-  module_id: string
   title: string
+  module_id: string
+  description?: string
   instructions?: string
   deadline: string
+  is_final?: boolean
   max_attempts: number
   accept_late: boolean
   grading_criteria?: TrainerGradingCriterion[]
-  is_final?: boolean
   order: number
 }
 
@@ -2162,13 +2153,17 @@ export interface TrainerAssignmentListItem {
 export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
   description: string
   instructions: string
+  grading_criteria: TrainerGradingCriterion[]
+  max_attempts: number
+  accept_late: boolean
   requirements?: CreateAssignmentRequirementPayload[]
   created_by: string
 }
 
+/** allowed_file_types is a confirmed array field — never a comma-joined string. */
 export interface CreateAssignmentRequirementPayload {
   label: string
-  allowed_file_types: string
+  allowed_file_types: string[]
   max_bytes: number
   required: boolean
   order: number
@@ -2188,20 +2183,6 @@ export interface CreateAssignmentResourcePayload {
   title: string
   file: File
   resource_type?: 'template' | 'worksheet' | 'slides' | 'document' | 'other'
-}
-
-export interface CreateTrainerAssignmentPayload {
-  title: string
-  module_id: string
-  description?: string
-  instructions?: string
-  deadline: string
-  is_final?: boolean
-  max_attempts: number
-  accept_late: boolean
-  grading_criteria?: TrainerGradingCriterion[]
-  order: number
-  
 }
 
 export const trainerAssignmentsAPI = {
@@ -2314,7 +2295,8 @@ export const trainerAssignmentsAPI = {
 
   /** POST /v1/trainer/courses/{slug}/assignments/{id}/requirements/
    *  Must be called AFTER the assignment exists — requirements are
-   *  per-slot rows keyed to assignmentId, not a field on assignment create/update. */
+   *  per-slot rows keyed to assignmentId, not a field on assignment create/update.
+   *  Returns 409 once any submission (even in-progress) exists for the assignment. */
   createRequirement: async (
     courseSlug: string,
     assignmentId: string,
@@ -2328,6 +2310,13 @@ export const trainerAssignmentsAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to save a submission requirement')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: 'Requirements are locked — a submission already exists for this assignment.',
+          statusCode,
+        }
+      }
       return { success: false as const, error: message, statusCode }
     }
   },
@@ -2345,7 +2334,9 @@ export const trainerAssignmentsAPI = {
     }
   },
 
-  /** PATCH /v1/trainer/courses/{slug}/assignments/{id}/requirements/{requirement_id}/ */
+  /** PATCH /v1/trainer/courses/{slug}/assignments/{id}/requirements/{requirement_id}/
+   *  requirement_id is assignment-scoped — a valid id from a different assignment 404s.
+   *  Returns 409 once any submission exists for the assignment. */
   updateRequirement: async (
     courseSlug: string,
     assignmentId: string,
@@ -2360,6 +2351,38 @@ export const trainerAssignmentsAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to update a submission requirement')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: 'Requirements are locked — a submission already exists for this assignment.',
+          statusCode,
+        }
+      }
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  /** DELETE /v1/trainer/courses/{slug}/assignments/{id}/requirements/{requirement_id}/
+   *  Returns 409 once any submission exists for the assignment. */
+  deleteRequirement: async (
+    courseSlug: string,
+    assignmentId: string,
+    requirementId: string,
+  ) => {
+    try {
+      await apiClient.delete(
+        `/v1/trainer/courses/${courseSlug}/assignments/${assignmentId}/requirements/${requirementId}/`,
+      )
+      return { success: true as const }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to remove a submission requirement')
+      if (statusCode === 409) {
+        return {
+          success: false as const,
+          error: 'Requirements are locked — a submission already exists for this assignment.',
+          statusCode,
+        }
+      }
       return { success: false as const, error: message, statusCode }
     }
   },
