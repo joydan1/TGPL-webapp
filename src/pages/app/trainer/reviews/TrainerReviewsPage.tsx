@@ -402,14 +402,14 @@ export default function TrainerReviewsPage() {
                         <p className="rv-file-size">{formatFileSize(file.file_size)}</p>
                       </div>
                       <a
-                        className="rv-file-download"
-                        href={file.download_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Download ${file.file_name}`}
-                      >
-                        <Download size={18} />
-                      </a>
+                       
+  className="rv-file-download"
+  href={file.download_url}
+  download={file.file_name}
+  aria-label={`Download ${file.file_name}`}
+>
+  <Download size={18} />
+</a>
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, CheckCircle2, Mail, Phone, Globe, AlertCircle, FileText, User, Check, X } from 'lucide-react'
+import { Camera, CheckCircle2, Mail, Phone, Globe, AlertCircle, FileText, User, Check, X, VideoOff } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import { apiClient } from '../../services/api'
@@ -62,7 +62,7 @@ const PAGE_CSS = `
   .avatar-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
   .avatar-img { width: 96px; height: 96px; border-radius: 999px; object-fit: cover; background: #E5E7EB; display: block; }
   .avatar-camera-btn { position: absolute; bottom: -6px; right: -6px; width: 36px; height: 36px; border-radius: 999px; background: #2563EB; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
-  .avatar-camera-btn:hover { background: #1D4ED8; }
+  .avatar-camera-btn:hover { background: #2492EB; }
   .avatar-info-name { font-weight: 700; color: #111; font-size: 1.0625rem; word-break: break-word; }
   .avatar-info-hint { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.2rem; }
   .avatar-actions { margin-top: 0.6rem; display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
@@ -158,13 +158,35 @@ const PAGE_CSS = `
   .sheet-option .label { color: #0F172A; font-weight: 700; }
   .sheet-option .sub { color: #6B7280; font-size: 0.875rem; margin-top: 2px; font-weight: 500; }
   .sheet-cancel { width: 100%; margin-top: 12px; padding: 12px; border-radius: 10px; border: none; background: #fff; color: #EF4444; font-weight: 700; cursor: pointer; }
+
+  /* Webcam modal (desktop "Take photo") */
+  .webcam-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 80; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .webcam-modal { background: #111; border-radius: 1rem; overflow: hidden; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .webcam-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.1rem; background: #1F2937; }
+  .webcam-title { color: #fff; font-weight: 700; font-size: 0.9375rem; }
+  .webcam-close { background: none; border: none; color: #9CA3AF; cursor: pointer; display: flex; padding: 0.25rem; }
+  .webcam-close:hover { color: #fff; }
+  .webcam-video-wrap { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; display: flex; align-items: center; justify-content: center; }
+  .webcam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+  .webcam-status { color: #9CA3AF; font-size: 0.875rem; text-align: center; padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .webcam-controls { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; background: #1F2937; }
+  .webcam-shutter { width: 60px; height: 60px; border-radius: 999px; background: #fff; border: 4px solid #4B5563; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .webcam-shutter:hover { border-color: #6B7280; }
+  .webcam-shutter:disabled { opacity: 0.5; cursor: default; }
+  .webcam-cancel-btn { background: none; border: none; color: #9CA3AF; font-weight: 600; font-size: 0.875rem; cursor: pointer; padding: 0.5rem 0.75rem; }
+  .webcam-cancel-btn:hover { color: #fff; }
 `
+
+const isMobileDevice = () =>
+  typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
 export default function SettingsProfilePage() {
   const navigate = useNavigate()
   const { user, isAuthenticated, loadCurrentUser } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const webcamVideoRef = useRef<HTMLVideoElement>(null)
+  const webcamStreamRef = useRef<MediaStream | null>(null)
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [original, setOriginal] = useState<UserProfile | null>(null)
@@ -176,6 +198,11 @@ export default function SettingsProfilePage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const [webcamOpen, setWebcamOpen] = useState(false)
+  const [webcamStarting, setWebcamStarting] = useState(false)
+  const [webcamError, setWebcamError] = useState<string | null>(null)
+  const [webcamCapturing, setWebcamCapturing] = useState(false)
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
@@ -203,6 +230,13 @@ export default function SettingsProfilePage() {
     }
     if (user) fetchProfile()
   }, [user])
+
+  // Always stop the webcam stream on unmount, no matter how the modal closed.
+  useEffect(() => {
+    return () => {
+      webcamStreamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
 
   const isDirty = !!profile && !!original && (
     profile.first_name !== original.first_name ||
@@ -248,12 +282,9 @@ export default function SettingsProfilePage() {
     setSheetOpen(true)
   }
 
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    setSheetOpen(false)
-    if (!file) return
-
+  // Shared upload path used by both the native file/camera input and the
+  // desktop webcam snapshot.
+  async function uploadAvatarFile(file: File) {
     setAvatarError(null)
 
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
@@ -284,6 +315,14 @@ export default function SettingsProfilePage() {
     }
   }
 
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    setSheetOpen(false)
+    if (!file) return
+    await uploadAvatarFile(file)
+  }
+
   function handleAvatarRemove() {
     if (!profile?.avatar_url) return
     setConfirmRemoveOpen(true)
@@ -308,14 +347,87 @@ export default function SettingsProfilePage() {
     }
   }
 
+  // On mobile, hand off to the OS camera app via the native capture input.
+  // On desktop, open an in-page webcam modal since `capture` is ignored there.
   function openCameraInput() {
     setSheetOpen(false)
-    setTimeout(() => cameraInputRef.current?.click(), 80)
+    if (isMobileDevice()) {
+      setTimeout(() => cameraInputRef.current?.click(), 80)
+    } else {
+      openWebcamModal()
+    }
   }
 
   function openFileInput() {
     setSheetOpen(false)
     setTimeout(() => fileInputRef.current?.click(), 80)
+  }
+
+  async function openWebcamModal() {
+    setWebcamError(null)
+    setWebcamOpen(true)
+    setWebcamStarting(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 540 } },
+        audio: false,
+      })
+      webcamStreamRef.current = stream
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = stream
+        await webcamVideoRef.current.play()
+      }
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+        setWebcamError('Camera access was denied. Allow camera access in your browser settings and try again.')
+      } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
+        setWebcamError('No camera was found on this device.')
+      } else {
+        setWebcamError('Could not access your camera. Please try again.')
+      }
+    } finally {
+      setWebcamStarting(false)
+    }
+  }
+
+  function closeWebcamModal() {
+    webcamStreamRef.current?.getTracks().forEach((t) => t.stop())
+    webcamStreamRef.current = null
+    setWebcamOpen(false)
+    setWebcamError(null)
+    setWebcamStarting(false)
+  }
+
+  async function captureWebcamPhoto() {
+    const video = webcamVideoRef.current
+    if (!video || !video.videoWidth) return
+
+    setWebcamCapturing(true)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Canvas not supported')
+
+      // Mirror the frame so the saved photo matches the (mirrored) preview.
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.92)
+      )
+      if (!blob) throw new Error('Capture failed')
+
+      const file = new File([blob], 'webcam-photo.jpg', { type: 'image/jpeg' })
+      closeWebcamModal()
+      await uploadAvatarFile(file)
+    } catch (err) {
+      setWebcamError('Could not capture photo. Please try again.')
+    } finally {
+      setWebcamCapturing(false)
+    }
   }
 
   const bioLength = profile?.bio?.length ?? 0
@@ -368,7 +480,7 @@ export default function SettingsProfilePage() {
                   ref={cameraInputRef}
                   type="file"
                   accept="image/*"
-                  {...{ capture: 'environment' }}
+                  capture="environment"
                   style={{ display: 'none' }}
                   onChange={handleAvatarChange}
                 />
@@ -522,6 +634,50 @@ export default function SettingsProfilePage() {
               <button className="sheet-cancel" onClick={() => setConfirmRemoveOpen(false)}>Cancel</button>
             </div>
           </>
+        )}
+
+        {/* Webcam modal (desktop "Take photo") */}
+        {webcamOpen && (
+          <div className="webcam-overlay" onClick={closeWebcamModal}>
+            <div className="webcam-modal" role="dialog" aria-label="Take a photo" onClick={(e) => e.stopPropagation()}>
+              <div className="webcam-header">
+                <span className="webcam-title">Take photo</span>
+                <button className="webcam-close" onClick={closeWebcamModal} aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="webcam-video-wrap">
+                {webcamError ? (
+                  <div className="webcam-status">
+                    <VideoOff size={28} />
+                    <span>{webcamError}</span>
+                  </div>
+                ) : webcamStarting ? (
+                  <div className="webcam-status">Starting camera…</div>
+                ) : null}
+                <video
+                  ref={webcamVideoRef}
+                  className="webcam-video"
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ display: webcamError || webcamStarting ? 'none' : 'block' }}
+                />
+              </div>
+
+              <div className="webcam-controls">
+                <button className="webcam-cancel-btn" onClick={closeWebcamModal}>Cancel</button>
+                <button
+                  className="webcam-shutter"
+                  onClick={captureWebcamPhoto}
+                  disabled={webcamStarting || !!webcamError || webcamCapturing}
+                  aria-label="Capture photo"
+                />
+                <span style={{ width: '3.25rem' }} />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Toast notification */}
