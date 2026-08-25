@@ -81,6 +81,13 @@ function latestAttempt(raw: RawAssignmentDetail): RawSubmissionAttempt | null {
   return raw.my_submissions[raw.my_submissions.length - 1]
 }
 
+// Attempts are only "used" once actually submitted — an abandoned/unsubmitted
+// draft attempt (submitted_at === null) doesn't count against max_attempts.
+function countAttemptsUsed(raw: RawAssignmentDetail): number {
+  if (!raw.my_submissions) return 0
+  return raw.my_submissions.filter((a) => !!a.submitted_at).length
+}
+
 function deriveStatus(attempt: RawSubmissionAttempt | null): AssignmentStatus {
   if (!attempt || attempt.state === 'not_started') return 'not_started'
   if (attempt.state === 'graded') return 'graded'
@@ -100,6 +107,14 @@ function deriveFeedback(attempt: RawSubmissionAttempt | null): AssignmentDetail[
     date: (typeof grade.date === 'string' && grade.date) || attempt.submitted_at || attempt.created_at,
     score: typeof grade.score === 'number' ? grade.score : undefined,
   }
+}
+
+// grade.status ('pass' | 'fail') lives on AssignmentDetail directly, as a
+// sibling of `feedback` — not nested inside AssignmentFeedback.
+function deriveGradeStatus(attempt: RawSubmissionAttempt | null): 'pass' | 'fail' | undefined {
+  if (!attempt || attempt.state !== 'graded') return undefined
+  const grade = (attempt.grade ?? {}) as Record<string, unknown>
+  return grade.status === 'pass' || grade.status === 'fail' ? grade.status : undefined
 }
 
 function normalizeGradingCriteria(
@@ -169,8 +184,11 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
     module_title: ctx.moduleTitle ?? '',
     due_at: raw.deadline ?? '',
     points: 0,
+    grade_status: deriveGradeStatus(attempt),
     grade_weight_percent: 0,
     status: deriveStatus(attempt),
+    max_attempts: raw.max_attempts ?? 1,
+    attempts_used: countAttemptsUsed(raw),
     instructions: {
       intro: raw.instructions,
       example_image_url: null,
@@ -334,6 +352,10 @@ const PAGE_CSS = `
   .info-banner { background: #FEF3C7; border-radius: 1rem; padding: 1.25rem 1.5rem; text-align: center; display: flex; flex-direction: column; gap: 0.25rem; }
   .info-banner-main { font-size: 0.9375rem; font-weight: 600; color: #92400E; }
   .info-banner-sub { font-size: 0.8125rem; color: #B45309; opacity: 0.85; }
+
+  .attempts-banner { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 1rem; padding: 1rem 1.25rem; text-align: center; display: flex; flex-direction: column; gap: 0.25rem; }
+  .attempts-banner-main { font-size: 0.9375rem; font-weight: 600; color: #B91C1C; }
+  .attempts-banner-sub { font-size: 0.8125rem; color: #DC2626; opacity: 0.85; }
 
   .instructions-card { box-sizing: border-box; background: #fff; border: 1px solid #F3F4F6; border-radius: 1rem; padding: 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
   .section-label { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.04em; color: #2B3942; text-transform: uppercase; }
@@ -677,9 +699,22 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
     )
   }
 
-  const showRevisionResubmit = assignment?.status === 'in_progress' && assignment.feedback?.type === 'revision_requested'
-  const showStartSubmission  = assignment?.status === 'not_started' || showRevisionResubmit
-  const showAwaitingBanner   = assignment?.status === 'in_progress' && !assignment.feedback
+  // Resubmission is only offered in one case: the trainer explicitly
+  // requested a revision. A "fail" grade is terminal, same as a pass —
+  // it's just shown with warning styling instead of green.
+  //
+  // Even a revision request is blocked once the learner has used up their
+  // max_attempts (counting only submissions that were actually submitted,
+  // not abandoned drafts) — in that case we show an explanatory banner
+  // instead of a resubmit button, rather than letting them hit a
+  // submitAssignment error deep in the modal.
+  const isRevisionRequested = assignment?.status === 'in_progress' && assignment.feedback?.type === 'revision_requested'
+  const attemptsExhausted = !!assignment && assignment.max_attempts > 0 && assignment.attempts_used >= assignment.max_attempts
+  const showResubmit = isRevisionRequested && !attemptsExhausted
+  const showAttemptsExhaustedNotice = isRevisionRequested && attemptsExhausted
+  const showStartSubmission = assignment?.status === 'not_started' || showResubmit
+  const showAwaitingBanner = assignment?.status === 'in_progress' && !assignment.feedback
+  const isFailed = assignment?.status === 'graded' && assignment.grade_status === 'fail'
 
   const hasPoints = Boolean(assignment?.points)
   const hasWeight = Boolean(assignment?.grade_weight_percent)
@@ -745,11 +780,14 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 <span className="meta-item"><Calendar size={12} />{fmtDueDate(assignment.due_at)}</span>
                 {hasPoints && <span className="meta-item meta-pts">{assignment.points} pts</span>}
                 {hasWeight && <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>}
+                {assignment.max_attempts > 0 && (
+                  <span className="meta-item">· Attempt {Math.min(assignment.attempts_used + (assignment.status === 'not_started' ? 1 : 0), assignment.max_attempts) || assignment.attempts_used} of {assignment.max_attempts}</span>
+                )}
               </div>
             </div>
 
             <div className="content">
-              {assignment.status === 'graded' && assignment.feedback && (
+              {assignment.status === 'graded' && assignment.feedback && !isFailed && (
                 <div className="feedback-card graded">
                   <div className="feedback-top-row">
                     <div className="feedback-head">
@@ -776,7 +814,34 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
               )}
 
-              {showRevisionResubmit && assignment.feedback && (
+              {isFailed && assignment.feedback && (
+                <div className="feedback-card revision">
+                  <div className="feedback-top-row">
+                    <div className="feedback-head">
+                      <div className="feedback-icon revision"><AlertTriangle size={18} color="#B45309" /></div>
+                      <div>
+                        <div className="feedback-label revision">Not passed</div>
+                        <div className="feedback-title revision">Review your feedback below</div>
+                      </div>
+                    </div>
+                    {typeof assignment.feedback.score === 'number' && (
+                      <div className="feedback-score">
+                        <div className="feedback-score-num" style={{ color: '#B45309' }}>{assignment.feedback.score}</div>
+                        {hasPoints && <div className="feedback-score-denom">/ {assignment.points} pts</div>}
+                      </div>
+                    )}
+                  </div>
+                  {assignment.feedback.comment && (
+                    <>
+                      <div className="feedback-divider" />
+                      <div className="feedback-comment revision">&ldquo;{assignment.feedback.comment}&rdquo;</div>
+                    </>
+                  )}
+                  <div className="feedback-byline revision">Graded by {assignment.feedback.grader_name} · {fmtShortDate(assignment.feedback.date)}</div>
+                </div>
+              )}
+
+              {isRevisionRequested && assignment.feedback && (
                 <div className="feedback-card revision">
                   <div className="feedback-head">
                     <div className="feedback-icon revision"><AlertTriangle size={18} color="#B45309" /></div>
@@ -786,6 +851,13 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                     <div className="feedback-comment revision">&ldquo;{assignment.feedback.comment}&rdquo;</div>
                   )}
                   <div className="feedback-byline revision">Feedback received · {fmtShortDate(assignment.feedback.date)}</div>
+                </div>
+              )}
+
+              {showAttemptsExhaustedNotice && (
+                <div className="attempts-banner">
+                  <span className="attempts-banner-main">You've used all {assignment.max_attempts} of your attempts</span>
+                  <span className="attempts-banner-sub">Contact your trainer if you believe you need another attempt on this assignment.</span>
                 </div>
               )}
 
@@ -951,7 +1023,7 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
               {showStartSubmission && (
                 <div className="action-bar">
                   <button className="action-btn start" onClick={() => setModalOpen(true)}>
-                    <Upload size={16} />{showRevisionResubmit ? 'Revise and resubmit' : 'Start submission'}
+                    <Upload size={16} />{isRevisionRequested ? 'Revise and resubmit' : 'Start submission'}
                   </button>
                   <span className="action-hint">Your progress is saved automatically — come back any time.</span>
                 </div>

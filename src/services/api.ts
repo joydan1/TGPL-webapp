@@ -1893,6 +1893,7 @@ export interface AssignmentFeedback {
   comment: string
   date: string
   score?: number
+  
 }
 
 export interface AssignmentDetail {
@@ -1903,6 +1904,9 @@ export interface AssignmentDetail {
   module_title: string
   due_at: string
   points: number
+   max_attempts: number 
+    attempts_used: number 
+  grade_status?: 'pass' | 'fail'
   grade_weight_percent: number
   status: AssignmentStatus
   instructions: {

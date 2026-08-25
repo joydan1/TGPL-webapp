@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X, Mail, Users, ShieldAlert, BookOpen, BarChart3, Megaphone,
-  DollarSign, Wallet, Settings as SettingsIcon,
+  DollarSign, Wallet, Settings as SettingsIcon, AlertCircle, CheckCircle2,
 } from 'lucide-react'
-import { type UserRole } from '../../types/adminUser'
-
 
 type InviteRoleChoice = 'Learner' | 'Trainer' | 'Admin Asst'
+
+
 
 export interface AdminPermissionKey {
   id: string
@@ -17,6 +17,7 @@ export interface AdminPermissionKey {
   sensitive?: boolean
   defaultEnabled: boolean
 }
+
 
 const ADMIN_PERMISSIONS: AdminPermissionKey[] = [
   { id: 'manage_users',       label: 'Manage users',        description: 'Invite, suspend & delete accounts',    icon: Users,        defaultEnabled: true },
@@ -29,15 +30,17 @@ const ADMIN_PERMISSIONS: AdminPermissionKey[] = [
   { id: 'system_settings',    label: 'System settings',     description: 'Edit platform config & integrations',  icon: SettingsIcon, sensitive: true, defaultEnabled: false },
 ]
 
+// What the caller (AdminUsersPage) hands us — kept broad so the panel can stay
+// even though only email/role are currently sent to the backend.
 export interface InviteUserPayload {
   email: string
-  role: UserRole
+  role: InviteRoleChoice
   permissions?: Record<string, boolean>
 }
 
 interface InviteUserModalProps {
   onClose: () => void
-  onInvite: (payload: InviteUserPayload) => void
+  onInvite: (payload: InviteUserPayload) => Promise<void> | void
 }
 
 const MODAL_CSS = `
@@ -128,6 +131,14 @@ const MODAL_CSS = `
   .ium-clear-all { border: none; background: none; font-size: 10px; font-weight: 600; color: #99A1AF; cursor: pointer; flex-shrink: 0; }
   .ium-clear-all:hover { color: #616873; }
 
+  .ium-not-enforced { font-size: 10px; color: #B45309; background: #FFFBEB; border-top: 1px solid #FEF3C7; padding: 8px 16px; }
+
+  .ium-error { display: flex; align-items: flex-start; gap: 8px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; padding: 10px 12px; font-size: 12px; color: #B91C1C; }
+  .ium-error svg { flex-shrink: 0; margin-top: 1px; }
+
+  .ium-success { display: flex; align-items: flex-start; gap: 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 10px 12px; font-size: 12px; color: #15803D; }
+  .ium-success svg { flex-shrink: 0; margin-top: 1px; }
+
   .ium-footer { padding: 4px 24px 20px; flex-shrink: 0; }
   .ium-submit { width: 100%; height: 44px; border: none; border-radius: 14px; background: #2492EB; color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
   .ium-submit:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -171,13 +182,16 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
   const [permissions, setPermissions] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(ADMIN_PERMISSIONS.map((p) => [p.id, p.defaultEnabled]))
   )
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const enabledCount = useMemo(
     () => Object.values(permissions).filter(Boolean).length,
     [permissions]
   )
 
-  const canSubmit = isValidEmail(email) && (role !== 'Admin Asst' || enabledCount > 0)
+  const canSubmit = isValidEmail(email) && (role !== 'Admin Asst' || enabledCount > 0) && !submitting && !success
 
   function togglePermission(id: string) {
     setPermissions((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -187,13 +201,35 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
     setPermissions(Object.fromEntries(ADMIN_PERMISSIONS.map((p) => [p.id, false])))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
-    onInvite({
-      email: email.trim(),
-      role,
-      permissions: role === 'Admin Asst' ? permissions : undefined,
-    })
+    setErrorMessage(null)
+    setSubmitting(true)
+    try {
+      await onInvite({
+        email: email.trim(),
+        role,
+        permissions: role === 'Admin Asst' ? permissions : undefined,
+      })
+      setSuccess(true)
+      setTimeout(() => {
+        onClose()
+      }, 1200)
+    } catch (err: any) {
+      const code = err?.response?.data?.code
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      if (apiMessage) {
+        setErrorMessage(apiMessage)
+      } else if (code === 'invite_not_pending') {
+        setErrorMessage('There is already a pending invite for this email. Try resending it instead.')
+      } else if (err?.response?.status === 400) {
+        setErrorMessage('This email already has an account or a pending invite.')
+      } else {
+        setErrorMessage('Something went wrong sending the invite. Please try again.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const modal = (
@@ -211,6 +247,20 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
         </div>
 
         <div className="ium-body">
+          {success && (
+            <div className="ium-success" role="status">
+              <CheckCircle2 size={14} />
+              <span>Invite sent to {email.trim()}</span>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="ium-error" role="alert">
+              <AlertCircle size={14} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <div>
             <label className="ium-field-label" htmlFor="ium-email">Email address</label>
             <div className="ium-input-wrap">
@@ -222,6 +272,7 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
                 placeholder="colleague@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={success}
               />
             </div>
           </div>
@@ -235,6 +286,7 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
                   type="button"
                   className={`ium-role-btn${role === r ? ' active' : ''}`}
                   onClick={() => setRole(r)}
+                  disabled={success}
                 >
                   {r === 'Admin Asst' ? 'Admin' : r}
                 </button>
@@ -273,6 +325,7 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
                       onClick={() => togglePermission(perm.id)}
                       aria-pressed={on}
                       aria-label={`Toggle ${perm.label}`}
+                      disabled={success}
                     >
                       <span className="ium-toggle-knob" />
                     </button>
@@ -282,7 +335,10 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
 
               <div className="ium-perm-footer">
                 <span className="ium-perm-count">{enabledCount} of {ADMIN_PERMISSIONS.length} permissions enabled</span>
-                <button type="button" className="ium-clear-all" onClick={clearAll}>Clear all</button>
+                <button type="button" className="ium-clear-all" onClick={clearAll} disabled={success}>Clear all</button>
+              </div>
+              <div className="ium-not-enforced">
+                Not yet enforced by the platform — every admin currently has full access. These settings will take effect once permission enforcement ships.
               </div>
             </div>
           )}
@@ -290,7 +346,7 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
 
         <div className="ium-footer">
           <button className="ium-submit" type="button" disabled={!canSubmit} onClick={handleSubmit}>
-            <Mail size={15} /> Send invite
+            <Mail size={15} /> {success ? 'Sent!' : submitting ? 'Sending…' : 'Send invite'}
           </button>
         </div>
       </div>

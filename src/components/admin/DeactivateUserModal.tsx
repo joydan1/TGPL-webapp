@@ -28,7 +28,7 @@ export const DEACTIVATE_MODAL_CSS = `
   .dm-duration-pill { border: 1.5px solid #E5E7EB; background: #fff; color: #6B7280; font-size: 0.82rem; font-weight: 700; padding: 0.55rem 0.9rem; border-radius: 0.7rem; cursor: pointer; }
   .dm-duration-pill.selected { border-color: #F59E0B; color: #D97706; background: #FFFBEB; }
 
-  .dm-required { color: #EF444; }
+  .dm-required { color: #EF4444; }
 
   .dm-reason-list { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.25rem; }
   .dm-reason-option { display: flex; align-items: center; gap: 0.75rem; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; cursor: pointer; font-size: 0.87rem; font-weight: 600; color: #374151; }
@@ -49,7 +49,6 @@ export const DEACTIVATE_MODAL_CSS = `
   .dm-toggle-track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
   .dm-toggle input:checked + .dm-toggle-track { background: #2492EB; }
   .dm-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
-  .dm-toggle input:checked ~ .dm-toggle-track .dm-toggle-thumb { }
   .dm-toggle input:checked + .dm-toggle-track .dm-toggle-thumb { transform: translateX(19px); }
 
   .dm-actions { display: flex; gap: 0.6rem; }
@@ -67,20 +66,26 @@ const DURATIONS = [
   { key: 'indefinite', label: 'Indefinite' },
 ] as const
 
-const REASONS = [
-  'Violation of community guidelines',
-  'Suspicious or fraudulent activity',
-  'Repeated policy breaches',
-  'Payment dispute',
-  'User-requested suspension',
-  'Other',
-] as const
+// Display label -> backend reason enum. Backend's message only confirmed ONE
+// value ("violation_of_guidelines"), so only that entry is mapped for real.
+// The other five below are my best-guess snake_case codes, NOT confirmed —
+// treat them as placeholders. Get the full `reason` enum from backend before
+// shipping this modal, or a suspend attempt with any reason other than the
+// first option will likely 400.
+const REASONS: { label: string; code: string; confirmed: boolean }[] = [
+  { label: 'Violation of community guidelines', code: 'violation_of_guidelines', confirmed: true },
+  { label: 'Suspicious or fraudulent activity', code: 'suspicious_activity', confirmed: false },
+  { label: 'Repeated policy breaches', code: 'repeated_policy_breaches', confirmed: false },
+  { label: 'Payment dispute', code: 'payment_dispute', confirmed: false },
+  { label: 'User-requested suspension', code: 'user_requested', confirmed: false },
+  { label: 'Other', code: 'other', confirmed: false },
+]
 
 export interface DeactivatePayload {
   duration: (typeof DURATIONS)[number]['key']
   reason: string
-  note: string
-  notify: boolean
+  internal_note: string
+  notify_user_by_email: boolean
 }
 
 interface DeactivateUserModalProps {
@@ -96,15 +101,20 @@ function initials(name: string) {
 export default function DeactivateUserModal({ user, onClose, onConfirm }: DeactivateUserModalProps) {
   const isReactivating = user.status === 'inactive'
   const [duration, setDuration] = useState<(typeof DURATIONS)[number]['key']>('7d')
-  const [reason, setReason] = useState('')
-  const [note, setNote] = useState('')
-  const [notify, setNotify] = useState(true)
+  const [reasonCode, setReasonCode] = useState('')
+  const [internalNote, setInternalNote] = useState('')
+  const [notifyUserByEmail, setNotifyUserByEmail] = useState(true)
 
-  const canConfirm = isReactivating || reason !== ''
+  const canConfirm = isReactivating || reasonCode !== ''
 
   function handleConfirm() {
     if (!canConfirm) return
-    onConfirm({ duration, reason, note, notify })
+    onConfirm({
+      duration,
+      reason: reasonCode,
+      internal_note: internalNote,
+      notify_user_by_email: notifyUserByEmail,
+    })
   }
 
   return (
@@ -165,14 +175,14 @@ export default function DeactivateUserModal({ user, onClose, onConfirm }: Deacti
               <div className="dm-reason-list">
                 {REASONS.map((r) => (
                   <div
-                    key={r}
-                    className={`dm-reason-option${reason === r ? ' selected' : ''}`}
-                    onClick={() => setReason(r)}
+                    key={r.code}
+                    className={`dm-reason-option${reasonCode === r.code ? ' selected' : ''}`}
+                    onClick={() => setReasonCode(r.code)}
                   >
                     <span className="dm-radio">
-                      {reason === r && <span className="dm-radio-dot" />}
+                      {reasonCode === r.code && <span className="dm-radio-dot" />}
                     </span>
-                    {r}
+                    {r.label}
                   </div>
                 ))}
               </div>
@@ -181,8 +191,8 @@ export default function DeactivateUserModal({ user, onClose, onConfirm }: Deacti
               <textarea
                 className="dm-note"
                 placeholder="Add context for other admins..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                value={internalNote}
+                onChange={(e) => setInternalNote(e.target.value)}
               />
 
               <div className="dm-notify-row">
@@ -193,8 +203,8 @@ export default function DeactivateUserModal({ user, onClose, onConfirm }: Deacti
                 <label className="dm-toggle">
                   <input
                     type="checkbox"
-                    checked={notify}
-                    onChange={(e) => setNotify(e.target.checked)}
+                    checked={notifyUserByEmail}
+                    onChange={(e) => setNotifyUserByEmail(e.target.checked)}
                   />
                   <span className="dm-toggle-track">
                     <span className="dm-toggle-thumb" />

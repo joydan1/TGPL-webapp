@@ -26,15 +26,15 @@ interface MessageComposerModalProps {
 
 export default function MessageComposerModal({ user, onClose }: MessageComposerModalProps) {
   const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
 
-  async function handleSend() {
+  function handleSend() {
     if (!message.trim()) return
-    setSending(true)
-    // TODO: wire to a real messaging endpoint once one exists
-    // (nothing in the confirmed Swagger doc covers admin -> user messaging yet).
-    await new Promise((r) => setTimeout(r, 400))
-    setSending(false)
+    // No backend endpoint for admin -> user messaging exists (confirmed —
+    // this is intentionally frontend-only, per backend). Hand off to the
+    // admin's own email client instead of pretending to send anything.
+    const subject = encodeURIComponent('Message from TGPL Admin')
+    const body = encodeURIComponent(message)
+    window.location.href = `mailto:${user.email}?subject=${subject}&body=${body}`
     onClose()
   }
 
@@ -57,15 +57,14 @@ export default function MessageComposerModal({ user, onClose }: MessageComposerM
             placeholder={`Write a message to ${user.name}...`}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={sending}
           />
 
           <div className="mc-actions">
-            <button className="mc-btn cancel" onClick={onClose} disabled={sending} type="button">
+            <button className="mc-btn cancel" onClick={onClose} type="button">
               Cancel
             </button>
-            <button className="mc-btn send" onClick={handleSend} disabled={sending || !message.trim()} type="button">
-              <Send size={15} /> {sending ? 'Sending…' : 'Send'}
+            <button className="mc-btn send" onClick={handleSend} disabled={!message.trim()} type="button">
+              <Send size={15} /> Open in email
             </button>
           </div>
         </div>

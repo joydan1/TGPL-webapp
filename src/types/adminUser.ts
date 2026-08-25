@@ -1,4 +1,4 @@
-export type UserRole = 'Learner' | 'Trainer' | 'Admin Asst' | 'Super Admin'
+export type UserRole = 'learner' | 'trainer' | 'admin'
 export type UserStatus = 'active' | 'inactive'
 
 export interface AdminUser {
@@ -8,7 +8,7 @@ export interface AdminUser {
   role: UserRole
   courses_count?: number // trainers only, shown in the table row
   joined_at: string
-  last_active: string
+    last_active?: string
   status: UserStatus
   avatar_color: string
 }
