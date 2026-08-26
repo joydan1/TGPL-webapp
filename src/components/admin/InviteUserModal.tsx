@@ -7,7 +7,12 @@ import {
 
 type InviteRoleChoice = 'Learner' | 'Trainer' | 'Admin Asst'
 
-
+// UI label -> value the backend actually expects
+const ROLE_TO_BACKEND: Record<InviteRoleChoice, 'learner' | 'trainer' | 'admin'> = {
+  Learner: 'learner',
+  Trainer: 'trainer',
+  'Admin Asst': 'admin',
+}
 
 export interface AdminPermissionKey {
   id: string
@@ -18,8 +23,10 @@ export interface AdminPermissionKey {
   defaultEnabled: boolean
 }
 
-
-const ADMIN_PERMISSIONS: AdminPermissionKey[] = [
+// `id` for each entry must match the backend field name exactly — these are
+// spread directly into the request body when role is admin, and reused
+// as-is by UserProfileModal to render an admin's current permission state.
+export const ADMIN_PERMISSIONS: AdminPermissionKey[] = [
   { id: 'manage_users',       label: 'Manage users',        description: 'Invite, suspend & delete accounts',    icon: Users,        defaultEnabled: true },
   { id: 'moderate_content',   label: 'Moderate content',    description: 'Remove messages & flag violations',    icon: ShieldAlert,  defaultEnabled: true },
   { id: 'manage_courses',     label: 'Manage courses',      description: 'Publish, archive & edit courses',      icon: BookOpen,     defaultEnabled: true },
@@ -30,12 +37,20 @@ const ADMIN_PERMISSIONS: AdminPermissionKey[] = [
   { id: 'system_settings',    label: 'System settings',     description: 'Edit platform config & integrations',  icon: SettingsIcon, sensitive: true, defaultEnabled: false },
 ]
 
-// What the caller (AdminUsersPage) hands us — kept broad so the panel can stay
-// even though only email/role are currently sent to the backend.
+// Matches POST /api/v1/admin/invites/. The 8 toggle fields must only be
+// present when role is "admin" — the backend rejects the request with a
+// validation error if they're sent for learner/trainer invites.
 export interface InviteUserPayload {
   email: string
-  role: InviteRoleChoice
-  permissions?: Record<string, boolean>
+  role: 'learner' | 'trainer' | 'admin'
+  manage_users?: boolean
+  moderate_content?: boolean
+  manage_courses?: boolean
+  view_analytics?: boolean
+  send_announcements?: boolean
+  view_revenue?: boolean
+  manage_payouts?: boolean
+  system_settings?: boolean
 }
 
 interface InviteUserModalProps {
@@ -131,8 +146,6 @@ const MODAL_CSS = `
   .ium-clear-all { border: none; background: none; font-size: 10px; font-weight: 600; color: #99A1AF; cursor: pointer; flex-shrink: 0; }
   .ium-clear-all:hover { color: #616873; }
 
-  .ium-not-enforced { font-size: 10px; color: #B45309; background: #FFFBEB; border-top: 1px solid #FEF3C7; padding: 8px 16px; }
-
   .ium-error { display: flex; align-items: flex-start; gap: 8px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; padding: 10px 12px; font-size: 12px; color: #B91C1C; }
   .ium-error svg { flex-shrink: 0; margin-top: 1px; }
 
@@ -208,8 +221,10 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
     try {
       await onInvite({
         email: email.trim(),
-        role,
-        permissions: role === 'Admin Asst' ? permissions : undefined,
+        role: ROLE_TO_BACKEND[role],
+        // Only send the 8 toggle fields for admin invites — the backend
+        // 400s if they're present for learner/trainer.
+        ...(role === 'Admin Asst' ? permissions : {}),
       })
       setSuccess(true)
       setTimeout(() => {
@@ -336,9 +351,6 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
               <div className="ium-perm-footer">
                 <span className="ium-perm-count">{enabledCount} of {ADMIN_PERMISSIONS.length} permissions enabled</span>
                 <button type="button" className="ium-clear-all" onClick={clearAll} disabled={success}>Clear all</button>
-              </div>
-              <div className="ium-not-enforced">
-                Not yet enforced by the platform — every admin currently has full access. These settings will take effect once permission enforcement ships.
               </div>
             </div>
           )}

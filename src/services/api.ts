@@ -57,6 +57,12 @@ export interface LoginPayload {
   email: string
   password: string
 }
+export interface AcceptInvitePayload {
+  token: string
+  password: string
+  first_name: string
+  last_name: string
+}
 
 export interface PasswordResetPayload {
   email: string
@@ -365,7 +371,24 @@ export const authAPI = {
       return { success: false as const, error: message }
     }
   },
-
+  acceptInvite: async (payload: AcceptInvitePayload) => {
+    try {
+      const response = await apiClient.post<TokenResponse>(
+        '/v1/auth/accept-invite/',
+        payload,
+      )
+      const { access, refresh } = response.data
+      useAuthStore.getState().setToken(access)
+      useAuthStore.getState().setRefreshToken(refresh)
+      return { success: true as const, access, refresh }
+    } catch (error) {
+      const { message } = parseApiError(
+        error,
+        'This invite link is invalid, expired, or has already been used.',
+      )
+      return { success: false as const, error: message }
+    }
+  },
   login: async (payload: LoginPayload): Promise<LoginResult> => {
     try {
       const response = await apiClient.post<TokenResponse & { user: UserResponse }>(

@@ -1,5 +1,5 @@
 // pages/admin/AdminDashboardPage.tsx
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Users, BookOpen, GraduationCap, CreditCard, ChevronDown, Download,
   UserPlus, CheckCircle2, BookMarked,
@@ -8,30 +8,32 @@ import {
   LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import AdminShell from '../../layouts/AdminShell'
+import { adminUsersAPI } from '../../services/adminUsersApi'
+import { adminCoursesAPI } from '../../services/adminCoursesApi'
 
+// ─── Types ──────────────────────────────────────────────────────────────────
 
-interface AdminDashboardSummary {
-  total_users: number
-  total_users_change_pct: number
-  active_courses: number
-  active_courses_note: string
-  total_enrollments: number
-  total_enrollments_change_pct: number
-  revenue_naira: number
-  revenue_change_pct: number
+interface DashboardStats {
+  total_users: number | null
+  active_courses: number | null
+  revenue_naira: number | null
 }
 
-const MOCK_SUMMARY: AdminDashboardSummary = {
-  total_users: 1842,
-  total_users_change_pct: 12,
-  active_courses: 1,
-  active_courses_note: '1 published this month',
-  total_enrollments: 1223,
-  total_enrollments_change_pct: 23,
-  revenue_naira: 234500,
-  revenue_change_pct: 10,
+interface TopCourse {
+  id: string
+  title: string
+  enrollments: number
+  color: string
 }
 
+const TOP_COURSE_COLORS = ['#7C3AED', '#2563EB', '#16A34A', '#F59E0B', '#DC2626']
+
+// Enrollments-over-time and revenue-over-time series stay mocked — no
+// platform-wide time-series endpoint exists yet. courseAnalyticsAPI
+// .getEnrollmentTrends is confirmed callable per-course by admins, and
+// could be summed client-side across courses (N+1), but that decision is
+// still pending — swap these out once either that's built or Mark ships
+// a real aggregate.
 const MOCK_ENROLLMENTS_OVER_TIME = [
   { month: 'Jan', value: 520 },
   { month: 'Feb', value: 610 },
@@ -41,7 +43,6 @@ const MOCK_ENROLLMENTS_OVER_TIME = [
   { month: 'Jun', value: 720 },
   { month: 'Jul', value: 810 },
 ]
-const ENROLLMENTS_CHANGE_PCT = 23
 
 const MOCK_REVENUE_OVER_TIME = [
   { month: 'Jan', value: 18_000_000 },
@@ -51,22 +52,6 @@ const MOCK_REVENUE_OVER_TIME = [
   { month: 'May', value: 48_000_000 },
   { month: 'Jun', value: 45_000_000 },
   { month: 'Jul', value: 62_000_000 },
-]
-const REVENUE_CHANGE_PCT = 25
-
-interface TopCourse {
-  id: string
-  title: string
-  enrollments: number
-  color: string
-}
-
-const MOCK_TOP_COURSES: TopCourse[] = [
-  { id: '1', title: 'Project Management', enrollments: 1240, color: '#7C3AED' },
-  { id: '2', title: 'Leadership Essentials', enrollments: 980, color: '#2563EB' },
-  { id: '3', title: 'Agile & Scrum Mastery', enrollments: 847, color: '#16A34A' },
-  { id: '4', title: 'Communication Skills', enrollments: 631, color: '#F59E0B' },
-  { id: '5', title: 'Risk Management', enrollments: 512, color: '#DC2626' },
 ]
 
 type ActivityCategory = 'signup' | 'payment' | 'certificate' | 'content'
@@ -79,6 +64,9 @@ interface ActivityItem {
   time_ago: string
 }
 
+// Recent Activity has no backing endpoint (settings/audit-log/ only covers
+// settings changes, not signups/payments/certs/content) — sent to Mark as
+// a blocker, stays mocked until there's a real feed.
 const MOCK_ACTIVITY: ActivityItem[] = [
   { id: '1', category: 'signup',      title: 'Kwame Asante signed up as Learner',          subtitle: 'Signup',      time_ago: '2 min ago' },
   { id: '2', category: 'payment',     title: '₦129,000 payment received — Leadership Essentials', subtitle: 'Payment', time_ago: '8 min ago' },
@@ -96,6 +84,14 @@ const ACTIVITY_ICON: Record<ActivityCategory, { Icon: typeof UserPlus; bg: strin
   certificate: { Icon: CheckCircle2, bg: '#FEF3C7', color: '#D97706' },
   content:     { Icon: BookMarked,   bg: '#EDE9FE', color: '#7C3AED' },
 }
+
+const ACTIVITY_TABS: { key: 'all' | ActivityCategory; label: string }[] = [
+  { key: 'all',         label: 'All' },
+  { key: 'signup',      label: 'Signups' },
+  { key: 'payment',     label: 'Payments' },
+  { key: 'certificate', label: 'Certificates' },
+  { key: 'content',     label: 'Content' },
+]
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -115,6 +111,8 @@ const PAGE_CSS = `
   .ad-stat-value { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
   .ad-stat-title { margin: 0.3rem 0 0.4rem; color: #6B7280; font-size: 0.8rem; }
   .ad-stat-change { font-size: 0.78rem; font-weight: 700; color: #16A34A; }
+  .ad-stat-change.muted { color: #9CA3AF; font-weight: 600; }
+  .ad-stat-skeleton { height: 1.6rem; width: 60%; background: #F3F4F6; border-radius: 0.4rem; }
   .ad-stat-icon { width: 38px; height: 38px; border-radius: 0.65rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   .ad-charts { display: grid; grid-template-columns: 2fr 1.3fr 1.3fr; gap: 1rem; margin-bottom: 1.25rem; align-items: stretch; }
@@ -124,6 +122,7 @@ const PAGE_CSS = `
   .ad-panel-sub { margin: 0.2rem 0 0; color: #9CA3AF; font-size: 0.78rem; }
   .ad-panel-badge { background: #EFF6FF; color: #2563EB; font-weight: 800; font-size: 0.78rem; padding: 0.3rem 0.65rem; border-radius: 999px; white-space: nowrap; text-align: center; }
   .ad-panel-badge-sub { font-weight: 500; font-size: 0.68rem; display: block; color: #6B7280; }
+  .ad-panel-empty { color: #9CA3AF; font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
 
   .ad-top-course-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0; }
   .ad-top-course-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -167,22 +166,85 @@ function formatNaira(amount: number) {
   return `₦${amount.toLocaleString('en-NG')}`
 }
 
-const ACTIVITY_TABS: { key: 'all' | ActivityCategory; label: string }[] = [
-  { key: 'all',         label: 'All' },
-  { key: 'signup',      label: 'Signups' },
-  { key: 'payment',     label: 'Payments' },
-  { key: 'certificate', label: 'Certificates' },
-  { key: 'content',     label: 'Content' },
-]
-
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'all' | ActivityCategory>('all')
 
-  // Swap these three consts for real fetches (e.g. adminDashboardAPI.getSummary())
-  // once the backend endpoint exists — shapes are already API-ready.
-  const summary = MOCK_SUMMARY
-  const topCourses = MOCK_TOP_COURSES
+  const [stats, setStats] = useState<DashboardStats>({
+    total_users: null,
+    active_courses: null,
+    revenue_naira: null,
+  })
+  const [topCourses, setTopCourses] = useState<TopCourse[]>([])
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Total Enrollments has no backing endpoint yet — no /admin/enrollments/
+  // list or count exists (only the grant-access write action). Sent to
+  // Mark as a blocker, stays mocked/placeholder for now.
+  // Enrollments and activity have no backend source yet — stay mocked.
   const activity = MOCK_ACTIVITY
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadDashboard() {
+      setLoading(true)
+      setStatsError(null)
+
+      const [usersResult, catalogResult, coursesResult] = await Promise.all([
+        adminUsersAPI.getCount(),
+        adminCoursesAPI.aggregateCatalogStats(),
+        adminCoursesAPI.listCourses({ page_size: 5 }),
+      ])
+
+      if (cancelled) return
+
+      const errors: string[] = []
+
+      const totalUsers = usersResult.success ? usersResult.data : null
+      if (!usersResult.success) errors.push('users')
+
+      // Active courses + revenue both come from the confirmed
+      // aggregateCatalogStats() call — using its total_revenue_kobo
+      // (summed from course rows) rather than the separate
+      // /admin/revenue/ endpoint, since that endpoint's response shape
+      // (RevenueOverview) is still unconfirmed. Swap if that endpoint
+      // turns out to be more authoritative (e.g. accounts for refunds).
+      let activeCourses: number | null = null
+      let revenueNaira: number | null = null
+      if (catalogResult.success) {
+        activeCourses = catalogResult.data.published
+        revenueNaira = catalogResult.data.total_revenue_kobo / 100
+      } else {
+        errors.push('courses')
+      }
+
+      // Top courses — derived client-side from the courses list, sorted
+      // by the confirmed enrollment_count field on AdminCourseRow.
+      let derivedTopCourses: TopCourse[] = []
+      if (coursesResult.success) {
+        derivedTopCourses = [...coursesResult.data.results]
+          .sort((a, b) => b.enrollment_count - a.enrollment_count)
+          .slice(0, 5)
+          .map((course, i) => ({
+            id: course.id,
+            title: course.title,
+            enrollments: course.enrollment_count,
+            color: TOP_COURSE_COLORS[i % TOP_COURSE_COLORS.length],
+          }))
+      } else {
+        errors.push('courses')
+      }
+
+      setStats({ total_users: totalUsers, active_courses: activeCourses, revenue_naira: revenueNaira })
+      setTopCourses(derivedTopCourses)
+      if (errors.length) setStatsError(`Couldn't load: ${[...new Set(errors)].join(', ')}`)
+      setLoading(false)
+    }
+
+    loadDashboard()
+    return () => { cancelled = true }
+  }, [])
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: activity.length }
@@ -196,7 +258,9 @@ export default function AdminDashboardPage() {
     ? activity
     : activity.filter((item) => item.category === activeTab)
 
-  const maxTopCourseEnrollments = Math.max(...topCourses.map((c) => c.enrollments))
+  const maxTopCourseEnrollments = topCourses.length
+    ? Math.max(...topCourses.map((c) => c.enrollments))
+    : 1
 
   return (
     <AdminShell>
@@ -206,7 +270,9 @@ export default function AdminDashboardPage() {
         <div className="ad-header">
           <div>
             <h1 className="ad-title">Overview</h1>
-            <p className="ad-subtitle">July 2026 · Real-time data</p>
+            <p className="ad-subtitle">
+              {statsError ? statsError : 'Real-time data'}
+            </p>
           </div>
           <div className="ad-header-actions">
             <button className="ad-range-select" type="button">
@@ -223,9 +289,12 @@ export default function AdminDashboardPage() {
           <div className="ad-stat-card">
             <div className="ad-stat-top">
               <div>
-                <p className="ad-stat-value">{summary.total_users.toLocaleString()}</p>
+                {loading ? (
+                  <div className="ad-stat-skeleton" />
+                ) : (
+                  <p className="ad-stat-value">{stats.total_users?.toLocaleString() ?? '—'}</p>
+                )}
                 <p className="ad-stat-title">Total users</p>
-                <span className="ad-stat-change">+{summary.total_users_change_pct}% vs last month</span>
               </div>
               <div className="ad-stat-icon" style={{ background: '#DBEAFE' }}>
                 <Users size={18} color="#2563EB" />
@@ -236,9 +305,12 @@ export default function AdminDashboardPage() {
           <div className="ad-stat-card">
             <div className="ad-stat-top">
               <div>
-                <p className="ad-stat-value">{summary.active_courses.toLocaleString()}</p>
+                {loading ? (
+                  <div className="ad-stat-skeleton" />
+                ) : (
+                  <p className="ad-stat-value">{stats.active_courses?.toLocaleString() ?? '—'}</p>
+                )}
                 <p className="ad-stat-title">Active Courses</p>
-                <span className="ad-stat-change">{summary.active_courses_note}</span>
               </div>
               <div className="ad-stat-icon" style={{ background: '#EDE9FE' }}>
                 <BookOpen size={18} color="#7C3AED" />
@@ -249,9 +321,9 @@ export default function AdminDashboardPage() {
           <div className="ad-stat-card">
             <div className="ad-stat-top">
               <div>
-                <p className="ad-stat-value">{summary.total_enrollments.toLocaleString()}</p>
+                <p className="ad-stat-value">—</p>
                 <p className="ad-stat-title">Total Enrollments</p>
-                <span className="ad-stat-change">+{summary.total_enrollments_change_pct}% vs last month</span>
+                <span className="ad-stat-change muted">Pending backend</span>
               </div>
               <div className="ad-stat-icon" style={{ background: '#FEF3C7' }}>
                 <GraduationCap size={18} color="#D97706" />
@@ -262,9 +334,14 @@ export default function AdminDashboardPage() {
           <div className="ad-stat-card">
             <div className="ad-stat-top">
               <div>
-                <p className="ad-stat-value">{formatNaira(summary.revenue_naira)}</p>
+                {loading ? (
+                  <div className="ad-stat-skeleton" />
+                ) : (
+                  <p className="ad-stat-value">
+                    {stats.revenue_naira != null ? formatNaira(stats.revenue_naira) : '—'}
+                  </p>
+                )}
                 <p className="ad-stat-title">Revenue</p>
-                <span className="ad-stat-change">+{summary.revenue_change_pct}% vs last month</span>
               </div>
               <div className="ad-stat-icon" style={{ background: '#D1FAE5' }}>
                 <CreditCard size={18} color="#059669" />
@@ -279,12 +356,8 @@ export default function AdminDashboardPage() {
             <div className="ad-panel-head">
               <div>
                 <h3 className="ad-panel-title">Enrollments Over Time</h3>
-                <p className="ad-panel-sub">New student enrollments per month</p>
+                <p className="ad-panel-sub">Mocked — no platform-wide endpoint yet</p>
               </div>
-              <span className="ad-panel-badge">
-                +{ENROLLMENTS_CHANGE_PCT}%
-                <span className="ad-panel-badge-sub">this month</span>
-              </span>
             </div>
             <ResponsiveContainer width="100%" height={230}>
               <LineChart data={MOCK_ENROLLMENTS_OVER_TIME} margin={{ left: -20, right: 8 }}>
@@ -301,9 +374,8 @@ export default function AdminDashboardPage() {
             <div className="ad-panel-head">
               <div>
                 <h3 className="ad-panel-title">Revenue Over Time</h3>
-                <p className="ad-panel-sub">Monthly (₦)</p>
+                <p className="ad-panel-sub">Mocked — no time-series field confirmed</p>
               </div>
-              <span className="ad-panel-badge">+{REVENUE_CHANGE_PCT}%</span>
             </div>
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={MOCK_REVENUE_OVER_TIME} margin={{ left: -20, right: 8 }}>
@@ -335,24 +407,30 @@ export default function AdminDashboardPage() {
                 <p className="ad-panel-sub">By total enrollments</p>
               </div>
             </div>
-            {topCourses.map((course) => (
-              <div key={course.id} className="ad-top-course-row" style={{ display: 'block' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span className="ad-top-course-dot" style={{ background: course.color }} />
-                  <span className="ad-top-course-name">{course.title}</span>
-                  <span className="ad-top-course-count">{course.enrollments.toLocaleString()}</span>
+            {loading ? (
+              <p className="ad-panel-empty">Loading…</p>
+            ) : topCourses.length === 0 ? (
+              <p className="ad-panel-empty">No course data available.</p>
+            ) : (
+              topCourses.map((course) => (
+                <div key={course.id} className="ad-top-course-row" style={{ display: 'block' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="ad-top-course-dot" style={{ background: course.color }} />
+                    <span className="ad-top-course-name">{course.title}</span>
+                    <span className="ad-top-course-count">{course.enrollments.toLocaleString()}</span>
+                  </div>
+                  <div className="ad-top-course-bar-track">
+                    <div
+                      className="ad-top-course-bar-fill"
+                      style={{
+                        width: `${(course.enrollments / maxTopCourseEnrollments) * 100}%`,
+                        background: course.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="ad-top-course-bar-track">
-                  <div
-                    className="ad-top-course-bar-fill"
-                    style={{
-                      width: `${(course.enrollments / maxTopCourseEnrollments) * 100}%`,
-                      background: course.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -361,7 +439,7 @@ export default function AdminDashboardPage() {
           <div className="ad-activity-head">
             <div>
               <h3 className="ad-activity-title">Recent Activity</h3>
-              <p className="ad-activity-sub">Live platform event stream</p>
+              <p className="ad-activity-sub">Mocked — no feed endpoint yet</p>
             </div>
             <button className="ad-view-all" type="button">
               View all <ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} />

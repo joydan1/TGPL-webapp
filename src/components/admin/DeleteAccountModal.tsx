@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, AlertCircle, Loader2 } from 'lucide-react'
 import type { AdminUser } from '../../types/adminUser'
 
 export const DELETE_MODAL_CSS = `
@@ -25,10 +25,14 @@ export const DELETE_MODAL_CSS = `
   .da-consequence { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.86rem; color: #374151; }
   .da-x-icon { width: 20px; height: 20px; border-radius: 50%; background: #FEE2E2; color: #EF4444; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; margin-top: 0.1rem; }
 
+  .da-error { display: flex; align-items: flex-start; gap: 0.5rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.75rem; padding: 0.7rem 0.85rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: #B91C1C; }
+  .da-error svg { flex-shrink: 0; margin-top: 0.1rem; }
+
   .da-confirm-label { font-size: 0.85rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; display: block; }
   .da-confirm-label strong { color: #EF4444; }
-  .da-confirm-input { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .da-confirm-input { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.75rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; box-sizing: border-box; }
   .da-confirm-input:focus { outline: none; border-color: #EF4444; }
+  .da-confirm-input:disabled { background: #F9FAFB; color: #9CA3AF; }
 
   .da-actions { display: flex; gap: 0.6rem; }
   .da-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
@@ -41,6 +45,11 @@ interface DeleteAccountModalProps {
   user: AdminUser
   onClose: () => void
   onConfirm: () => void
+  // Owned by the caller so a failed delete can stay on this screen with the
+  // reason shown, instead of the caller closing the modal out from under
+  // the person mid-action and surfacing the error somewhere else.
+  submitting?: boolean
+  errorMessage?: string | null
 }
 
 function initials(name: string) {
@@ -54,9 +63,11 @@ const CONSEQUENCES = [
   'Cannot be recovered after confirmation',
 ]
 
-export default function DeleteAccountModal({ user, onClose, onConfirm }: DeleteAccountModalProps) {
+export default function DeleteAccountModal({
+  user, onClose, onConfirm, submitting = false, errorMessage = null,
+}: DeleteAccountModalProps) {
   const [confirmText, setConfirmText] = useState('')
-  const canDelete = confirmText === 'Delete'
+  const canDelete = confirmText === 'Delete' && !submitting
 
   function handleConfirm() {
     if (!canDelete) return
@@ -64,7 +75,7 @@ export default function DeleteAccountModal({ user, onClose, onConfirm }: DeleteA
   }
 
   return (
-    <div className="da-overlay" onClick={onClose}>
+    <div className="da-overlay" onClick={() => !submitting && onClose()}>
       <div className="da-modal" onClick={(e) => e.stopPropagation()}>
         <div className="da-topbar" />
         <div className="da-inner">
@@ -105,6 +116,13 @@ export default function DeleteAccountModal({ user, onClose, onConfirm }: DeleteA
             ))}
           </div>
 
+          {errorMessage && (
+            <div className="da-error" role="alert">
+              <AlertCircle size={15} />
+              {errorMessage}
+            </div>
+          )}
+
           <label className="da-confirm-label">
             Type <strong>Delete</strong> to confirm
           </label>
@@ -115,14 +133,16 @@ export default function DeleteAccountModal({ user, onClose, onConfirm }: DeleteA
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             autoComplete="off"
+            disabled={submitting}
           />
 
           <div className="da-actions">
-            <button className="da-btn cancel" onClick={onClose} type="button">
+            <button className="da-btn cancel" onClick={onClose} type="button" disabled={submitting}>
               Cancel
             </button>
             <button className="da-btn confirm" onClick={handleConfirm} disabled={!canDelete} type="button">
-              <Trash2 size={15} /> Delete permanently
+              {submitting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {submitting ? 'Deleting…' : 'Delete permanently'}
             </button>
           </div>
         </div>

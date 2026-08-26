@@ -43,6 +43,7 @@ const PAGE_CSS = `
   .rv-learner-cell { display: flex; align-items: center; gap: 0.7rem; }
   .rv-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.68rem; flex-shrink: 0; }
   .rv-learner-name { font-weight: 600; color: #111827; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  .rv-learner-name.unknown { color: #9CA3AF; font-style: italic; font-weight: 500; }
   .rv-learner-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
   .rv-course-cell { color: #374151; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
@@ -79,15 +80,21 @@ const PAGE_CSS = `
 `
 
 const AVATAR_COLORS = ['#2492EB', '#8B5CF6', '#10B981', '#FE9A00', '#EF4444']
+const UNKNOWN_AVATAR_COLOR = '#9CA3AF'
 
-function avatarColor(seed: string) {
+// `seed` is `learner.id`, which the API sends as `null` for anonymous/guest
+// checkouts or learners whose account no longer exists — the payment record
+// survives even when the account it points to doesn't. Guard against
+// null/empty rather than assuming every transaction has a live learner.
+function avatarColor(seed: string | null | undefined) {
+  if (!seed) return UNKNOWN_AVATAR_COLOR
   let hash = 0
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
+function initials(name: string | null | undefined) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -298,21 +305,30 @@ export default function AdminRevenuePage() {
                   {transactions.map((txn) => {
                     const meta = STATUS_META[txn.status] ?? { label: txn.status, badgeClass: 'pending' }
                     const method = methodDisplay(txn.payment_method)
+                    // learner is null-shaped (id/email null, full_name '')
+                    // for guest checkouts or learners whose account was
+                    // deleted after paying — the payment record survives,
+                    // the account doesn't. Render a clear "Unknown learner"
+                    // state instead of assuming the nested object is complete.
+                    const learnerId = txn.learner?.id ?? null
+                    const learnerName = txn.learner?.full_name?.trim() || null
+                    const learnerEmail = txn.learner?.email ?? null
+                    const displayName = learnerName ?? 'Unknown learner'
                     return (
                       <tr key={txn.id} className="clickable" onClick={() => setSelectedPaymentId(txn.id)}>
                         <td style={{ fontFamily: 'monospace', color: '#6B7280' }}>{txn.reference}</td>
                         <td>
                           <div className="rv-learner-cell">
-                            <div className="rv-avatar" style={{ background: avatarColor(txn.learner.id) }}>
-                              {initials(txn.learner.full_name)}
+                            <div className="rv-avatar" style={{ background: avatarColor(learnerId) }}>
+                              {initials(learnerName)}
                             </div>
                             <div>
-                              <div className="rv-learner-name">{txn.learner.full_name}</div>
-                              <div className="rv-learner-email">{txn.learner.email}</div>
+                              <div className={`rv-learner-name${learnerName ? '' : ' unknown'}`}>{displayName}</div>
+                              <div className="rv-learner-email">{learnerEmail ?? '—'}</div>
                             </div>
                           </div>
                         </td>
-                        <td><span className="rv-course-cell">{txn.course.title}</span></td>
+                        <td><span className="rv-course-cell">{txn.course?.title ?? '—'}</span></td>
                         <td style={{ fontWeight: 700 }}>{formatNairaFromKobo(txn.amount_kobo)}</td>
                         <td>
                           <span className="rv-method-cell">{method.icon} {method.label}</span>

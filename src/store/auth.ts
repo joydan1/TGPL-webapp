@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
 
-  // Single source of truth — store owns localStorage for tokens
+  
   setToken: (token) => {
     if (token) {
       localStorage.setItem('token', token)

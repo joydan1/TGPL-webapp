@@ -2,26 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   UserPlus, Search, Download, MoreVertical, User as UserIcon,
   Mail, Trash2, Loader2, AlertCircle, Clock, XCircle, CheckCircle2, Ban,
-  RotateCw, Slash,
+  RotateCw, Slash, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
-import { apiClient } from '../../services/api' 
+import { apiClient } from '../../services/api'
+import { adminUsersAPI, type ApiRole, type AdminUserListItem } from '../../services/adminUsersApi'
 import UserProfileModal, { USER_PROFILE_MODAL_ALL_CSS } from '../../components/admin/UserProfileModal'
 import DeleteAccountModal from '../../components/admin/DeleteAccountModal'
 import InviteUserModal, { type InviteUserPayload } from '../../components/admin/InviteUserModal'
-
-
-export type ApiRole = 'learner' | 'trainer' | 'admin'
-
-interface AdminUserListItem {
-  id: string
-  full_name: string
-  email: string
-  role: ApiRole
-  is_active: boolean
-  avatar_url: string | null
-  created_at: string
-}
 
 export interface AdminUser {
   id: string
@@ -33,10 +21,7 @@ export interface AdminUser {
   avatar_color: string
 }
 
-// ─── Invites ────────────────────────────────────────────────────────────────
-// Mirrors GET /v1/admin/invites/ per Swagger. `status` is computed server-side
-// from used_at/revoked_at/expires_at, not stored — treat it as an opaque string
-// from the API rather than a fixed union in case the backend adds values.
+// ─── Invites (unchanged — separate endpoint, not in scope of this fix) ─────
 interface AdminInviteListItem {
   id: string
   email: string
@@ -56,8 +41,10 @@ interface PaginatedResponse<T> {
 
 type AdminView = 'members' | 'invites'
 
-const AVATAR_PALETTE = ['#EF4444', '#8B5CF6', '#10B981', '#2492EB', '#F59E0B', '#EC4899']
+const PAGE_SIZE = 20
+const SEARCH_DEBOUNCE_MS = 400
 
+const AVATAR_PALETTE = ['#EF4444', '#8B5CF6', '#10B981', '#2492EB', '#F59E0B', '#EC4899']
 
 function colorForId(id: string) {
   let hash = 0
@@ -90,13 +77,6 @@ const ROLE_TABS: { key: RoleFilterKey; label: string }[] = [
   { key: 'admin', label: 'Admin' },
 ]
 
-
-const ROLE_TO_API: Record<'Learner' | 'Trainer' | 'Admin Asst', ApiRole> = {
-  Learner: 'learner',
-  Trainer: 'trainer',
-  'Admin Asst': 'admin',
-}
-
 // ─── Styles ────────────────────────────────────────────────────────────────
 const PAGE_CSS = `
   .au-page { padding: 1.5rem 2rem 2rem; background: #F7F7F7; font-family: 'Sora', sans-serif; }
@@ -123,6 +103,7 @@ const PAGE_CSS = `
   .au-search-wrap input { flex: 1; min-width: 0; background: none; border: none; outline: none; font-size: 0.8rem; color: #2B2B2C; font-family: 'Sora', sans-serif; }
   .au-search-wrap input::placeholder { color: #99A1AF; }
   .au-export-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #fff; border: 1px solid #EBEBEB; border-radius: 14px; padding: 0.6rem 1rem; font-size: 0.8rem; font-weight: 600; color: #616873; cursor: pointer; white-space: nowrap; }
+  .au-export-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .au-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .au-table { width: 100%; border-collapse: collapse; min-width: 780px; }
@@ -147,7 +128,6 @@ const PAGE_CSS = `
   .au-status-badge.inactive { background: #FFF7EB; color: #FE9A00; }
   .au-status-badge.inactive .au-status-dot { background: #FE9A00; }
 
-  /* Invite status badges — pending/accepted/revoked/expired (server-computed) */
   .au-invite-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 999px; white-space: nowrap; text-transform: capitalize; }
   .au-invite-badge.pending { background: #FFF7EB; color: #FE9A00; }
   .au-invite-badge.accepted { background: #F0FDF4; color: #10B981; }
@@ -169,7 +149,10 @@ const PAGE_CSS = `
 
   .au-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; flex-wrap: wrap; background: #FAFAFA; border-top: 1px solid #F3F4F6; }
   .au-footer-text { font-size: 0.75rem; color: #99A1AF; }
-  .au-page-pill { width: 28px; height: 28px; border-radius: 10px; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .au-pagination { display: flex; align-items: center; gap: 0.5rem; }
+  .au-page-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #EBEBEB; background: #fff; color: #616873; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .au-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .au-page-pill { min-width: 28px; height: 28px; padding: 0 0.5rem; border-radius: 10px; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   .au-empty, .au-loading, .au-load-error { padding: 3rem 1.25rem; text-align: center; color: #99A1AF; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
   .au-load-error { color: #DC2626; }
@@ -188,7 +171,6 @@ const PAGE_CSS = `
   .au-user-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; margin-top: 0.5rem; font-size: 0.7rem; color: #99A1AF; }
   .au-user-card-meta span strong { color: #616873; font-weight: 500; }
 
-  /* Invite cards (mobile) reuse .au-user-card structure without checkbox/avatar */
   .au-invite-card-main { flex: 1; min-width: 0; }
   .au-invite-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
   .au-invite-card-email { font-weight: 600; color: #2B2B2C; font-size: 0.85rem; word-break: break-all; }
@@ -264,58 +246,80 @@ function downloadCsv(rows: AdminUser[]) {
 export default function AdminUsersPage() {
   const [view, setView] = useState<AdminView>('members')
 
+  // ── Members (server-paginated) ──
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
-  const [invites, setInvites] = useState<AdminInviteListItem[]>([])
-  const [invitesLoading, setInvitesLoading] = useState(false)
-  const [invitesLoadError, setInvitesLoadError] = useState<string | null>(null)
-  const [invitesLoaded, setInvitesLoaded] = useState(false)
-  const [invitesReloadKey, setInvitesReloadKey] = useState(0)
-
-  // Per-invite resend/revoke: which row's menu is open, which invite is
-  // currently mid-request (disables its menu button so it can't be double
-  // clicked), and a transient error banner if the action fails.
-  const [openInviteMenuId, setOpenInviteMenuId] = useState<string | null>(null)
-  const [invitesActingId, setInvitesActingId] = useState<string | null>(null)
-  const [inviteActionError, setInviteActionError] = useState<string | null>(null)
-
   const [roleFilter, setRoleFilter] = useState<RoleFilterKey>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')      // raw input, updates every keystroke
+  const [searchQuery, setSearchQuery] = useState('')       // debounced, drives the actual fetch
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null)
   const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
 
+  // ── Invites (unchanged) ──
+  const [invites, setInvites] = useState<AdminInviteListItem[]>([])
+  const [invitesLoading, setInvitesLoading] = useState(false)
+  const [invitesLoadError, setInvitesLoadError] = useState<string | null>(null)
+  const [invitesLoaded, setInvitesLoaded] = useState(false)
+  const [invitesReloadKey, setInvitesReloadKey] = useState(0)
+  const [openInviteMenuId, setOpenInviteMenuId] = useState<string | null>(null)
+  const [invitesActingId, setInvitesActingId] = useState<string | null>(null)
+  const [inviteActionError, setInviteActionError] = useState<string | null>(null)
+
+  // Debounce the search box — resets to page 1 once the debounced value changes.
   useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [roleFilter, searchQuery])
+
+  // Main members fetch — re-runs whenever page, filters, or reloadKey change.
+  useEffect(() => {
+    if (view !== 'members') return
     let cancelled = false
     setLoading(true)
     setLoadError(null)
-    apiClient
-      .get<AdminUserListItem[] | { results: AdminUserListItem[] }>('/v1/admin/users/')
+
+    adminUsersAPI
+      .listUsers({
+        page,
+        page_size: PAGE_SIZE,
+        ...(roleFilter !== 'all' ? { role: roleFilter } : {}),
+        ...(searchQuery ? { search: searchQuery } : {}),
+      })
       .then((res) => {
         if (cancelled) return
-        
-        const rows = Array.isArray(res.data) ? res.data : res.data.results
-        setUsers(rows.map(toAdminUser))
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError("Couldn't load users. Please try again.")
+        if (res.success) {
+          setUsers(res.data.results.map(toAdminUser))
+          setTotalUsers(res.data.count)
+        } else {
+          setLoadError(res.error || "Couldn't load users. Please try again.")
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
-  }, [reloadKey])
 
-  // Invites are fetched lazily — only once the Invites tab is first opened —
-  // then cached; the reload key lets the Retry button force a refetch.
+    return () => { cancelled = true }
+  }, [view, page, roleFilter, searchQuery, reloadKey])
+
+  // Invites — unchanged, still lazily loaded on first tab visit.
   useEffect(() => {
     if (view !== 'invites') return
     if (invitesLoaded && invitesReloadKey === 0) return
@@ -336,20 +340,11 @@ export default function AdminUsersPage() {
       .finally(() => {
         if (!cancelled) setInvitesLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, invitesReloadKey])
 
-  const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return users.filter((u) => {
-      const matchesRole = roleFilter === 'all' || u.role === roleFilter
-      const matchesSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-      return matchesRole && matchesSearch
-    })
-  }, [users, roleFilter, searchQuery])
+  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
 
   const filteredInvites = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -360,10 +355,10 @@ export default function AdminUsersPage() {
     })
   }, [invites, roleFilter, searchQuery])
 
-  const allSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedIds.has(u.id))
+  const allSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id))
 
   function toggleSelectAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(filteredUsers.map((u) => u.id)))
+    setSelectedIds(allSelected ? new Set() : new Set(users.map((u) => u.id)))
   }
 
   function toggleSelectOne(id: string) {
@@ -384,10 +379,6 @@ export default function AdminUsersPage() {
     setOpenInviteMenuId((prev) => (prev === id ? null : id))
   }
 
-  // Shared by resend + revoke: both endpoints take no body, only work on a
-  // currently-pending invite, and return the updated invite object — so on
-  // success we just splice that object back into local state instead of
-  // refetching the whole list.
   async function handleInviteAction(invite: AdminInviteListItem, action: 'resend' | 'revoke') {
     setOpenInviteMenuId(null)
     setInviteActionError(null)
@@ -418,47 +409,81 @@ export default function AdminUsersPage() {
 
   function handleViewProfile(user: AdminUser) {
     setOpenMenuId(null)
-    if (user.role === 'admin') {
-      
-      return
-    }
+    if (user.role === 'admin') return
     setViewingUser(user)
   }
 
   function requestDelete(user: AdminUser) {
     setOpenMenuId(null)
+    setDeleteError(null)
     setDeletingUser(user)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deletingUser) return
+    setDeleteError(null)
+    setDeleteSubmitting(true)
+    try {
+      await apiClient.delete(`/v1/admin/users/${deletingUser.id}/?confirm=true`)
+      setDeletingUser(null)
+      // Deleting a row can shift totals/pages — safest to refetch the
+      // current page from the server rather than patch local state.
+      setReloadKey((k) => k + 1)
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      setDeleteError(apiMessage || "Couldn't delete this account. Please try again.")
+    } finally {
+      setDeleteSubmitting(false)
+    }
   }
 
   function handleUserStatusChange(userId: string, status: 'active' | 'inactive') {
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status } : u)))
   }
 
-  function handleUserDeleted(userId: string) {
-    setUsers((prev) => prev.filter((u) => u.id !== userId))
+  function handleUserRoleChange(userId: string, role: 'learner' | 'trainer') {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
   }
 
-  function handleExportCsv() {
-    downloadCsv(filteredUsers)
+  function handleUserDeleted(userId: string) {
+    setUsers((prev) => prev.filter((u) => u.id !== userId))
+    setReloadKey((k) => k + 1)
+  }
+
+  // Exports every user matching the current filters, not just the visible
+  // page — pages through the server in the background via listAllMatching.
+  async function handleExportCsv() {
+    setExporting(true)
+    setExportError(null)
+    const res = await adminUsersAPI.listAllMatching({
+      ...(roleFilter !== 'all' ? { role: roleFilter } : {}),
+      ...(searchQuery ? { search: searchQuery } : {}),
+    })
+    if (res.success) {
+      downloadCsv(res.data.map(toAdminUser))
+    } else {
+      setExportError(res.error || 'Export failed. Please try again.')
+    }
+    setExporting(false)
   }
 
   function handleSwitchView(next: AdminView) {
     setView(next)
+    setSearchInput('')
     setSearchQuery('')
     setRoleFilter('all')
+    setPage(1)
     setOpenMenuId(null)
     setOpenInviteMenuId(null)
     setInviteActionError(null)
   }
 
+  // The modal now sends exactly what POST /v1/admin/invites/ expects: email,
+  // role (already lowercased to match ApiRole), and — only for admin invites
+  // — the 8 permission toggle fields. Nothing left to translate here.
   async function handleInviteUser(payload: InviteUserPayload) {
-    await apiClient.post('/v1/admin/invites/', {
-      email: payload.email,
-      role: ROLE_TO_API[payload.role],
-      
-    })
+    await apiClient.post('/v1/admin/invites/', payload)
     setInviting(false)
-    // A newly-sent invite should show up next time the Invites tab is opened.
     setInvitesReloadKey((k) => k + 1)
   }
 
@@ -471,7 +496,7 @@ export default function AdminUsersPage() {
           <div>
             <h1 className="au-title">Users &amp; Roles</h1>
             <p className="au-subtitle">
-              {view === 'members' ? `${users.length} total members` : `${invites.length} invites sent`}
+              {view === 'members' ? `${totalUsers} total members` : `${invites.length} invites sent`}
             </p>
           </div>
           <button className="au-create-btn" type="button" onClick={() => setInviting(true)}>
@@ -486,7 +511,7 @@ export default function AdminUsersPage() {
             onClick={() => handleSwitchView('members')}
           >
             Members
-            <span className="au-view-tab-count">{users.length}</span>
+            <span className="au-view-tab-count">{totalUsers}</span>
           </button>
           <button
             className={`au-view-tab${view === 'invites' ? ' active' : ''}`}
@@ -518,17 +543,25 @@ export default function AdminUsersPage() {
               <input
                 type="text"
                 placeholder={view === 'members' ? 'Search by name or email...' : 'Search by email...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={view === 'members' ? searchInput : searchQuery}
+                onChange={(e) => (view === 'members' ? setSearchInput(e.target.value) : setSearchQuery(e.target.value))}
               />
             </div>
 
             {view === 'members' && (
-              <button className="au-export-btn" type="button" onClick={handleExportCsv}>
-                <Download size={15} /> Export CSV
+              <button className="au-export-btn" type="button" onClick={handleExportCsv} disabled={exporting}>
+                {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                {exporting ? 'Exporting…' : 'Export CSV'}
               </button>
             )}
           </div>
+
+          {view === 'members' && exportError && (
+            <div className="au-inline-error" role="alert">
+              <AlertCircle size={15} />
+              {exportError}
+            </div>
+          )}
 
           {view === 'members' && (
             <>
@@ -566,7 +599,7 @@ export default function AdminUsersPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredUsers.map((user) => (
+                        {users.map((user) => (
                           <tr key={user.id}>
                             <td>
                               <input
@@ -634,13 +667,13 @@ export default function AdminUsersPage() {
                       </tbody>
                     </table>
 
-                    {filteredUsers.length === 0 && (
+                    {users.length === 0 && (
                       <div className="au-empty">No users match your filters.</div>
                     )}
                   </div>
 
                   <div className="au-card-list">
-                    {filteredUsers.map((user) => (
+                    {users.map((user) => (
                       <div className="au-user-card" key={user.id}>
                         <div className="au-user-card-checkbox">
                           <input
@@ -708,16 +741,36 @@ export default function AdminUsersPage() {
                       </div>
                     ))}
 
-                    {filteredUsers.length === 0 && (
+                    {users.length === 0 && (
                       <div className="au-empty">No users match your filters.</div>
                     )}
                   </div>
 
                   <div className="au-footer">
                     <span className="au-footer-text">
-                      Showing {filteredUsers.length} of {users.length} users
+                      Page {page} of {totalPages} · {totalUsers} total users
                     </span>
-                    <span className="au-page-pill">1</span>
+                    <div className="au-pagination">
+                      <button
+                        className="au-page-btn"
+                        type="button"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="au-page-pill">{page}</span>
+                      <button
+                        className="au-page-btn"
+                        type="button"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -918,6 +971,7 @@ export default function AdminUsersPage() {
           user={viewingUser}
           onClose={() => setViewingUser(null)}
           onStatusChange={handleUserStatusChange}
+          onRoleChange={handleUserRoleChange}
           onDeleted={(id) => {
             handleUserDeleted(id)
             setViewingUser(null)
@@ -929,10 +983,9 @@ export default function AdminUsersPage() {
         <DeleteAccountModal
           user={deletingUser}
           onClose={() => setDeletingUser(null)}
-          onConfirm={() => {
-            handleUserDeleted(deletingUser.id)
-            setDeletingUser(null)
-          }}
+          onConfirm={handleDeleteConfirm}
+          submitting={deleteSubmitting}
+          errorMessage={deleteError}
         />
       )}
 

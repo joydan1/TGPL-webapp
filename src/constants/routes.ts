@@ -13,6 +13,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
   GET_STARTED: '/getstarted',
+  ACCEPT_INVITE: '/accept-invite',
   CONTACT: '/contact',
   ABOUT: '/about',
   SERVICES: '/services',
@@ -121,7 +122,7 @@ export const getRoute = (
  * Route Groups 
  */
 export const ROUTE_GROUPS = {
-  PUBLIC: [ROUTES.LOGIN, ROUTES.SIGNUP, ROUTES.FORGOT_PASSWORD, ROUTES.RESET_PASSWORD],
+  PUBLIC: [ROUTES.LOGIN, ROUTES.SIGNUP, ROUTES.FORGOT_PASSWORD, ROUTES.RESET_PASSWORD, ROUTES.ACCEPT_INVITE],
   LEARNER: [
     ROUTES.DASHBOARD,
     ROUTES.COURSES,
@@ -164,6 +165,11 @@ export const ROUTE_METADATA: Record<
   [ROUTES.SIGNUP]: {
     title: 'Sign Up',
     description: 'Create a new TGPL account',
+    requiresAuth: false,
+  },
+  [ROUTES.ACCEPT_INVITE]: {
+    title: 'Accept Invite',
+    description: 'Set up your account from an invite',
     requiresAuth: false,
   },
   [ROUTES.CHECKOUT]: {
@@ -267,6 +273,7 @@ export const ROUTE_METADATA: Record<
 export const RouteBuilder = {
   login: () => ROUTES.LOGIN,
   signup: () => ROUTES.SIGNUP,
+  acceptInvite: () => ROUTES.ACCEPT_INVITE,
   onboarding: () => ROUTES.ONBOARDING,
   dashboard: () => ROUTES.DASHBOARD,
 community: () => ROUTES.COMMUNITY,

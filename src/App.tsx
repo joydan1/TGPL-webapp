@@ -10,6 +10,7 @@ import LandingPage from './pages/public/LandingPage'
 // Auth Pages (no header/footer)
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
+import AcceptInvitePage from './pages/auth/AcceptInvitePage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import TermsPage from './pages/auth/TermsPage'
@@ -116,6 +117,19 @@ function App() {
             isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <SignupPage />
           }
         />
+                <Route
+          path={ROUTES.SIGNUP}
+          element={
+            isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <SignupPage />
+          }
+        />
+        <Route
+          path={ROUTES.ACCEPT_INVITE}
+          element={
+            isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <AcceptInvitePage />
+          }
+        />
+        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />

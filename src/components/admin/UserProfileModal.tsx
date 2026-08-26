@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   X, Mail, KeyRound, Ban, BookOpen, CheckCircle2, BadgeCheck, BarChart3,
-   Trash2,  Loader2, AlertCircle,
+   Trash2,  Loader2, AlertCircle, Repeat2,
 } from 'lucide-react'
 import { type AdminUser, type UserStatus } from '../../types/adminUser'
 import { apiClient } from '../../services/api' 
 import DeactivateUserModal, { DEACTIVATE_MODAL_CSS, type DeactivatePayload } from './DeactivateUserModal'
 import DeleteAccountModal, { DELETE_MODAL_CSS } from './DeleteAccountModal'
 import MessageComposerModal, { MESSAGE_MODAL_CSS } from './MessageComposerModal'
+import ChangeRoleModal, { CHANGE_ROLE_MODAL_CSS } from './ChangeRoleModal'
+import { ADMIN_PERMISSIONS } from './InviteUserModal'
 
 export const USER_PROFILE_MODAL_CSS = `
   .up-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: flex-start; justify-content: center; z-index: 900; padding: 2rem 1rem; overflow-y: auto; }
@@ -73,24 +75,42 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-activity-title { margin: 0; font-size: 0.88rem; font-weight: 600; color: #111827; }
   .up-activity-time { margin: 0.1rem 0 0; font-size: 0.78rem; color: #9CA3AF; }
 
+  .up-perm-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
+  .up-perm-icon { width: 30px; height: 30px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .up-perm-icon.on { background: #EFF6FF; color: #2563EB; }
+  .up-perm-icon.off { background: #F3F4F6; color: #D1D5DB; }
+  .up-perm-text { flex: 1; min-width: 0; }
+  .up-perm-title-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .up-perm-title { font-size: 0.85rem; font-weight: 700; }
+  .up-perm-title.on { color: #111827; }
+  .up-perm-title.off { color: #9CA3AF; }
+  .up-perm-desc { font-size: 0.76rem; margin-top: 0.1rem; }
+  .up-perm-desc.on { color: #6B7280; }
+  .up-perm-desc.off { color: #C4C9D4; }
+  .up-sensitive-tag { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 999px; padding: 0.1rem 0.4rem; white-space: nowrap; }
+  .up-perm-state { font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
+  .up-perm-state.on { color: #2563EB; }
+  .up-perm-state.off { color: #9CA3AF; }
+
   .up-danger-zone { border: 1.5px solid #FECACA; border-radius: 1rem; overflow: hidden; }
   .up-danger-title { margin: 0; padding: 1rem 1.1rem 0.6rem; font-size: 0.95rem; font-weight: 800; color: #DC2626; }
   .up-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.9rem 1.1rem 1.1rem; flex-wrap: wrap; }
   .up-danger-label { margin: 0; font-size: 0.9rem; font-weight: 700; color: #111827; }
   .up-danger-sub { margin: 0.15rem 0 0; font-size: 0.78rem; color: #9CA3AF; }
   .up-delete-btn { display: flex; align-items: center; gap: 0.4rem; border: 1.5px solid #FECACA; background: #fff; color: #DC2626; font-weight: 700; font-size: 0.85rem; padding: 0.6rem 1rem; border-radius: 0.7rem; cursor: pointer; white-space: nowrap; }
-  .up-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: #E5E7EB; color: #9CA3AF; }
+  .up-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .up-loading, .up-error { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; padding: 3rem 1rem; color: #6B7280; font-size: 0.9rem; }
   .up-error { color: #DC2626; }
 
   @media (max-width: 640px) {
     .up-stats-4, .up-stats-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .up-perm-desc { display: none; }
   }
 `
 
 export const USER_PROFILE_MODAL_ALL_CSS =
-  USER_PROFILE_MODAL_CSS + DEACTIVATE_MODAL_CSS + DELETE_MODAL_CSS + MESSAGE_MODAL_CSS
+  USER_PROFILE_MODAL_CSS + DEACTIVATE_MODAL_CSS + DELETE_MODAL_CSS + MESSAGE_MODAL_CSS + CHANGE_ROLE_MODAL_CSS
 
 
 
@@ -114,6 +134,17 @@ interface AdminUserDetail {
     expires_at: string | null
     reason: string | null
   } | null
+  // Present only when role is "admin" — same 8 fields the invite flow
+  // sends/receives. Optional because learner/trainer detail responses omit
+  // them entirely rather than sending them as false.
+  manage_users?: boolean
+  moderate_content?: boolean
+  manage_courses?: boolean
+  view_analytics?: boolean
+  send_announcements?: boolean
+  view_revenue?: boolean
+  manage_payouts?: boolean
+  system_settings?: boolean
 }
 
 type SuspendDuration = '24h' | '3d' | '7d' | '30d' | 'indefinite'
@@ -125,11 +156,17 @@ interface SuspendPayload {
   notify_user_by_email: boolean
 }
 
+// The role-change endpoint only accepts learner <-> trainer (admins are
+// created solely via the invite flow, and the backend rejects setting role
+// to admin here) — so this is the only shape ChangeRoleModal ever deals in.
+type ChangeableRole = 'learner' | 'trainer'
+
 interface UserProfileModalProps {
   user: AdminUser
   onClose: () => void
   onStatusChange?: (userId: string, status: UserStatus) => void
   onDeleted?: (userId: string) => void
+  onRoleChange?: (userId: string, role: ChangeableRole) => void
 }
 
 function initials(name: string) {
@@ -146,6 +183,13 @@ function formatDate(dateStr: string | null) {
 function formatLastActive(dateStr: string | null) {
   if (!dateStr) return 'Never logged in'
   return formatDate(dateStr)
+}
+
+// The 8 permission fields aren't part of AdminUserDetail's own key set in a
+// way TS can narrow cleanly against ADMIN_PERMISSIONS' string ids, so read
+// them through an untyped lookup rather than pretending `id` is a keyof.
+function permissionEnabled(detail: AdminUserDetail, id: string): boolean {
+  return Boolean((detail as unknown as Record<string, boolean | undefined>)[id])
 }
 
 function StatCard({
@@ -175,16 +219,24 @@ function DetailRow({ label, value }: { label: string; value: string | number }) 
   )
 }
 
-export default function UserProfileModal({ user, onClose, onStatusChange, onDeleted }: UserProfileModalProps) {
+export default function UserProfileModal({ user, onClose, onStatusChange, onDeleted, onRoleChange }: UserProfileModalProps) {
   const [detail, setDetail] = useState<AdminUserDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<'resetPassword' | 'suspend' | 'delete' | null>(null)
+  const [busyAction, setBusyAction] = useState<'resetPassword' | 'suspend' | 'delete' | 'role' | null>(null)
 
   const [showDeactivate, setShowDeactivate] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [showMessage, setShowMessage] = useState(false)
+  const [showChangeRole, setShowChangeRole] = useState(false)
+
+  // Owned separately from actionError: these render inside the delete/role
+  // confirm modals themselves rather than behind them, so a failure stays
+  // visible right where the person is looking instead of closing the modal
+  // out from under them.
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [roleChangeError, setRoleChangeError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -211,7 +263,14 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const isActive = detail ? !(detail.suspension?.is_active ?? false) : user.status === 'active'
   const roleIsLearner = detail?.role === 'learner'
   const roleIsTrainer = detail?.role === 'trainer'
+  const roleIsAdmin = detail?.role === 'admin'
   const canDelete = detail?.role === 'learner'
+  const canChangeRole = roleIsLearner || roleIsTrainer
+
+  const enabledPermCount = useMemo(() => {
+    if (!detail || !roleIsAdmin) return 0
+    return ADMIN_PERMISSIONS.filter((perm) => permissionEnabled(detail, perm.id)).length
+  }, [detail, roleIsAdmin])
 
   async function handleResetPassword() {
     setActionError(null)
@@ -249,18 +308,48 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
     }
   }
 
+  function openDeleteModal() {
+    setDeleteError(null)
+    setShowDelete(true)
+  }
+
   async function handleDeleteConfirm() {
     if (!canDelete) return
-    setActionError(null)
+    setDeleteError(null)
     setBusyAction('delete')
     try {
-      await apiClient.delete(`/v1/admin/users/${user.id}/`)
+      await apiClient.delete(`/v1/admin/users/${user.id}/?confirm=true`)
+      // Only close on success — a failure keeps the confirm modal open with
+      // the reason shown, instead of dropping the person back onto the
+      // profile modal with no indication anything went wrong there.
+      setShowDelete(false)
       onDeleted?.(user.id)
-      setShowDelete(false)
       onClose()
-    } catch {
-      setActionError("Couldn't delete this account. Please try again.")
-      setShowDelete(false)
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      setDeleteError(apiMessage || "Couldn't delete this account. Please try again.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  function openChangeRoleModal() {
+    setRoleChangeError(null)
+    setShowChangeRole(true)
+  }
+
+  async function handleChangeRoleConfirm(nextRole: ChangeableRole) {
+    if (!canChangeRole) return
+    setRoleChangeError(null)
+    setBusyAction('role')
+    try {
+      const res = await apiClient.patch<AdminUserDetail>(`/v1/admin/users/${user.id}/role/`, { role: nextRole })
+      setDetail(res.data)
+      onRoleChange?.(user.id, nextRole)
+      setShowChangeRole(false)
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      setRoleChangeError(apiMessage || `Couldn't move this user to ${nextRole}. Please try again.`)
     } finally {
       setBusyAction(null)
     }
@@ -343,6 +432,17 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                   >
                     <KeyRound size={16} /> {busyAction === 'resetPassword' ? 'Sending…' : 'Reset password'}
                   </button>
+                  {canChangeRole && (
+                    <button
+                      className="up-btn"
+                      type="button"
+                      onClick={openChangeRoleModal}
+                      disabled={busyAction === 'role'}
+                      title={`Move to ${roleIsLearner ? 'Trainer' : 'Learner'}`}
+                    >
+                      <Repeat2 size={16} /> Change role
+                    </button>
+                  )}
                   <div style={{ flex: 1 }} />
                   <button
                     className={`up-btn up-deactivate${!isActive ? ' active' : ''}`}
@@ -372,6 +472,34 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                         showing placeholder numbers here to avoid misleading you. Ask for a
                         trainer example response before this section is built out.
                       </div>
+                    </div>
+                  )}
+
+                  {roleIsAdmin && (
+                    <div className="up-section">
+                      <div className="up-section-head-row">
+                        <h4 className="up-section-title">Admin permissions</h4>
+                        <span className="up-section-count">{enabledPermCount} of {ADMIN_PERMISSIONS.length} enabled</span>
+                      </div>
+                      {ADMIN_PERMISSIONS.map((perm) => {
+                        const on = permissionEnabled(detail, perm.id)
+                        const Icon = perm.icon
+                        return (
+                          <div className="up-perm-row" key={perm.id}>
+                            <div className={`up-perm-icon ${on ? 'on' : 'off'}`}>
+                              <Icon size={14} />
+                            </div>
+                            <div className="up-perm-text">
+                              <div className="up-perm-title-row">
+                                <span className={`up-perm-title ${on ? 'on' : 'off'}`}>{perm.label}</span>
+                                {perm.sensitive && <span className="up-sensitive-tag">Sensitive</span>}
+                              </div>
+                              <div className={`up-perm-desc ${on ? 'on' : 'off'}`}>{perm.description}</div>
+                            </div>
+                            <span className={`up-perm-state ${on ? 'on' : 'off'}`}>{on ? 'On' : 'Off'}</span>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
 
@@ -406,7 +534,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                       </div>
                       <button
                         className="up-delete-btn"
-                        onClick={() => setShowDelete(true)}
+                        onClick={openDeleteModal}
                         type="button"
                         disabled={!canDelete}
                         title={canDelete ? undefined : 'Deletion is only available for learner accounts right now'}
@@ -435,6 +563,19 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
           user={user}
           onClose={() => setShowDelete(false)}
           onConfirm={handleDeleteConfirm}
+          submitting={busyAction === 'delete'}
+          errorMessage={deleteError}
+        />
+      )}
+
+      {showChangeRole && (roleIsLearner || roleIsTrainer) && (
+        <ChangeRoleModal
+          user={user}
+          currentRole={roleIsLearner ? 'learner' : 'trainer'}
+          onClose={() => setShowChangeRole(false)}
+          onConfirm={handleChangeRoleConfirm}
+          submitting={busyAction === 'role'}
+          errorMessage={roleChangeError}
         />
       )}
 
