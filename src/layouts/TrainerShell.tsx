@@ -36,20 +36,20 @@ export const SHELL_CSS = `
   .search-wrap input::placeholder { color: #9CA3AF; }
   .topbar-bell { width: 36px; height: 36px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; position: relative; transition: background 0.15s; }
   .topbar-bell:hover { background: #F3F4F6; }
-  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
+  .topbar-bell.active { background: #EFF6FF; border-color: #BFDBFE; color: #2492EB; }
   .bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 1.5px solid #fff; }
 
   /* ── Page header (replaces navbar content on sub-pages like Settings) ── */
   .navbar-page-header { display: flex; align-items: center; gap: 0.875rem; }
   .navbar-page-back { background: none; border: none; cursor: pointer; color: #111; padding: 0.25rem; display: flex; align-items: center; flex-shrink: 0; }
-  .navbar-page-back:hover { color: #2563EB; }
+  .navbar-page-back:hover { color: #2492EB; }
   .navbar-page-title { font-size: 1.0625rem; font-weight: 700; color: #111; line-height: 1.2; }
   .navbar-page-subtitle { font-size: 0.75rem; color: #6B7280; line-height: 1.2; margin-top: 1px; }
 
   /* ── Profile dropdown ── */
   .profile-menu-wrap { position: relative; }
   .profile-trigger { display: flex; align-items: center; gap: 0.375rem; background: none; border: none; cursor: pointer; padding: 0; }
-  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
+  .topbar-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2492EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; border: 2px solid #E5E7EB; flex-shrink: 0; overflow: hidden; }
   .profile-chevron { color: #9CA3AF; transition: transform 0.15s ease; }
   .profile-chevron.open { transform: rotate(180deg); }
   .profile-dropdown { position: absolute; top: calc(100% + 0.625rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 220px; padding: 0.5rem; z-index: 300; }
@@ -71,7 +71,7 @@ export const SHELL_CSS = `
   .sidebar-nav { flex: 1; padding: 0.5rem 0.625rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; }
   .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.6rem; cursor: pointer; color: #6B7280; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background 0.15s, color 0.15s; }
   .nav-item:hover { background: #F9FAFB; color: #111; }
-  .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+  .nav-item.active { background: #EFF6FF; color: #2492EB; font-weight: 600; }
   .nav-item .nav-label { flex: 1; }
   .nav-item .nav-badge { background: #F59E0B; color: #fff; font-size: 0.68rem; font-weight: 700; border-radius: 999px; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0; }
   .nav-item .nav-chevron { transition: transform 0.18s ease; flex-shrink: 0; }
@@ -90,7 +90,7 @@ export const SHELL_CSS = `
   .nav-subitem.danger:hover { background: #FEF2F2; }
 
   .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
-  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2563EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
+  .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2492EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
   .user-text { overflow: hidden; }
   .user-name { font-size: 0.8125rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .user-email { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

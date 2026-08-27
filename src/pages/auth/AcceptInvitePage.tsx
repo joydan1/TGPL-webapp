@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useAuthStore } from '../../store/auth'
+import { useAuth } from '../../hooks/useAuth'
 import { authAPI } from '../../services/api'
 import { Eye, EyeOff } from 'lucide-react'
 import Input from '../../components/Input'
@@ -12,6 +12,7 @@ import { ROUTES, RouteBuilder } from '../../constants/routes'
 export default function AcceptInvitePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { loadCurrentUser } = useAuth()
   const token = searchParams.get('token')
 
   const [showPassword, setShowPassword] = useState(false)
@@ -56,8 +57,13 @@ export default function AcceptInvitePage() {
     })
 
     if (result.success) {
-      const userResult = await authAPI.getCurrentUser()
-      const user = userResult.success ? userResult.data : useAuthStore.getState().user
+      // authAPI.acceptInvite() already stored the access/refresh tokens via
+      // the store setters (same as verifyEmail). loadCurrentUser() fetches
+      // /me/, maps it to the app's User type, and calls store.setUser(),
+      // which flips isAuthenticated true — required for ProtectedRoute's
+      // requiredRole check to pass immediately on the redirect below.
+      const userResult = await loadCurrentUser()
+      const user = userResult.success ? userResult.user : undefined
 
       const destination =
         user?.role === 'trainer'

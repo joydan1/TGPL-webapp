@@ -70,7 +70,7 @@ const PAGE_CSS = `
   .cert-card-stats { display: flex; gap: 1.25rem; font-size: 0.75rem; color: #6B7280; }
   .cert-card-stats strong { color: #111; font-size: 0.875rem; display: block; }
 
-  .cert-download-btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; background: #2563EB; color: #fff; border: none; border-radius: 0.625rem; padding: 0.6rem 1rem; font-size: 0.8125rem; font-weight: 700; cursor: pointer; margin-top: 0.25rem; }
+  .cert-download-btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; background: #2492EB; color: #fff; border: none; border-radius: 0.625rem; padding: 0.6rem 1rem; font-size: 0.8125rem; font-weight: 700; cursor: pointer; margin-top: 0.25rem; }
   .cert-download-btn:hover { opacity: 0.9; }
   .cert-download-btn:disabled { background: #D1D5DB; cursor: not-allowed; }
 
@@ -80,7 +80,7 @@ const PAGE_CSS = `
   .certs-empty-icon { width: 3.5rem; height: 3.5rem; border-radius: 50%; background: #FEF9EC; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
   .certs-empty-title { font-size: 1.0625rem; font-weight: 700; color: #111; }
   .certs-empty-sub { font-size: 0.875rem; color: #6B7280; max-width: 420px; line-height: 1.6; }
-  .certs-empty-btn { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.875rem; background: #2563EB; color: #fff; border: none; border-radius: 2rem; padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+  .certs-empty-btn { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.875rem; background: #2492EB; color: #fff; border: none; border-radius: 2rem; padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
 
   @media (max-width: 640px) {
     .content { padding: 1.25rem 1rem 5rem; }

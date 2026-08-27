@@ -95,6 +95,7 @@ ADMIN_COURSES: '/admin/courses',
 ADMIN_COURSE_MANAGE: 'admin/courses/:slug/manage', 
 ADMIN_SETTINGS: '/admin/settings', 
 ADMIN_COMMUNITY: '/admin/community',
+ADMIN_ACTIVITY: '/admin/activity',
   // ===========================
   // ERROR PAGES
   // ===========================
@@ -345,6 +346,7 @@ adminResetPassword: () => ROUTES.ADMIN_RESET_PASSWORD,
 adminForgotPassword: () => ROUTES.ADMIN_FORGOT_PASSWORD,
 adminSettings: () => ROUTES.ADMIN_SETTINGS,
 adminCommunity:() => ROUTES.ADMIN_COMMUNITY,
+adminActivity: () => ROUTES.ADMIN_ACTIVITY,
 
   // Error routes
   notFound: () => ROUTES.NOT_FOUND,

@@ -59,7 +59,7 @@ const PAGE_CSS = `
   .db-course-img-wrap { position: relative; }
   .db-course-img { width: 100%; height: 176px; object-fit: cover; border-radius: 1rem; background: #E2E8F0; display: block; }
   .db-course-body { margin-top: 1rem; display: grid; gap: 0.5rem; }
-  .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; font-weight: 700; }
+  .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2492EB; font-weight: 700; }
   .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
   .db-course-date { margin: 0; color: #6B7280; font-size: 0.8rem; }
   .db-course-preview-btn { margin-top: 1rem; width: 100%; border: none; border-radius: 999px; padding: 0.8rem 1rem; background: #EFF6FF; color: #2492EB; font-weight: 700; cursor: pointer; }
@@ -228,10 +228,10 @@ export default function TrainerDashboardPage() {
       title: 'Active learners',
       value: activeLearners !== null ? String(activeLearners) : '—',
       label: 'Holding active access',
-      labelColor: '#2563EB',
+      labelColor: '#2492EB',
       icon: Users,
       iconBg: '#DBEAFE',
-      iconColor: '#2563EB',
+      iconColor: '#2492EB',
     },
     {
       title: 'Courses published',

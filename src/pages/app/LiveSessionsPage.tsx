@@ -84,7 +84,7 @@ const PAGE_CSS = `
   .ls-tab.active { background: #fff; color: #111; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
   .avatar-img { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-  .avatar-fallback { border-radius: 50%; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .avatar-fallback { border-radius: 50%; background: #DBEAFE; color: #2492EB; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
 
   .ls-section-label { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #FB2C36; margin-bottom: 0; }
   .ls-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #FB2C36; opacity: 0.88; animation: ls-pulse 1.4s ease-in-out infinite; }
@@ -134,8 +134,8 @@ const PAGE_CSS = `
   .ls-filter-row { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
   .ls-filter-pill { padding: 0.5rem 1.1rem; border-radius: 2rem; border: none; background: #F3F4F6; color: #374151; font-size: 0.8125rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .ls-filter-pill:hover { background: #E5E7EB; }
-  .ls-filter-pill.active { background: #2563EB; color: #fff; }
-  .ls-filter-pill.active:hover { background: #2563EB; }
+  .ls-filter-pill.active { background: #2492EB; color: #fff; }
+  .ls-filter-pill.active:hover { background: #2492EB; }
 
   .ls-past-card { box-sizing: border-box; background: #fff; border: 1px solid #F3F4F6; border-radius: 16px; padding: 16px; box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
   .ls-past-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); border-color: #D1D5DB; }
@@ -336,7 +336,7 @@ export default function LiveSessionsPage() {
                 <div className="ls-schedule-label">Today's schedule</div>
                 {!hasToday ? (
                   <div className="ls-empty">
-                    <div className="ls-empty-icon"><Calendar size={26} color="#2563EB" /></div>
+                    <div className="ls-empty-icon"><Calendar size={26} color="#2492EB" /></div>
                     <div className="ls-empty-title">Nothing scheduled today</div>
                     <div className="ls-empty-sub">Check the Upcoming tab to see what's coming up next.</div>
                   </div>
@@ -384,7 +384,7 @@ export default function LiveSessionsPage() {
           {!loading && !error && tab === 'upcoming' && (
             !hasUpcoming ? (
               <div className="ls-empty">
-                <div className="ls-empty-icon"><Calendar size={26} color="#2563EB" /></div>
+                <div className="ls-empty-icon"><Calendar size={26} color="#2492EB" /></div>
                 <div className="ls-empty-title">No upcoming sessions yet</div>
                 <div className="ls-empty-sub">New sessions from your trainers will show up here as they're scheduled.</div>
               </div>
@@ -446,7 +446,7 @@ export default function LiveSessionsPage() {
                 <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF' }}>Loading sessions...</div>
               ) : filteredPastSessions.length === 0 ? (
                 <div className="ls-empty">
-                  <div className="ls-empty-icon"><Clock size={26} color="#2563EB" /></div>
+                  <div className="ls-empty-icon"><Clock size={26} color="#2492EB" /></div>
                   <div className="ls-empty-title">No past sessions yet</div>
                   <div className="ls-empty-sub">Sessions you've attended will be listed here for reference.</div>
                 </div>

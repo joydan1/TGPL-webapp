@@ -255,7 +255,7 @@ const CSS = `
     transition: height 0.1s;
   }
   .progress-wrap:hover { height: 6px; }
-  .progress-fill { height: 100%; background: #2563EB; border-radius: 2px; position: relative; pointer-events: none; }
+  .progress-fill { height: 100%; background: #2492EB; border-radius: 2px; position: relative; pointer-events: none; }
   .progress-thumb {
     position: absolute; right: -5px; top: 50%; transform: translateY(-50%);
     width: 10px; height: 10px; border-radius: 50%;
@@ -288,13 +288,13 @@ const CSS = `
 
   .info { background: #111827; padding: 1.25rem 1.5rem; border-top: 1px solid #1F2937; }
   .info-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-  .info-category { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; color: #2563EB; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .info-category { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; color: #2492EB; text-transform: uppercase; margin-bottom: 0.3rem; }
   .info-title { font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.35; margin-bottom: 0.25rem; }
   .info-instructor { font-size: 0.8125rem; color: #9CA3AF; }
   .info-instructor span { color: #6B7280; font-size: 0.75rem; }
   .avatar-circle {
     width: 2.25rem; height: 2.25rem; border-radius: 50%;
-    background: #2563EB; display: flex; align-items: center;
+    background: #2492EB; display: flex; align-items: center;
     justify-content: center; font-weight: 700; color: #fff;
     font-size: 0.875rem; flex-shrink: 0; border: 2px solid #374151;
   }
@@ -315,7 +315,7 @@ const CSS = `
     justify-content: center; font-size: 0.75rem; font-weight: 600;
     color: #9CA3AF; flex-shrink: 0;
   }
-  .pl-item.active .pl-num { background: #2563EB; color: #fff; }
+  .pl-item.active .pl-num { background: #2492EB; color: #fff; }
   .pl-title { flex: 1; font-size: 0.875rem; color: #D1D5DB; font-weight: 500; }
   .pl-item.active .pl-title { color: #fff; }
   .pl-dur { font-size: 0.75rem; color: #6B7280; font-variant-numeric: tabular-nums; }
@@ -328,7 +328,7 @@ const CSS = `
   .enroll-price { font-size: 1.125rem; font-weight: 700; color: #fff; }
   .enroll-btn {
     padding: 0.65rem 1.5rem; border-radius: 2rem; border: none;
-    background: #2563EB; color: #fff; font-size: 0.9375rem;
+    background: #2492EB; color: #fff; font-size: 0.9375rem;
     font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
   .enroll-btn:hover { opacity: 0.88; }

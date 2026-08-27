@@ -79,7 +79,7 @@ function initials(name?: string): string {
 }
 
 function avatarColor(seed: string): string {
-  const palette = ['#7C3AED', '#0D9488', '#EA580C', '#DB2777', '#2563EB', '#65A30D']
+  const palette = ['#7C3AED', '#0D9488', '#EA580C', '#DB2777', '#2492EB', '#65A30D']
   let hash = 0
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   return palette[hash % palette.length]
@@ -131,7 +131,7 @@ const BOOKINGS_CSS = `
   .bk-title { font-size: 1.75rem; font-weight: 700; color: #111; }
   .bk-subtitle { font-size: 0.9375rem; color: #6B7280; margin-top: 0.25rem; }
   .bk-cta {
-    display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2563EB; color: #fff; border: none;
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none;
     border-radius: 0.625rem; padding: 0.7rem 1.25rem; font-size: 0.875rem; font-weight: 700; cursor: pointer;
     white-space: nowrap; flex-shrink: 0;
   }
@@ -149,7 +149,7 @@ const BOOKINGS_CSS = `
     border: none; background: transparent; padding: 0.55rem 1.25rem; border-radius: 0.5rem;
     font-size: 0.875rem; font-weight: 700; color: #6B7280; cursor: pointer; white-space: nowrap;
   }
-  .bk-tab.active { background: #2563EB; color: #fff; }
+  .bk-tab.active { background: #2492EB; color: #fff; }
   .bk-refresh {
     width: 2.25rem; height: 2.25rem; border-radius: 50%; border: 1px solid #E5E7EB; background: #fff;
     display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; flex-shrink: 0;
@@ -314,7 +314,7 @@ export default function LiveBookingsPage() {
 
           <div className="bk-stats">
             <div className="bk-stat">
-              <div className="bk-stat-icon" style={{ background: '#EFF6FF' }}><ClipboardList size={18} color="#2563EB" /></div>
+              <div className="bk-stat-icon" style={{ background: '#EFF6FF' }}><ClipboardList size={18} color="#2492EB" /></div>
               <div><div className="bk-stat-value">{stats.total}</div><div className="bk-stat-label">Total bookings</div></div>
             </div>
             <div className="bk-stat">

@@ -61,7 +61,7 @@ const DIALOG_CSS = `
     background: #DC2626;
   }
   .confirm-btn.confirm.non-destructive {
-    background: #2563EB;
+    background: #2492EB;
   }
   .confirm-btn.confirm.non-destructive:hover {
     background: #1D4ED8;

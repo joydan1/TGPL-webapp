@@ -35,7 +35,7 @@ const PAGE_CSS = `
   .rv-overdue-badge { background: #FEF3C7; color: #D97706; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; }
   .rv-pending-assignment { margin: 0.35rem 0 0; color: #2492EB; font-weight: 600; font-size: 0.875rem; }
   .rv-pending-meta { margin: 0.35rem 0 0; color: #9CA3AF; font-size: 0.8rem; }
-  .rv-grade-btn { width: 100%; border: none; border-top: 1px solid #F3F4F6; background: none; color: #2563EB; font-weight: 700; cursor: pointer; padding: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.875rem; }
+  .rv-grade-btn { width: 100%; border: none; border-top: 1px solid #F3F4F6; background: none; color: #2492EB; font-weight: 700; cursor: pointer; padding: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.875rem; }
 
   .rv-past-card { background: #fff; border-radius: 1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); overflow: hidden; margin-top: 0.85rem; }
   .rv-past-row { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.1rem; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
@@ -273,7 +273,7 @@ export default function TrainerReviewsPage() {
                 <p className="rv-stat-value">{loading ? '—' : summary?.total_reviews ?? 0}</p>
                 <p className="rv-stat-title">Total Reviews</p>
               </div>
-              <div className="rv-stat-icon" style={{ background: '#DBEAFE' }}><Users size={16} color="#2563EB" /></div>
+              <div className="rv-stat-icon" style={{ background: '#DBEAFE' }}><Users size={16} color="#2492EB" /></div>
             </div>
           </div>
           <div className="rv-stat-card">

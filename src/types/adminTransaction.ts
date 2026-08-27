@@ -189,12 +189,12 @@ function buildRow(
 }
 
 export const MOCK_TRANSACTIONS: AdminTransactionRow[] = [
-  buildRow('240724-001', 'Emeka Okafor', 'emeka@example.com', '#2563EB', 'Advanced Agile Methodologies', 85_000, 'card', 'successful', '2026-07-24', { gateway_ref: 'PAY-8X2KL9' }),
+  buildRow('240724-001', 'Emeka Okafor', 'emeka@example.com', '#2492EB', 'Advanced Agile Methodologies', 85_000, 'card', 'successful', '2026-07-24', { gateway_ref: 'PAY-8X2KL9' }),
   buildRow('240724-003', 'Taiwo Adeyinka', 'taiwo@example.com', '#7C3AED', 'PMP Exam Prep', 120_000, 'card', 'pending', '2026-07-24', { gateway_ref: 'PAY-5Q1RT8' }),
-  buildRow('240724-010', 'Rotimi Akintola', 'rotimi@example.com', '#2563EB', 'Advanced Agile Methodologies', 85_000, 'ussd', 'pending', '2026-07-24', { gateway_ref: 'PAY-7N3VD2' }),
+  buildRow('240724-010', 'Rotimi Akintola', 'rotimi@example.com', '#2492EB', 'Advanced Agile Methodologies', 85_000, 'ussd', 'pending', '2026-07-24', { gateway_ref: 'PAY-7N3VD2' }),
   buildRow('230724-002', 'Chidinma Eze', 'chidinma@example.com', '#059669', 'Leadership Essentials', 75_000, 'bank_transfer', 'successful', '2026-07-23', { gateway_ref: 'PAY-2M9FC1' }),
   buildRow('220724-004', 'Bola Fashola', 'bola@example.com', '#F59E0B', 'Scrum for Product Teams', 65_000, 'ussd', 'failed', '2026-07-22', { gateway_ref: 'PAY-9W4XK3' }),
-  buildRow('210724-006', 'Dele Babatunde', 'dele@example.com', '#2563EB', 'Microsoft Project Mastery', 95_000, 'card', 'successful', '2026-07-21', { gateway_ref: 'PAY-4L8HY6' }),
+  buildRow('210724-006', 'Dele Babatunde', 'dele@example.com', '#2492EB', 'Microsoft Project Mastery', 95_000, 'card', 'successful', '2026-07-21', { gateway_ref: 'PAY-4L8HY6' }),
   buildRow('200724-005', 'Ngozi Okonkwo', 'ngozi@example.com', '#DC2626', 'Risk & Stakeholder Management', 90_000, 'paystack', 'refunded', '2026-07-20', { gateway_ref: 'PAY-1K6QW4' }),
   buildRow('190724-007', 'Kemi Adeleke', 'kemi@example.com', '#059669', 'Communication Skills', 55_000, 'bank_transfer', 'successful', '2026-07-19', { gateway_ref: 'PAY-3P7ZS9' }),
   buildRow('180724-008', 'Femi Coker', 'femi@example.com', '#7C3AED', 'Leadership Essentials', 75_000, 'card', 'failed', '2026-07-18', { gateway_ref: 'PAY-6T2BN5' }),

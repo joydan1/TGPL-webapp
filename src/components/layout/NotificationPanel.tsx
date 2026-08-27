@@ -81,7 +81,7 @@ export const NOTIF_CSS = `
   }
   .notif-title { font-size: 1.125rem; font-weight: 700; color: #111; }
   .notif-new-badge {
-    background: #2563EB; color: #fff;
+    background: #2492EB; color: #fff;
     font-size: 0.65rem; font-weight: 800;
     padding: 0.15rem 0.5rem; border-radius: 2rem;
     margin-left: 0.5rem; letter-spacing: 0.04em;
@@ -107,13 +107,13 @@ export const NOTIF_CSS = `
     font-size: 0.75rem; font-weight: 600; color: #6B7280;
     cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
-  .notif-tab.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+  .notif-tab.active { background: #2492EB; border-color: #2492EB; color: #fff; }
   .notif-tab-count { font-size: 0.7rem; font-weight: 700; }
 
   /* ── Mark all read (inside body) ── */
   .notif-mark-read {
     text-align: center; padding: 0.625rem 0;
-    font-size: 0.875rem; font-weight: 600; color: #2563EB;
+    font-size: 0.875rem; font-weight: 600; color: #2492EB;
     cursor: pointer; background: none; border: none; width: 100%;
     border-bottom: 1px solid #F3F4F6; flex-shrink: 0;
   }
@@ -143,7 +143,7 @@ export const NOTIF_CSS = `
   .notif-item:hover { background: #F9FAFB; }
   .notif-item.unread::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-    width: 3px; background: #2563EB; border-radius: 0 2px 2px 0;
+    width: 3px; background: #2492EB; border-radius: 0 2px 2px 0;
   }
 
   .notif-icon-wrap {
@@ -163,7 +163,7 @@ export const NOTIF_CSS = `
   }
   .notif-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; flex-shrink: 0; }
   .notif-time { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; }
-  .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563EB; }
+  .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #2492EB; }
 
   /* ── Loading / error / empty ── */
   .notif-loading {
@@ -185,7 +185,7 @@ export const NOTIF_CSS = `
   }
   .notif-see-all {
     background: none; border: none;
-    font-size: 0.875rem; font-weight: 600; color: #2563EB;
+    font-size: 0.875rem; font-weight: 600; color: #2492EB;
     cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;
   }
   .notif-see-all:hover { opacity: 0.8; }
@@ -203,7 +203,7 @@ export function notifIcon(category: Notification['category'], bg: string) {
     feedback:    <MessageSquare {...iconProps} color="#16A34A" />,
     live:        <Radio     {...iconProps} color="#EF4444" />,
     deadlines:   <ClipboardList {...iconProps} color="#EF4444" />,
-    bookings:    <CalendarCheck {...iconProps} color="#2563EB" />,
+    bookings:    <CalendarCheck {...iconProps} color="#2492EB" />,
     system:      <Info      {...iconProps} color="#6B7280" />,
   }
   return (

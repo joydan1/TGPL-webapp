@@ -25,7 +25,7 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
   .up-name { margin: 0; font-size: 1.35rem; font-weight: 800; color: #111827; }
   .up-role-badge { display: inline-flex; align-items: center; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; }
-  .up-role-badge.learner { background: #EFF6FF; color: #2563EB; }
+  .up-role-badge.learner { background: #EFF6FF; color: #2492EB; }
   .up-role-badge.trainer { background: #ECFDF5; color: #059669; }
   .up-role-badge.admin { background: #F5F3FF; color: #7C3AED; }
   .up-status-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; }
@@ -66,9 +66,9 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-progress-row { padding: 0.9rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-progress-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
   .up-progress-title { font-size: 0.9rem; font-weight: 700; color: #111827; }
-  .up-progress-pct { font-size: 0.9rem; font-weight: 800; color: #2563EB; }
+  .up-progress-pct { font-size: 0.9rem; font-weight: 800; color: #2492EB; }
   .up-progress-track { height: 8px; border-radius: 999px; background: #F3F4F6; overflow: hidden; }
-  .up-progress-fill { height: 100%; border-radius: 999px; background: #2563EB; }
+  .up-progress-fill { height: 100%; border-radius: 999px; background: #2492EB; }
 
   .up-activity-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-activity-icon { width: 34px; height: 34px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -77,7 +77,7 @@ export const USER_PROFILE_MODAL_CSS = `
 
   .up-perm-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-perm-icon { width: 30px; height: 30px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .up-perm-icon.on { background: #EFF6FF; color: #2563EB; }
+  .up-perm-icon.on { background: #EFF6FF; color: #2492EB; }
   .up-perm-icon.off { background: #F3F4F6; color: #D1D5DB; }
   .up-perm-text { flex: 1; min-width: 0; }
   .up-perm-title-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
@@ -89,7 +89,7 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-perm-desc.off { color: #C4C9D4; }
   .up-sensitive-tag { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 999px; padding: 0.1rem 0.4rem; white-space: nowrap; }
   .up-perm-state { font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
-  .up-perm-state.on { color: #2563EB; }
+  .up-perm-state.on { color: #2492EB; }
   .up-perm-state.off { color: #9CA3AF; }
 
   .up-danger-zone { border: 1.5px solid #FECACA; border-radius: 1rem; overflow: hidden; }
@@ -457,7 +457,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                 <div className="up-body">
                  {roleIsLearner && (
   <div className="up-stats-grid up-stats-4">
-    <StatCard icon={<BookOpen size={17} color="#2563EB" />} iconBg="#DBEAFE" value={detail.stats?.courses_enrolled ?? 0} line1="courses" line2="Enrolled" />
+    <StatCard icon={<BookOpen size={17} color="#2492EB" />} iconBg="#DBEAFE" value={detail.stats?.courses_enrolled ?? 0} line1="courses" line2="Enrolled" />
     <StatCard icon={<CheckCircle2 size={17} color="#059669" />} iconBg="#D1FAE5" value={detail.stats?.courses_completed ?? 0} line1="courses" line2="Completed" />
     <StatCard icon={<BadgeCheck size={17} color="#D97706" />} iconBg="#FEF3C7" value={detail.stats?.certificates_earned ?? 0} line1="earned" line2="Certificates" />
     <StatCard icon={<BarChart3 size={17} color="#7C3AED" />} iconBg="#EDE9FE" value={`${detail.stats?.avg_completion_rate ?? 0}%`} line1="avg" line2="Completion Rate" />

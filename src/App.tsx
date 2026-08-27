@@ -56,7 +56,7 @@ import AdminLoginPage from './pages/admin/AdminLoginPage.tsx'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage.tsx'
 import AdminCommunityPage from './pages/admin/AdminCommunityPage.tsx'
 import AdminCourseManagePage from './pages/admin/AdminCourseManagePage'
-
+import AdminActivityPage from './pages/admin/AdminActivityPage.tsx'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -404,6 +404,7 @@ element={
           <AdminSettingsPage />
         }
         />
+        <Route path={ROUTES.ADMIN_ACTIVITY} element={<AdminActivityPage />} />  
         <Route path={ROUTES.ADMIN_COMMUNITY} element={<AdminCommunityPage />} />
         <Route path="/admin/courses/create" element={<AddCoursePage />} />
 <Route path="/admin/courses/:slug/edit" element={<AdminCourseManagePage />} />

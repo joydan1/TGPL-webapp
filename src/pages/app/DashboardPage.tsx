@@ -73,7 +73,7 @@ interface AssignmentItem {
 }
 
 // ── Progress ring ──────────────────────────────────────────────────────────
-function Ring({ pct, size = 80, stroke = 7, color = '#2563EB' }: { pct: number; size?: number; stroke?: number; color?: string }) {
+function Ring({ pct, size = 80, stroke = 7, color = '#2492EB' }: { pct: number; size?: number; stroke?: number; color?: string }) {
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
   const offset = circ - (pct / 100) * circ
@@ -209,12 +209,12 @@ const PAGE_CSS = `
   .resume-empty-fill { height: 100%; background: #fff; border-radius: 99px; width: 2%; }
   .resume-empty-sub2 { font-size: 0.75rem; opacity: 0.75; margin-top: 0.4rem; }
   .resume-empty-right { flex-shrink: 0; }
-  .start-course-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.65rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .start-course-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2492EB; border: none; border-radius: 2rem; padding: 0.65rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .start-course-btn:hover { opacity: 0.9; }
 
   .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.875rem; }
   .section-title { font-size: 0.9375rem; font-weight: 700; color: #111; }
-  .see-all { font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.2rem; background: none; border: none; }
+  .see-all { font-size: 0.8125rem; color: #2492EB; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.2rem; background: none; border: none; }
 
   .empty-inline { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 3rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.5rem; }
   .empty-inline-icon { width: 56px; height: 56px; border-radius: 0.875rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
@@ -314,7 +314,7 @@ const PAGE_CSS = `
   .empty-state-icon { width: 3.5rem; height: 3.5rem; border-radius: 50%; background: #EFF6FF; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
   .empty-state-title { font-size: 1.0625rem; font-weight: 700; color: #111; }
   .empty-state-sub { font-size: 0.875rem; color: #6B7280; max-width: 420px; line-height: 1.6; }
-  .empty-state-btn { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.875rem; background: #2563EB; color: #fff; border: none; border-radius: 2rem; padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+  .empty-state-btn { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.875rem; background: #2492EB; color: #fff; border: none; border-radius: 2rem; padding: 0.7rem 1.5rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .empty-state-btn:hover { opacity: 0.9; }
 
   .course-card { background: #fff; border: 1px solid #F3F4F6; border-radius: 16px; overflow: hidden; width: 385.5px; flex-shrink: 0; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
@@ -335,11 +335,11 @@ const PAGE_CSS = `
   .cert-badge-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #F59E0B; }
   .cert-name { font-size: 1rem; font-weight: 700; color: #111; margin-bottom: 0.625rem; }
   .cert-desc { font-size: 0.8375rem; color: #6B7280; margin-bottom: 1rem; line-height: 1.55; }
-  .cert-desc strong { color: #2563EB; }
+  .cert-desc strong { color: #2492EB; }
   .cert-config-note { font-size: 0.8125rem; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.5rem; padding: 0.625rem 0.75rem; margin-bottom: 0.875rem; line-height: 1.5; }
   .cert-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8375rem; color: #374151; padding: 0.3rem 0; }
   .cert-item.done { color: #6B7280; }
-  .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2563EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
+  .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2492EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
   .cert-right { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   .cert-empty { background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1.5rem 1.75rem; }
@@ -350,9 +350,9 @@ const PAGE_CSS = `
   .cert-empty-sub { font-size: 0.8375rem; color: #6B7280; margin-top: 0.2rem; line-height: 1.5; }
   .cert-empty-progress-label { display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; color: #6B7280; margin-bottom: 0.4rem; }
   .cert-empty-bar { height: 6px; background: #E5E7EB; border-radius: 99px; }
-  .cert-empty-fill { height: 100%; background: #2563EB; border-radius: 99px; width: 0%; }
+  .cert-empty-fill { height: 100%; background: #2492EB; border-radius: 99px; width: 0%; }
   .cert-empty-hint { text-align: center; font-size: 0.8125rem; color: #9CA3AF; margin-top: 1rem; padding: 0 1rem; }
-  .cert-empty-cta { display: flex; align-items: center; justify-content: center; gap: 0.375rem; width: 100%; margin-top: 1.25rem; padding: 1rem 0; border-top: 1px solid #F3F4F6; border-left: none; border-right: none; border-bottom: none; font-size: 0.9375rem; font-weight: 600; color: #2563EB; background: none; cursor: pointer; }
+  .cert-empty-cta { display: flex; align-items: center; justify-content: center; gap: 0.375rem; width: 100%; margin-top: 1.25rem; padding: 1rem 0; border-top: 1px solid #F3F4F6; border-left: none; border-right: none; border-bottom: none; font-size: 0.9375rem; font-weight: 600; color: #2492EB; background: none; cursor: pointer; }
   .cert-empty-cta:hover { background: #F9FAFB; }
 
   @media (max-width: 900px) {
@@ -649,7 +649,7 @@ function goToCertification() {
                   if (resumeCourse.resume_url) navigate(resumeCourse.resume_url)
                   else goToCourse(resumeCourse.course_slug)
                 }}>
-                  <Play size={14} fill="#2563EB" /> Start Course
+                  <Play size={14} fill="#2492EB" /> Start Course
                 </button>
               </div>
             </div>
@@ -663,7 +663,7 @@ function goToCertification() {
             {assignmentsLoaded && !hasAssignments && (
               <div className="empty-inline">
                 <div className="empty-inline-icon" style={{ background: '#EFF6FF' }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.8">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2492EB" strokeWidth="1.8">
                     <rect x="3" y="4" width="18" height="18" rx="2" />
                     <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
                     <path d="M9 16l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -786,7 +786,7 @@ function goToCertification() {
               <div style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>{error}</div>
             ) : showEmptyState ? (
               <div className="empty-state-card">
-                <div className="empty-state-icon"><BookOpen size={26} color="#2563EB" /></div>
+                <div className="empty-state-icon"><BookOpen size={26} color="#2492EB" /></div>
                 <div className="empty-state-title">You haven't enrolled in a course yet</div>
                 <div className="empty-state-sub">Browse the catalog and enroll in your first course — your progress, assignments, and certificate tracker will show up right here once you do.</div>
                 <button className="empty-state-btn" onClick={() => navigate(RouteBuilder.courseCatalogPage())}>
@@ -867,7 +867,7 @@ function goToCertification() {
 </button>
               </div>
               <div className="cert-right">
-                <Ring pct={activeCert.completion_percentage} size={110} stroke={10} color="#2563EB" />
+                <Ring pct={activeCert.completion_percentage} size={110} stroke={10} color="#2492EB" />
               </div>
             </div>
           )}

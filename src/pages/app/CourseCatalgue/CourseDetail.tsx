@@ -124,7 +124,7 @@ function buildMockProgress(course: CourseDetail): CourseProgressResponse {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const CheckIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2492EB" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
     <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
   </svg>
 )
@@ -163,11 +163,11 @@ const PUBLIC_CSS = `
   }
   .hero-back:hover { background: rgba(255,255,255,0.32); }
   .hero-content { position: absolute; bottom: 1.25rem; left: 1.25rem; right: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
-  .badge { display: inline-block; background: #2563EB; color: #fff; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 2rem; width: fit-content; }
+  .badge { display: inline-block; background: #2492EB; color: #fff; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 2rem; width: fit-content; }
   .hero-title { font-size: 1.3rem; font-weight: 700; color: #fff; line-height: 1.25; }
   .body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.75rem; }
   .instructor { display: flex; align-items: center; gap: 0.75rem; }
-  .instructor-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2563EB; font-size: 1rem; flex-shrink: 0; border: 2px solid #E8E8E8; }
+  .instructor-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2492EB; font-size: 1rem; flex-shrink: 0; border: 2px solid #E8E8E8; }
   .instructor-name { font-size: 0.9375rem; font-weight: 600; color: #111; }
   .instructor-role { font-size: 0.8rem; color: #6B7280; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #F3F4F6; border-radius: 0.75rem; overflow: hidden; }
@@ -192,7 +192,7 @@ const PUBLIC_CSS = `
   .enroll-label { font-size: 0.65rem; color: #9CA3AF; }
   .enroll-price { font-size: 1.3rem; font-weight: 700; color: #111; }
   .enroll-sub { font-size: 0.72rem; color: #9CA3AF; }
-  .enroll-btn { padding: 0.75rem 1.75rem; border-radius: 0.625rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .enroll-btn { padding: 0.75rem 1.75rem; border-radius: 0.625rem; border: none; background: #2492EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .enroll-btn:hover { opacity: 0.88; }
   .enroll-btn:disabled { opacity: 0.6; cursor: default; }
   .enroll-error { font-size: 0.8125rem; color: #EF4444; margin-top: 0.375rem; }
@@ -264,19 +264,19 @@ const ENROLLED_PAGE_CSS = `
   .modules-empty-title { font-size: 0.9375rem; font-weight: 700; color: #374151; }
   .modules-empty-sub { font-size: 0.8125rem; color: #9CA3AF; max-width: 360px; line-height: 1.55; }
   .module-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 0.875rem; overflow: hidden; }
-  .module-card.current { border-color: #2563EB; box-shadow: 0 0 0 1px #2563EB; }
+  .module-card.current { border-color: #2492EB; box-shadow: 0 0 0 1px #2492EB; }
   .module-row { display: flex; align-items: center; gap: 0.875rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; }
   .module-num { width: 1.75rem; height: 1.75rem; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8125rem; font-weight: 700; background: #F3F4F6; color: #9CA3AF; }
   .module-num.done { background: #ECFDF3; color: #22C55E; }
-  .module-num.current { background: #2563EB; color: #fff; }
+  .module-num.current { background: #2492EB; color: #fff; }
   .module-info { flex: 1; min-width: 0; }
   .module-title-row { display: flex; align-items: center; gap: 0.5rem; }
   .module-title { font-size: 0.9375rem; font-weight: 700; color: #111; }
-  .module-current-pill { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: #2563EB; background: #EFF6FF; padding: 0.15rem 0.5rem; border-radius: 2rem; }
+  .module-current-pill { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: #2492EB; background: #EFF6FF; padding: 0.15rem 0.5rem; border-radius: 2rem; }
   .module-prog-bar { height: 4px; background: #E5E7EB; border-radius: 99px; margin-top: 0.5rem; }
   .module-prog-fill { height: 100%; border-radius: 99px; }
   .module-prog-fill.done { background: #22C55E; }
-  .module-prog-fill.current { background: #2563EB; }
+  .module-prog-fill.current { background: #2492EB; }
   .module-prog-fill.todo { background: #E5E7EB; }
   .module-count { font-size: 0.8125rem; color: #9CA3AF; flex-shrink: 0; white-space: nowrap; }
   .module-chevron { color: #9CA3AF; flex-shrink: 0; transition: transform 0.15s ease; }
@@ -291,7 +291,7 @@ const ENROLLED_PAGE_CSS = `
   .lesson-row.available { color: #374151; }
   .lesson-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .lesson-title-col { flex: 1; min-width: 0; }
-  .lesson-up-next { font-size: 0.75rem; color: #2563EB; font-weight: 600; margin-top: 0.1rem; }
+  .lesson-up-next { font-size: 0.75rem; color: #2492EB; font-weight: 600; margin-top: 0.1rem; }
   .lesson-duration { font-size: 0.8125rem; color: #9CA3AF; flex-shrink: 0; }
 
   /* ── Continue bar ── */
@@ -306,7 +306,7 @@ const ENROLLED_PAGE_CSS = `
   .continue-title { font-size: 0.9375rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .continue-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
   .continue-pct { font-size: 0.875rem; font-weight: 700; opacity: 0.9; white-space: nowrap; }
-  .continue-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2563EB; border: none; border-radius: 2rem; padding: 0.6rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .continue-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; color: #2492EB; border: none; border-radius: 2rem; padding: 0.6rem 1.4rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .continue-btn:hover { opacity: 0.92; }
 
   @media (max-width: 900px) {
@@ -329,7 +329,7 @@ function lessonIcon(status: LessonStatus) {
       return <CheckCircle size={18} color="#22C55E" fill="#ECFDF3" />
     case 'current':
       return (
-        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#2492EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Play size={9} color="#fff" fill="#fff" />
         </div>
       )
@@ -535,7 +535,7 @@ function PublicCourseOverview({
               <div className="stats">
                 {stats.map(({ icon: Icon, value, label }, i) => (
                   <div key={i} className="stat">
-                    <Icon size={18} color="#2563EB" />
+                    <Icon size={18} color="#2492EB" />
                     <span className="stat-value">{value}</span>
                     <span className="stat-label">{label}</span>
                   </div>
@@ -570,7 +570,7 @@ function PublicCourseOverview({
                     <div className="audience-grid">
                       {course.target_audience.map((item, i) => (
                         <div key={i} className="chip">
-                          <Users size={13} color="#2563EB" />
+                          <Users size={13} color="#2492EB" />
                           {item}
                         </div>
                       ))}
@@ -688,7 +688,7 @@ function EnrolledCourseOverview({
           <div className="ov-stats">
             <div className="ov-stat-card">
               <div className="ov-stat-icon" style={{ background: '#EFF6FF' }}>
-                <BookOpen size={18} color="#2563EB" />
+                <BookOpen size={18} color="#2492EB" />
               </div>
               <span className="ov-stat-value">{lessonsCompleted} of {lessonsTotal}</span>
               <span className="ov-stat-label">Lessons done</span>
@@ -784,7 +784,7 @@ function EnrolledCourseOverview({
                   className="continue-btn"
                   onClick={() => goToLesson(currentLesson.id, currentLesson.status, currentModule?.title ?? '')}
                 >
-                  <Play size={14} fill="#2563EB" /> Resume
+                  <Play size={14} fill="#2492EB" /> Resume
                 </button>
               </div>
             </div>

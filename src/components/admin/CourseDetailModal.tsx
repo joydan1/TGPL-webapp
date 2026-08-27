@@ -327,7 +327,7 @@ export default function CourseDetailModal({
             <>
               <div className="admincdm-stats-grid" style={{ display: 'grid' }}>
                 <div className="admincdm-stat-card">
-                  <div className="admincdm-stat-icon" style={{ background: '#DBEAFE' }}><Users size={15} color="#2563EB" /></div>
+                  <div className="admincdm-stat-icon" style={{ background: '#DBEAFE' }}><Users size={15} color="#2492EB" /></div>
                   <p className="admincdm-stat-value">{course.enrollment_count}</p>
                   <p className="admincdm-stat-label">Enrolled</p>
                 </div>

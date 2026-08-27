@@ -42,7 +42,7 @@ export const ASSIGN_TRAINER_MODAL_CSS = `
 
   .at-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 1.1rem; }
   .at-head-left { display: flex; align-items: center; gap: 0.8rem; min-width: 0; }
-  .at-icon { width: 44px; height: 44px; border-radius: 0.75rem; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .at-icon { width: 44px; height: 44px; border-radius: 0.75rem; background: #EFF6FF; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .at-title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #111827; }
   .at-sub { margin: 0.1rem 0 0; font-size: 0.82rem; color: #9CA3AF; }
   .at-close { border: none; background: none; cursor: pointer; color: #9CA3AF; padding: 0.2rem; flex-shrink: 0; }

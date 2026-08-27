@@ -95,10 +95,10 @@ const PAGE_CSS = `
   .bk-modal-note-label { margin: 0 0 0.4rem; font-size: 0.7rem; font-weight: 700; color: #9CA3AF; letter-spacing: 0.03em; text-transform: uppercase; }
   .bk-modal-note { background: #F9FAFB; border-radius: 0.75rem; padding: 0.75rem 0.85rem; color: #374151; font-size: 0.85rem; margin-bottom: 1rem; }
 
-  .bk-modal-link-label { display: block; color: #2563EB; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; text-decoration: none; }
+  .bk-modal-link-label { display: block; color: #2492EB; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; text-decoration: none; }
   .bk-modal-link-row { display: flex; gap: 0.5rem; margin-bottom: 1.1rem; }
   .bk-modal-link-input { flex: 1; min-width: 0; padding: 0.65rem 0.85rem; border: 1px solid #E5E7EB; border-radius: 0.7rem; font-size: 0.85rem; }
-  .bk-modal-link-send { border: 1px solid #2563EB; background: #fff; color: #2563EB; font-weight: 700; font-size: 0.85rem; padding: 0.65rem 1.1rem; border-radius: 0.7rem; cursor: pointer; white-space: nowrap; }
+  .bk-modal-link-send { border: 1px solid #2492EB; background: #fff; color: #2492EB; font-weight: 700; font-size: 0.85rem; padding: 0.65rem 1.1rem; border-radius: 0.7rem; cursor: pointer; white-space: nowrap; }
   .bk-modal-link-send:disabled { opacity: 0.5; cursor: not-allowed; }
   .bk-modal-error { color: #DC2626; font-size: 0.75rem; margin: -0.7rem 0 1rem; }
 
@@ -645,7 +645,7 @@ export default function TrainerBookingsPage() {
         <div className="bk-stats">
           <div className="bk-stat-card">
             <div className="bk-stat-icon" style={{ background: '#DBEAFE' }}>
-              <ClipboardList size={19} color="#2563EB" />
+              <ClipboardList size={19} color="#2492EB" />
             </div>
             <div>
               <p className="bk-stat-value">{loading ? '—' : stats.total}</p>

@@ -5,7 +5,7 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #2563EB;
+  background: #2492EB;
   color: #fff;
   border-radius: 8px;
   border: none;
@@ -14,7 +14,7 @@
   cursor: pointer;
 }
 .paystack-button:hover, .paystack-btn:hover, .paystack-ui-button:hover {
-  background: #1D4ED8;
+  background: #2492EB;
 }
 .paystack-button.secondary, .paystack-btn.secondary { background: #F3F4F6; color: #111; border: 1px solid #E5E7EB }
 /* Minimal responsive tweak */

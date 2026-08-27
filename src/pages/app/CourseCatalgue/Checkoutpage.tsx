@@ -285,7 +285,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
         return (
           <div key={label} style={{ display: 'contents' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: done || active ? '#2563EB' : '#E5E7EB', color: done || active ? '#fff' : '#9CA3AF' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: done || active ? '#2492EB' : '#E5E7EB', color: done || active ? '#fff' : '#9CA3AF' }}>
                 {done
                   ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20,6 9,17 4,12" /></svg>
                   : num}
@@ -293,7 +293,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
               <span style={{ fontSize: '0.875rem', fontWeight: 500, color: active || done ? '#111' : '#9CA3AF' }}>{label}</span>
             </div>
             {i < steps.length - 1 && (
-              <div key={`d-${i}`} style={{ flex: 1, height: 1.5, background: done ? '#2563EB' : '#E5E7EB', margin: '0 0.5rem' }} />
+              <div key={`d-${i}`} style={{ flex: 1, height: 1.5, background: done ? '#2492EB' : '#E5E7EB', margin: '0 0.5rem' }} />
             )}
           </div>
         )
@@ -372,7 +372,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             <div style={{ height: 1, background: '#F3F4F6' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111' }}>Total</span>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2563EB' }}>{fmtNaira(courseInfo.priceNaira)}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2492EB' }}>{fmtNaira(courseInfo.priceNaira)}</span>
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
@@ -433,7 +433,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
         {/* Trust badges */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingBottom: '1rem' }}>
           {[
-            { bg: '#EFF6FF', icon: <Shield size={18} color="#2563EB" />, label: 'Secure payment', sub: '256-bit SSL' },
+            { bg: '#EFF6FF', icon: <Shield size={18} color="#2492EB" />, label: 'Secure payment', sub: '256-bit SSL' },
             {
               bg: '#FFF7ED',
               icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10" /></svg>,
@@ -466,7 +466,7 @@ function ProcessingScreen() {
   return (
     <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '2rem' }}>
       <div style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CreditCard size={32} color="#2563EB" />
+        <CreditCard size={32} color="#2492EB" />
       </div>
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontWeight: 700, fontSize: '1.5rem', color: '#111', margin: '0 0 0.75rem' }}>Processing payment</p>
@@ -578,7 +578,7 @@ function SuccessScreen() {
 
         <button
           onClick={() => navigate(ROUTES.DASHBOARD ?? '/')}
-          style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textAlign: 'center' }}
+          style={{ background: 'none', border: 'none', color: '#2492EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textAlign: 'center' }}
         >
           Go to dashboard
         </button>
@@ -629,7 +629,7 @@ function FailedScreen() {
         </Button>
         <button
           onClick={handleContactSupport}
-          style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          style={{ background: 'none', border: 'none', color: '#2492EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
         >
           <MessageSquare size={16} />Contact support
         </button>

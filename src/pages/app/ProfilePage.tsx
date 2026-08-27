@@ -61,12 +61,12 @@ const PAGE_CSS = `
   .avatar-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
   .avatar-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
   .avatar-img { width: 96px; height: 96px; border-radius: 999px; object-fit: cover; background: #E5E7EB; display: block; }
-  .avatar-camera-btn { position: absolute; bottom: -6px; right: -6px; width: 36px; height: 36px; border-radius: 999px; background: #2563EB; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
+  .avatar-camera-btn { position: absolute; bottom: -6px; right: -6px; width: 36px; height: 36px; border-radius: 999px; background: #2492EB; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
   .avatar-camera-btn:hover { background: #2492EB; }
   .avatar-info-name { font-weight: 700; color: #111; font-size: 1.0625rem; word-break: break-word; }
   .avatar-info-hint { font-size: 0.8125rem; color: #9CA3AF; margin-top: 0.2rem; }
   .avatar-actions { margin-top: 0.6rem; display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
-  .avatar-upload-link { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; color: #2563EB; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; white-space: nowrap; }
+  .avatar-upload-link { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; color: #2492EB; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; white-space: nowrap; }
   .avatar-upload-link:hover { text-decoration: underline; }
   .avatar-remove-link { background: none; border: none; color: #EF4444; font-weight: 700; font-size: 0.875rem; cursor: pointer; padding: 0; white-space: nowrap; }
   .avatar-remove-link:hover { text-decoration: underline; }

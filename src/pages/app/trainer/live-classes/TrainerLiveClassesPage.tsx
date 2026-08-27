@@ -477,7 +477,7 @@ export default function TrainerLiveClassesPage() {
           <div className="lc-stat-card">
             <div className="lc-stat-top">
               <p className="lc-stat-title">Total Sessions</p>
-              <div className="lc-stat-icon" style={{ background: '#DBEAFE' }}><Video size={16} color="#2563EB" /></div>
+              <div className="lc-stat-icon" style={{ background: '#DBEAFE' }}><Video size={16} color="#2492EB" /></div>
             </div>
             <p className="lc-stat-value">{stats.totalSessions}</p>
             <p className="lc-stat-sub">All time</p>

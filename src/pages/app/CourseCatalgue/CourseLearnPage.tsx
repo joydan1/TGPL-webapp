@@ -154,7 +154,7 @@ const PAGE_CSS = `
   .video-controls { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.75rem 1rem; z-index: 10; }
   .progress-wrap { width: 100%; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; margin-bottom: 0.625rem; cursor: pointer; transition: height 0.1s; }
   .progress-wrap:hover { height: 6px; }
-  .progress-fill { height: 100%; background: #2563EB; border-radius: 2px; position: relative; pointer-events: none; }
+  .progress-fill { height: 100%; background: #2492EB; border-radius: 2px; position: relative; pointer-events: none; }
   .progress-thumb { position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
   .controls-row { display: flex; align-items: center; justify-content: space-between; }
   .time { font-size: 0.75rem; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
@@ -191,11 +191,11 @@ const PAGE_CSS = `
   .qp-item:hover { background: rgba(255,255,255,0.05); }
   .qp-item-left { display: flex; flex-direction: column; gap: 0.1rem; }
   .qp-item-label { font-size: 0.9375rem; font-weight: 700; color: #fff; }
-  .qp-item-label.active { color: #2563EB; }
+  .qp-item-label.active { color: #2492EB; }
   .qp-item-sub { font-size: 0.8125rem; color: #6B7280; }
   .qp-item-right { display: flex; align-items: center; gap: 0.625rem; }
   .qp-kbps { font-size: 0.8125rem; color: #6B7280; }
-  .qp-check-ring { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2563EB; background: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qp-check-ring { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2492EB; background: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .qp-check-ring-empty { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #4B5563; background: transparent; flex-shrink: 0; }
 
   /* ── Volume ── */
@@ -210,18 +210,18 @@ const PAGE_CSS = `
 
   .lesson-meta { padding: 1.25rem 0 0; display: flex; flex-direction: column; gap: 0.25rem; }
   .crumb { font-size: 0.8125rem; color: #9CA3AF; }
-  .crumb .crumb-link { color: #2563EB; font-weight: 600; cursor: pointer; }
+  .crumb .crumb-link { color: #2492EB; font-weight: 600; cursor: pointer; }
   .lesson-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .lesson-title { font-size: 1.375rem; font-weight: 700; color: #111; }
   .lesson-sub { font-size: 0.875rem; color: #6B7280; }
-  .mark-done-btn { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 2rem; border: 1.5px solid #2563EB; background: #fff; color: #2563EB; font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
+  .mark-done-btn { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 2rem; border: 1.5px solid #2492EB; background: #fff; color: #2492EB; font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
   .mark-done-btn:hover { background: #EFF6FF; }
   .mark-done-btn.done { border-color: #22C55E; color: #22C55E; background: #ECFDF3; }
   .mark-done-btn:disabled { opacity: 0.6; cursor: default; }
 
   .tabs-row { display: flex; gap: 2rem; border-bottom: 1px solid #E5E7EB; }
   .tab-btn { padding: 0.875rem 0; background: none; border: none; border-bottom: 2px solid transparent; font-size: 0.9375rem; font-weight: 600; color: #9CA3AF; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
-  .tab-btn.active { color: #2563EB; border-bottom-color: #2563EB; }
+  .tab-btn.active { color: #2492EB; border-bottom-color: #2492EB; }
   .tab-btn:disabled { cursor: not-allowed; color: #D1D5DB; }
   .tab-btn .tab-lock-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #D1D5DB; margin-left: 0.375rem; }
   .tab-panel { display: flex; flex-direction: column; gap: 1rem; }
@@ -229,28 +229,28 @@ const PAGE_CSS = `
   .overview-text { font-size: 0.9375rem; color: #374151; line-height: 1.7; white-space: pre-wrap; }
 
   .notes-textarea { width: 100%; min-height: 180px; border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 1rem; font-size: 0.9375rem; color: #111; font-family: inherit; resize: vertical; outline: none; transition: border-color 0.15s; background: #fff; }
-  .notes-textarea:focus { border-color: #2563EB; }
+  .notes-textarea:focus { border-color: #2492EB; }
   .notes-textarea::placeholder { color: #9CA3AF; }
   .notes-hint-row { display: flex; align-items: center; justify-content: space-between; }
   .notes-hint { font-size: 0.8125rem; color: #9CA3AF; }
   .notes-save-status { font-size: 0.8125rem; color: #22C55E; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; }
 
   .resources-select-all { display: flex; align-items: center; gap: 0.625rem; font-size: 0.875rem; color: #374151; font-weight: 500; cursor: pointer; }
-  .resources-select-all input { width: 16px; height: 16px; accent-color: #2563EB; cursor: pointer; }
+  .resources-select-all input { width: 16px; height: 16px; accent-color: #2492EB; cursor: pointer; }
   .resources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .resource-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; border: 1px solid #E5E7EB; border-radius: 0.875rem; background: #fff; }
-  .resource-card input { margin-top: 0.25rem; width: 16px; height: 16px; accent-color: #2563EB; cursor: pointer; flex-shrink: 0; }
+  .resource-card input { margin-top: 0.25rem; width: 16px; height: 16px; accent-color: #2492EB; cursor: pointer; flex-shrink: 0; }
   .resource-icon-wrap { width: 2.5rem; height: 2.5rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .resource-info { flex: 1; min-width: 0; }
   .resource-title { font-size: 0.9375rem; font-weight: 700; color: #111; margin-bottom: 0.25rem; }
   .resource-meta { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; color: #9CA3AF; text-transform: uppercase; }
   .resource-meta-light { font-size: 0.8125rem; color: #9CA3AF; font-weight: 400; text-transform: none; }
-  .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2563EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+  .resource-download { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #EFF6FF; border: none; color: #2492EB; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
   .resource-download:hover { background: #DBEAFE; }
   .resource-download:disabled { opacity: 0.55; cursor: not-allowed; }
   .resources-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
   .resources-footer-text { font-size: 0.9375rem; color: #111; font-weight: 600; }
-  .download-all-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .download-all-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 2rem; border: none; background: #2492EB; color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .download-all-btn:hover { opacity: 0.9; }
   .download-all-btn:disabled { opacity: 0.55; cursor: not-allowed; }
   .assignments-section { margin-bottom: 1.5rem; }
@@ -261,7 +261,7 @@ const PAGE_CSS = `
   .assignment-title { font-size: 0.95rem; font-weight: 700; color: #111; margin-bottom: 0.25rem; }
   .assignment-meta { font-size: 0.84rem; color: #4B5563; margin-bottom: 0.25rem; }
   .assignment-meta-light { font-size: 0.78rem; color: #9CA3AF; }
-  .assignment-link { display: inline-flex; align-items: center; justify-content: center; padding: 0.7rem 1rem; border-radius: 999px; border: none; background: #2563EB; color: #fff; font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .assignment-link { display: inline-flex; align-items: center; justify-content: center; padding: 0.7rem 1rem; border-radius: 999px; border: none; background: #2492EB; color: #fff; font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .assignment-link:hover { opacity: 0.92; }
   .error-banner { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
   .resources-empty { padding: 2.5rem 1rem; text-align: center; color: #9CA3AF; font-size: 0.9375rem; }
@@ -277,20 +277,20 @@ const PAGE_CSS = `
   .nav-card.up-next { border-color: #BFDBFE; background: #EFF6FF; }
   .nav-card.up-next:hover { background: #DBEAFE; }
   .nav-card-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; color: #9CA3AF; text-transform: uppercase; }
-  .nav-card.up-next .nav-card-label { color: #2563EB; justify-content: flex-end; }
+  .nav-card.up-next .nav-card-label { color: #2492EB; justify-content: flex-end; }
   .nav-card-title { font-size: 0.9375rem; font-weight: 700; color: #111; }
   .nav-card.up-next .nav-card-title { text-align: right; }
   .nav-card-sub { font-size: 0.8125rem; color: #9CA3AF; }
   .nav-card.up-next .nav-card-sub { text-align: right; }
 
   .ask-help-wrap { position: relative; }
-  .ask-help-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; white-space: nowrap; letter-spacing: 0.01em; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+  .ask-help-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 2rem; border: none; background: #2492EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; white-space: nowrap; letter-spacing: 0.01em; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
   .ask-help-btn:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.45); }
   .ask-help-popover { position: absolute; bottom: calc(100% + 0.75rem); right: 0; background: #1a2030; border-radius: 1.25rem; box-shadow: 0 12px 40px rgba(0,0,0,0.45); width: 320px; padding: 1.5rem; z-index: 50; display: flex; flex-direction: column; gap: 0.75rem; }
   .ask-help-popover-title { font-size: 1.125rem; font-weight: 700; color: #fff; }
   .ask-help-popover-sub { font-size: 0.875rem; color: #9CA3AF; line-height: 1.5; margin-top: -0.25rem; }
   .ask-help-item { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.875rem 1rem; border-radius: 2rem; border: none; font-size: 0.9375rem; font-weight: 700; cursor: pointer; text-align: center; transition: opacity 0.15s; }
-  .ask-help-item.primary { background: #2563EB; color: #fff; }
+  .ask-help-item.primary { background: #2492EB; color: #fff; }
   .ask-help-item.primary:hover { opacity: 0.9; }
   .ask-help-item.secondary { background: #2d3748; color: #fff; }
   .ask-help-item.secondary:hover { opacity: 0.85; }
@@ -305,14 +305,14 @@ const PAGE_CSS = `
   .modal-progress-card { width: 100%; background: #F9FAFB; border-radius: 0.875rem; padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.5rem; }
   .modal-progress-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; }
   .modal-progress-row span:first-child { color: #6B7280; }
-  .modal-progress-row span:last-child { color: #2563EB; font-weight: 700; }
+  .modal-progress-row span:last-child { color: #2492EB; font-weight: 700; }
   .modal-progress-bar { height: 6px; background: #E5E7EB; border-radius: 99px; }
-  .modal-progress-fill { height: 100%; background: #2563EB; border-radius: 99px; transition: width 0.4s ease; }
+  .modal-progress-fill { height: 100%; background: #2492EB; border-radius: 99px; transition: width 0.4s ease; }
   .modal-progress-footer { display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; }
   .modal-progress-footer .before { color: #9CA3AF; }
   .modal-progress-footer .after { color: #22C55E; font-weight: 700; }
   .modal-upnext-card { width: 100%; border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 0.875rem; padding: 0.875rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-  .modal-upnext-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: #2563EB; text-transform: uppercase; }
+  .modal-upnext-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: #2492EB; text-transform: uppercase; }
   .modal-upnext-row { display: flex; align-items: center; gap: 0.75rem; }
   .modal-upnext-thumb { width: 56px; height: 42px; border-radius: 0.5rem; background: linear-gradient(135deg,#c8c8c8,#a0a0a0); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
   .modal-upnext-title { font-size: 0.9375rem; font-weight: 700; color: #111; }
@@ -321,12 +321,12 @@ const PAGE_CSS = `
   .modal-countdown b { color: #111; }
   .modal-actions { display: flex; align-items: center; justify-content: center; gap: 1rem; }
   .modal-cancel { background: none; border: none; color: #6B7280; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
-  .modal-start-now { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+  .modal-start-now { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 2rem; border: none; background: #2492EB; color: #fff; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .modal-break-link { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8438rem; color: #6B7280; text-decoration: underline; cursor: pointer; background: none; border: none; }
 
   /* ── Booking calendar modal ── */
   .booking-modal-card { max-width: 400px; align-items: stretch; }
-  .booking-title { font-size: 1.25rem; font-weight: 700; color: #2563EB; text-align: center; }
+  .booking-title { font-size: 1.25rem; font-weight: 700; color: #2492EB; text-align: center; }
   .booking-sub { font-size: 0.875rem; color: #6B7280; text-align: center; margin-top: -0.75rem; }
   .booking-cal-box { width: 100%; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1.25rem; }
   .booking-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
@@ -340,23 +340,23 @@ const PAGE_CSS = `
   .booking-cal-day { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.875rem; color: #D1D5DB; background: none; border: 2px solid transparent; }
   .booking-cal-day.has-slots { color: #111; font-weight: 600; cursor: pointer; }
   .booking-cal-day.has-slots:hover { background: #F3F4F6; }
-  .booking-cal-day.selected { border: 2px dashed #2563EB; color: #2563EB; font-weight: 700; background: none; }
+  .booking-cal-day.selected { border: 2px dashed #2492EB; color: #2492EB; font-weight: 700; background: none; }
   .booking-time-row { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 1.25rem; }
-  .booking-time-label { font-size: 0.9375rem; font-weight: 700; color: #2563EB; }
+  .booking-time-label { font-size: 0.9375rem; font-weight: 700; color: #2492EB; }
   .booking-time-trigger-wrap { position: relative; }
   .booking-time-trigger { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; border-bottom: 1.5px solid #E5E7EB; padding: 0 0 0.3rem; font-size: 0.9375rem; font-weight: 600; color: #111; cursor: pointer; }
   .booking-time-trigger:disabled { color: #D1D5DB; cursor: not-allowed; }
   .booking-time-popover { position: absolute; top: calc(100% + 0.5rem); right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.14); min-width: 150px; z-index: 20; overflow: hidden; }
   .booking-time-option { padding: 0.75rem 1rem; font-size: 0.9375rem; color: #374151; cursor: pointer; white-space: nowrap; }
   .booking-time-option:hover { background: #F3F4F6; }
-  .booking-time-option.active { background: #EFF6FF; color: #2563EB; font-weight: 700; }
+  .booking-time-option.active { background: #EFF6FF; color: #2492EB; font-weight: 700; }
   .booking-summary { width: 100%; background: #EFF6FF; border-radius: 0.875rem; padding: 0.875rem 1rem; text-align: center; margin-top: 1.25rem; }
-  .booking-summary-label { font-size: 0.8125rem; font-weight: 700; color: #2563EB; }
-  .booking-summary-value { font-size: 0.875rem; font-style: italic; color: #2563EB; margin-top: 0.2rem; }
-  .booking-btn-primary { width: 100%; padding: 0.875rem; border-radius: 2rem; border: none; background: #2563EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 1.25rem; }
+  .booking-summary-label { font-size: 0.8125rem; font-weight: 700; color: #2492EB; }
+  .booking-summary-value { font-size: 0.875rem; font-style: italic; color: #2492EB; margin-top: 0.2rem; }
+  .booking-btn-primary { width: 100%; padding: 0.875rem; border-radius: 2rem; border: none; background: #2492EB; color: #fff; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 1.25rem; }
   .booking-btn-primary:hover:not(:disabled) { opacity: 0.9; }
   .booking-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  .booking-btn-cancel { width: 100%; padding: 0.875rem; border-radius: 2rem; border: 1.5px solid #2563EB; background: #fff; color: #2563EB; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 0.75rem; }
+  .booking-btn-cancel { width: 100%; padding: 0.875rem; border-radius: 2rem; border: 1.5px solid #2492EB; background: #fff; color: #2492EB; font-size: 0.9375rem; font-weight: 700; cursor: pointer; margin-top: 0.75rem; }
   .booking-btn-cancel:hover { background: #EFF6FF; }
 
   @media (max-width: 900px) {
@@ -1049,7 +1049,7 @@ async function downloadResource(r: LessonResource) {
                                 </div>
                                 <button
                                   className="qp-toggle"
-                                  style={{ background: saveData ? '#2563EB' : '#374151' }}
+                                  style={{ background: saveData ? '#2492EB' : '#374151' }}
                                   onClick={(e) => { e.stopPropagation(); setSaveData(s => { if (!s) setQuality('240p'); return !s }) }}
                                 >
                                   <div className="qp-toggle-thumb" style={{ left: saveData ? '21px' : '3px' }} />
