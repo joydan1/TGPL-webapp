@@ -1,21 +1,17 @@
 // components/community/CommunityChatPanel.tsx
 //
-// One shared chat UI for Learner / Trainer / Admin. The `role` prop drives
-// the only thing that actually differs between the three Figma exports:
-// which items show up in each message's context menu. Everything else
-// (bubbles, reactions, rules panel, composer) is identical across roles.
-//
-// This component owns no data fetching — it's handed a thread + handlers by
+// One shared chat UI for Learner / Trainer / Admin. The `role` prop (the
+// viewer's own role) drives what shows up in a message's context menu.
+// This component owns no data fetching — it's handed messages + handlers by
 // whichever page renders it (CommunityPage / TrainerCommunityPage /
-// AdminCommunityPage), same division of responsibility as Ring/SmallRing in
-// DashboardPage.tsx.
+// AdminCommunityPage).
 
 import { useEffect, useRef, useState } from 'react'
 import {
   Hash, ShieldCheck, ChevronDown, ChevronUp, Pin, Reply, Copy, Trash2,
-  ShieldAlert, Smile, Send,
+  Smile, Send,
 } from 'lucide-react'
-import type { CommunityMessage, CommunityRole, CommunityThread } from '../../types/community'
+import type { CommunityMessage, CommunityRole } from '../../types/community'
 
 export const COMMUNITY_CHAT_CSS = `
   .cc-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #F7F7F7; }
@@ -57,10 +53,6 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-bubble { padding: 10px 16px; border-radius: 16px 16px 16px 8px; background: #fff; font-size: 13px; line-height: 1.6; color: #2B2B2C; word-break: break-word; }
   .cc-msg-row.own .cc-bubble { border-radius: 16px 16px 8px 16px; background: #2492EB; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
-  .cc-reactions { display: flex; align-items: center; gap: 6px; padding: 0 4px; flex-wrap: wrap; }
-  .cc-reaction { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; border: 1px solid #EBEBEB; background: #fff; font-size: 11px; font-weight: 600; color: #616873; cursor: pointer; }
-  .cc-reaction.mine { background: #E9F5FF; border-color: #BFDFFD; color: #2492EB; }
-
   .cc-menu-btn { opacity: 0; position: absolute; top: 2px; background: #fff; border: 1px solid #EBEBEB; border-radius: 999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #99A1AF; transition: opacity .12s; }
   .cc-msg-row:not(.own) .cc-menu-btn { right: -32px; }
   .cc-msg-row.own .cc-menu-btn { left: -32px; }
@@ -93,11 +85,13 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-emoji-grid button:hover { background: #F7F7F7; }
 `
 
+// Emoji picker for composing your own message text — client-side only,
+// unrelated to any backend "reactions" feature (there isn't one).
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
 const AVATAR_COLORS = ['#0891B2', '#10B981', '#D97706', '#8B5CF6', '#2492EB', '#EC4899']
 
 function initialsOf(name: string): string {
-  return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')
+  return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '?'
 }
 
 function avatarColorFor(name: string): string {
@@ -122,21 +116,21 @@ interface MessageMenuAction {
   danger?: boolean
 }
 
-// The one place role actually changes behavior — mirrors the three Figma
-// context-menu exports exactly (Learner: 2/3 items, Trainer: 4, Admin: 5).
-function buildMenuActions(msg: CommunityMessage, role: CommunityRole): MessageMenuAction[] {
-  const canModerate = role === 'trainer' || role === 'admin'
-  const isAdmin = role === 'admin'
-  const actions: MessageMenuAction[] = [{ key: 'reply', label: 'Reply', icon: Reply }]
+// The one place role actually changes behavior. Per the confirmed backend:
+// - Anyone can delete their own message (DELETE /messages/{id}/).
+// - Only ADMIN can delete someone else's message (DELETE /messages/{id}/moderate/ is admin-only).
+//   Trainers get no moderation action on other people's messages.
+// - There's no pin, reaction, or warn-user endpoint, so none of those appear here.
+function buildMenuActions(isMine: boolean, viewerRole: CommunityRole): MessageMenuAction[] {
+  const actions: MessageMenuAction[] = [
+    { key: 'reply', label: 'Reply', icon: Reply },
+    { key: 'copy', label: 'Copy text', icon: Copy },
+  ]
 
-  if (canModerate) actions.push({ key: 'pin', label: 'Pin message', icon: Pin })
-  actions.push({ key: 'copy', label: 'Copy text', icon: Copy })
-
-  if (msg.is_mine) {
+  if (isMine) {
     actions.push({ key: 'delete-mine', label: 'Delete for everyone', icon: Trash2, danger: true })
-  } else if (canModerate) {
-    actions.push({ key: 'delete-mod', label: isAdmin ? 'Delete message' : 'Delete for everyone', icon: Trash2, danger: true })
-    if (isAdmin) actions.push({ key: 'warn', label: 'Remove & warn user', icon: ShieldAlert, danger: true })
+  } else if (viewerRole === 'admin') {
+    actions.push({ key: 'delete-mod', label: 'Delete message', icon: Trash2, danger: true })
   }
 
   return actions
@@ -144,40 +138,50 @@ function buildMenuActions(msg: CommunityMessage, role: CommunityRole): MessageMe
 
 interface MessageRowProps {
   msg: CommunityMessage
-  role: CommunityRole
-  onReact: (messageId: string, emoji: string) => void
-  onPin: (messageId: string) => void
+  viewerRole: CommunityRole
+  currentUserId: string
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
-  onRemoveAndWarn: (messageId: string) => void
 }
 
-function MessageRow({ msg, role, onReact, onPin, onDeleteMine, onDeleteModerator, onRemoveAndWarn }: MessageRowProps) {
+function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator }: MessageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const actions = buildMenuActions(msg, role)
+  const isMine = msg.author.id !== null && msg.author.id === currentUserId
+  const actions = buildMenuActions(isMine, viewerRole)
+  const displayName = isMine ? 'You' : msg.author.full_name
+  const roleLabel = msg.author.role ? msg.author.role[0].toUpperCase() + msg.author.role.slice(1) : null
 
   function handleAction(key: string) {
     setMenuOpen(false)
     if (key === 'copy') { navigator.clipboard?.writeText(msg.body); return }
-    if (key === 'pin') return onPin(msg.id)
     if (key === 'delete-mine') return onDeleteMine(msg.id)
     if (key === 'delete-mod') return onDeleteModerator(msg.id)
-    if (key === 'warn') return onRemoveAndWarn(msg.id)
-    // 'reply' — no-op here; wire to a reply/thread feature when that exists.
+    // 'reply' — no-op here; wire to a reply/thread feature when that exists (backend doesn't have one yet).
   }
 
   return (
-    <div className={`cc-msg-row${msg.is_mine ? ' own' : ''}`}>
-      <div className="cc-avatar" style={{ background: avatarColorFor(msg.author.name) }}>
-        {initialsOf(msg.author.name)}
+    <div className={`cc-msg-row${isMine ? ' own' : ''}`}>
+      <div
+        className="cc-avatar"
+        style={!msg.author.avatar_url ? { background: avatarColorFor(msg.author.full_name) } : undefined}
+      >
+        {msg.author.avatar_url ? (
+          <img
+            src={msg.author.avatar_url}
+            alt={msg.author.full_name}
+            style={{ width: '100%', height: '100%', borderRadius: '999px', objectFit: 'cover' }}
+          />
+        ) : (
+          initialsOf(msg.author.full_name)
+        )}
       </div>
       <div className="cc-msg-col">
         <div className="cc-msg-meta">
-          {msg.is_mine && <span className="cc-msg-time">{timeAgo(msg.created_at)}</span>}
-          {msg.is_mine && <span className={`cc-msg-role ${msg.author.role}`}>{msg.author.role[0].toUpperCase() + msg.author.role.slice(1)}</span>}
-          <span className="cc-msg-name">{msg.is_mine ? 'You' : msg.author.name}</span>
-          {!msg.is_mine && <span className={`cc-msg-role ${msg.author.role}`}>{msg.author.role[0].toUpperCase() + msg.author.role.slice(1)}</span>}
-          {!msg.is_mine && <span className="cc-msg-time">{timeAgo(msg.created_at)}</span>}
+          {isMine && <span className="cc-msg-time">{timeAgo(msg.created_at)}</span>}
+          {isMine && roleLabel && <span className={`cc-msg-role ${msg.author.role}`}>{roleLabel}</span>}
+          <span className="cc-msg-name">{displayName}</span>
+          {!isMine && roleLabel && <span className={`cc-msg-role ${msg.author.role}`}>{roleLabel}</span>}
+          {!isMine && <span className="cc-msg-time">{timeAgo(msg.created_at)}</span>}
         </div>
         <div className="cc-bubble-wrap">
           <button className={`cc-menu-btn${menuOpen ? ' open' : ''}`} type="button" onClick={() => setMenuOpen((v) => !v)} aria-label="Message actions">
@@ -198,43 +202,30 @@ function MessageRow({ msg, role, onReact, onPin, onDeleteMine, onDeleteModerator
             </div>
           )}
         </div>
-        {msg.reactions.length > 0 && (
-          <div className="cc-reactions">
-            {msg.reactions.map((r) => (
-              <button
-                className={`cc-reaction${r.reacted_by_me ? ' mine' : ''}`}
-                key={r.emoji}
-                type="button"
-                onClick={() => onReact(msg.id, r.emoji)}
-              >
-                {r.emoji} {r.count}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )
 }
 
 export interface CommunityChatPanelProps {
-  role: CommunityRole
+  role: CommunityRole // the viewer's own role — drives menu permissions
+  currentUserId: string // used to determine isMine per message (author.id === currentUserId)
   currentUserInitials: string
-  thread: CommunityThread | null
+  messages: CommunityMessage[]
+  activeMembers: number
+  totalMembers: number
+  rules: string[] | null // from GET /v1/community/rules/ — fetched once by the page, not polled
   loading: boolean
   error: string | null
   sending: boolean
   onSend: (body: string) => void
-  onReact: (messageId: string, emoji: string) => void
-  onPin: (messageId: string) => void
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
-  onRemoveAndWarn: (messageId: string) => void
 }
 
 export default function CommunityChatPanel({
-  role, currentUserInitials, thread, loading, error, sending,
-  onSend, onReact, onPin, onDeleteMine, onDeleteModerator, onRemoveAndWarn,
+  role, currentUserId, currentUserInitials, messages, activeMembers, totalMembers, rules,
+  loading, error, sending, onSend, onDeleteMine, onDeleteModerator,
 }: CommunityChatPanelProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -272,7 +263,7 @@ export default function CommunityChatPanel({
             <p className="cc-title">Community Chat</p>
             <div className="cc-meta">
               <span className="cc-live-dot" />
-              {thread ? `${thread.message_count} messages · ${thread.active_member_count} members active` : '—'}
+              {`${totalMembers} members · ${activeMembers} active`}
             </div>
           </div>
         </div>
@@ -282,11 +273,11 @@ export default function CommunityChatPanel({
         </button>
       </div>
 
-      {rulesOpen && thread && (
+      {rulesOpen && rules && (
         <div className="cc-rules-panel">
           <p className="cc-rules-eyebrow"><Pin size={11} /> Pinned · Community rules</p>
           <ul className="cc-rules-list">
-            {thread.rules.map((r, i) => (
+            {rules.map((r, i) => (
               <li key={i}><span className="cc-rules-num">{i + 1}</span>{r}</li>
             ))}
           </ul>
@@ -296,19 +287,17 @@ export default function CommunityChatPanel({
       <div className="cc-messages">
         {loading && <p className="cc-state-note">Loading messages…</p>}
         {!loading && error && <p className="cc-state-note error">{error}</p>}
-        {!loading && !error && thread?.messages.length === 0 && (
+        {!loading && !error && messages.length === 0 && (
           <p className="cc-state-note">No messages yet — be the first to say hello.</p>
         )}
-        {!loading && !error && thread?.messages.map((msg) => (
+        {!loading && !error && messages.map((msg) => (
           <MessageRow
             msg={msg}
-            role={role}
+            viewerRole={role}
+            currentUserId={currentUserId}
             key={msg.id}
-            onReact={onReact}
-            onPin={onPin}
             onDeleteMine={onDeleteMine}
             onDeleteModerator={onDeleteModerator}
-            onRemoveAndWarn={onRemoveAndWarn}
           />
         ))}
       </div>

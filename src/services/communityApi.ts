@@ -1,24 +1,26 @@
-
 import { apiClient } from './api'
-import type { CommunityThread } from '../types/community'
+import type { CommunityFeedResponse, CommunityMessage, CommunityRules } from '../types/community'
 
 type ApiResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-async function getThread(): Promise<ApiResult<CommunityThread>> {
+// No `?since=` → initial load. Pass `?since=` → poll for new messages.
+async function getMessages(since?: string): Promise<ApiResult<CommunityFeedResponse>> {
   try {
-    const res = await apiClient.get<CommunityThread>('/v1/community/thread/')
+    const res = await apiClient.get<CommunityFeedResponse>('/v1/community/messages/', {
+      params: since ? { since } : undefined,
+    })
     return { success: true, data: res.data }
   } catch (err) {
-    console.error('Failed to fetch community thread:', err)
+    console.error('Failed to fetch community messages:', err)
     return { success: false, error: 'Failed to load the community chat.' }
   }
 }
 
-async function sendMessage(body: string): Promise<ApiResult<CommunityThread['messages'][number]>> {
+async function sendMessage(body: string): Promise<ApiResult<CommunityMessage>> {
   try {
-    const res = await apiClient.post<CommunityThread['messages'][number]>('/v1/community/messages/', { body })
+    const res = await apiClient.post<CommunityMessage>('/v1/community/messages/', { body })
     return { success: true, data: res.data }
   } catch (err) {
     console.error('Failed to send message:', err)
@@ -26,32 +28,10 @@ async function sendMessage(body: string): Promise<ApiResult<CommunityThread['mes
   }
 }
 
-async function toggleReaction(messageId: string, emoji: string): Promise<ApiResult<null>> {
+// Deleting your own message.
+async function deleteMessage(messageId: string): Promise<ApiResult<null>> {
   try {
-    await apiClient.post(`/v1/community/messages/${messageId}/reactions/`, { emoji })
-    return { success: true, data: null }
-  } catch (err) {
-    console.error('Failed to toggle reaction:', err)
-    return { success: false, error: 'Reaction failed.' }
-  }
-}
-
-// Trainer + Admin only.
-async function pinMessage(messageId: string): Promise<ApiResult<null>> {
-  try {
-    await apiClient.post(`/v1/community/messages/${messageId}/pin/`)
-    return { success: true, data: null }
-  } catch (err) {
-    console.error('Failed to pin message:', err)
-    return { success: false, error: 'Could not pin that message.' }
-  }
-}
-
-// `scope: 'mine'` = the sender deleting their own message ("Delete for everyone").
-// `scope: 'moderator'` = Trainer/Admin removing someone else's message.
-async function deleteMessage(messageId: string, scope: 'mine' | 'moderator'): Promise<ApiResult<null>> {
-  try {
-    await apiClient.delete(`/v1/community/messages/${messageId}/`, { params: { scope } })
+    await apiClient.delete(`/v1/community/messages/${messageId}/`)
     return { success: true, data: null }
   } catch (err) {
     console.error('Failed to delete message:', err)
@@ -59,22 +39,31 @@ async function deleteMessage(messageId: string, scope: 'mine' | 'moderator'): Pr
   }
 }
 
-// Admin only.
-async function removeAndWarnUser(messageId: string): Promise<ApiResult<null>> {
+// Admin-only: delete anyone's message.
+async function moderateDeleteMessage(messageId: string): Promise<ApiResult<null>> {
   try {
-    await apiClient.post(`/v1/community/messages/${messageId}/warn-user/`)
+    await apiClient.delete(`/v1/community/messages/${messageId}/moderate/`)
     return { success: true, data: null }
   } catch (err) {
-    console.error('Failed to warn user:', err)
-    return { success: false, error: 'Could not send the warning.' }
+    console.error('Failed to moderate-delete message:', err)
+    return { success: false, error: 'Could not remove that message.' }
+  }
+}
+
+async function getRules(): Promise<ApiResult<CommunityRules>> {
+  try {
+    const res = await apiClient.get<CommunityRules>('/v1/community/rules/')
+    return { success: true, data: res.data }
+  } catch (err) {
+    console.error('Failed to fetch community rules:', err)
+    return { success: false, error: 'Failed to load community rules.' }
   }
 }
 
 export const communityAPI = {
-  getThread,
+  getMessages,
   sendMessage,
-  toggleReaction,
-  pinMessage,
   deleteMessage,
-  removeAndWarnUser,
+  moderateDeleteMessage,
+  getRules,
 }

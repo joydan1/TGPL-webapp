@@ -392,10 +392,6 @@ export default function AdminDashboardPage() {
     return ((latest.revenue_kobo - prev.revenue_kobo) / prev.revenue_kobo) * 100
   }, [revenueMonthly])
 
-  // Builds a CSV snapshot of everything currently on screen for the
-  // selected range. There's no backend endpoint for this yet — see the
-  // comment above csvField — so this reads straight from component state
-  // rather than making a fresh request.
   function handleExport() {
     setIsExporting(true)
     try {

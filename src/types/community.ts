@@ -1,16 +1,10 @@
 export type CommunityRole = 'learner' | 'trainer' | 'admin'
 
 export interface CommunityAuthor {
-  id: string
-  name: string
-  role: CommunityRole
-  avatar_url?: string | null
-}
-
-export interface CommunityReaction {
-  emoji: string
-  count: number
-  reacted_by_me: boolean
+  id: string | null // null when the author's account has been deleted
+  full_name: string // "Deleted user" when author is null
+  role: CommunityRole | null // null when the author's account has been deleted
+  avatar_url: string | null
 }
 
 export interface CommunityMessage {
@@ -18,14 +12,19 @@ export interface CommunityMessage {
   author: CommunityAuthor
   body: string
   created_at: string
-  reactions: CommunityReaction[]
-  is_pinned: boolean
-  is_mine: boolean
 }
 
-export interface CommunityThread {
-  message_count: number
-  active_member_count: number
-  rules: string[]
-  messages: CommunityMessage[]
+export interface CommunityFeedResponse {
+  results: CommunityMessage[]
+  active_members: number // posted in the last 15 min
+  total_members: number // platform's total enrolled learners
+}
+
+export interface CommunityRule {
+  id: number
+  text: string
+}
+
+export interface CommunityRules {
+  rules: CommunityRule[]
 }
