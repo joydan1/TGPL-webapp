@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   X, Mail, KeyRound, Ban, BookOpen, CheckCircle2, BadgeCheck, BarChart3,
-   Trash2,  Loader2, AlertCircle, Repeat2,
+   Trash2,  Loader2, AlertCircle, Repeat2, Star, Users, AlertTriangle,
+   Video, UploadCloud, Sparkles, Clock,
 } from 'lucide-react'
 import { type AdminUser, type UserStatus } from '../../types/adminUser'
 import { apiClient } from '../../services/api' 
@@ -50,6 +51,7 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-stat-card { background: #F9FAFB; border-radius: 0.9rem; padding: 1rem; border: 1px solid #F3F4F6; }
   .up-stat-icon { width: 34px; height: 34px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.6rem; }
   .up-stat-value { margin: 0; font-size: 1.4rem; font-weight: 800; color: #111827; }
+  .up-stat-value.muted { color: #9CA3AF; }
   .up-stat-label { margin: 0.2rem 0 0; font-size: 0.76rem; color: #6B7280; line-height: 1.3; }
 
   .up-section { background: #fff; border: 1px solid #F3F4F6; border-radius: 1rem; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
@@ -72,8 +74,16 @@ export const USER_PROFILE_MODAL_CSS = `
 
   .up-activity-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-activity-icon { width: 34px; height: 34px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .up-activity-icon.enrolled { background: #EFF6FF; color: #2492EB; }
+  .up-activity-icon.completed_module { background: #ECFDF5; color: #059669; }
+  .up-activity-icon.course_created { background: #F5F3FF; color: #7C3AED; }
+  .up-activity-icon.live_session_hosted { background: #FEF3C7; color: #D97706; }
+  .up-activity-icon.material_added { background: #E9F5FF; color: #2492EB; }
   .up-activity-title { margin: 0; font-size: 0.88rem; font-weight: 600; color: #111827; }
   .up-activity-time { margin: 0.1rem 0 0; font-size: 0.78rem; color: #9CA3AF; }
+
+  .up-load-more-btn { display: block; width: 100%; text-align: center; border: none; background: none; color: #2492EB; font-weight: 700; font-size: 0.85rem; padding: 0.85rem 1.1rem; cursor: pointer; border-top: 1px solid #F3F4F6; }
+  .up-load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .up-perm-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-perm-icon { width: 30px; height: 30px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -91,6 +101,17 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-perm-state { font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
   .up-perm-state.on { color: #2492EB; }
   .up-perm-state.off { color: #9CA3AF; }
+
+  .up-course-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
+  .up-course-icon { width: 32px; height: 32px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #E9F5FF; color: #2492EB; }
+  .up-course-text { flex: 1; min-width: 0; }
+  .up-course-title { margin: 0; font-size: 0.88rem; font-weight: 600; color: #111827; }
+  .up-course-sub { margin: 0.15rem 0 0; font-size: 0.78rem; color: #9CA3AF; }
+  .up-course-warning { display: flex; align-items: center; gap: 0.3rem; margin: 0.3rem 0 0; font-size: 0.74rem; font-weight: 600; color: #D97706; }
+  .up-course-status { flex-shrink: 0; font-size: 0.7rem; font-weight: 700; text-transform: capitalize; padding: 0.2rem 0.6rem; border-radius: 999px; }
+  .up-course-status.published { background: #ECFDF5; color: #059669; }
+  .up-course-status.draft { background: #F3F4F6; color: #9CA3AF; }
+  .up-course-status.archived { background: #FEF2F2; color: #DC2626; }
 
   .up-danger-zone { border: 1.5px solid #FECACA; border-radius: 1rem; overflow: hidden; }
   .up-danger-title { margin: 0; padding: 1rem 1.1rem 0.6rem; font-size: 0.95rem; font-weight: 800; color: #DC2626; }
@@ -114,6 +135,12 @@ export const USER_PROFILE_MODAL_ALL_CSS =
 
 
 
+interface AdminInProgressCourse {
+  course_id: string
+  course_title: string
+  percent_complete: number
+}
+
 interface AdminUserDetail {
   id: string
   full_name: string
@@ -123,28 +150,80 @@ interface AdminUserDetail {
   avatar_url: string | null
   created_at: string
   last_login_at: string | null
+  // Learner and trainer fields live side by side here — each detail
+  // response only populates the set that applies to that user's role.
   stats?: {
     courses_enrolled?: number
     courses_completed?: number
     certificates_earned?: number
     avg_completion_rate?: number
+    total_courses_count?: number
+    published_courses_count?: number
+    students_registered?: number
+    avg_rating?: number | null
   }
+  // Learners only. Excludes not-started (0%) and fully-completed (100%)
+  // courses — this is specifically the "in progress" band.
+  in_progress_courses?: AdminInProgressCourse[]
   suspension: {
     is_active: boolean
     expires_at: string | null
     reason: string | null
   } | null
-  // Present only when role is "admin" — same 8 fields the invite flow
-  // sends/receives. Optional because learner/trainer detail responses omit
-  // them entirely rather than sending them as false.
-  manage_users?: boolean
-  moderate_content?: boolean
-  manage_courses?: boolean
-  view_analytics?: boolean
-  send_announcements?: boolean
-  view_revenue?: boolean
-  manage_payouts?: boolean
-  system_settings?: boolean
+  // null for learner/trainer responses; an object with the 8 booleans
+  // below when role is "admin" — same shape the invite flow sends/receives.
+  permissions: {
+    manage_users?: boolean
+    moderate_content?: boolean
+    manage_courses?: boolean
+    view_analytics?: boolean
+    send_announcements?: boolean
+    view_revenue?: boolean
+    manage_payouts?: boolean
+    system_settings?: boolean
+  } | null
+}
+
+// One row from GET /v1/admin/courses/?trainer_id={id} — only the fields
+// this modal displays; the endpoint returns more (pricing, revenue, etc.)
+// that other admin screens use.
+interface AdminCourseListItem {
+  id: string
+  title: string
+  slug: string
+  status: 'draft' | 'published' | 'archived'
+  enrollment_count: number
+  completion_percentage: number
+  is_final_assignment_set: boolean
+}
+
+// GET /v1/admin/users/{id}/activity/ — learner types are enrolled /
+// completed_module; trainer types are course_created / live_session_hosted /
+// material_added. `course_published` and `review_left` are intentionally
+// not emitted yet (no publish timestamps tracked, no review system).
+type ActivityType = 'enrolled' | 'completed_module' | 'course_created' | 'live_session_hosted' | 'material_added'
+
+interface AdminActivityItem {
+  type: ActivityType
+  description: string
+  created_at: string
+  course_id?: string
+  module_id?: string
+}
+
+interface AdminActivityPage {
+  count: number
+  next: string | null
+  previous: string | null
+  results: AdminActivityItem[]
+}
+
+const ACTIVITY_ICON: Record<ActivityType, typeof BookOpen> = {
+  enrolled: BookOpen,
+  completed_module: CheckCircle2,
+  course_created: Sparkles,
+  live_session_hosted: Video,
+  material_added: UploadCloud,
 }
 
 type SuspendDuration = '24h' | '3d' | '7d' | '30d' | 'indefinite'
@@ -185,26 +264,28 @@ function formatLastActive(dateStr: string | null) {
   return formatDate(dateStr)
 }
 
-// The 8 permission fields aren't part of AdminUserDetail's own key set in a
-// way TS can narrow cleanly against ADMIN_PERMISSIONS' string ids, so read
-// them through an untyped lookup rather than pretending `id` is a keyof.
+// The 8 permission fields live under detail.permissions (an object, only
+// populated for role "admin") rather than as a flat keyof AdminUserDetail,
+// so read them through an untyped lookup rather than pretending `id` is a
+// keyof the permissions object.
 function permissionEnabled(detail: AdminUserDetail, id: string): boolean {
-  return Boolean((detail as unknown as Record<string, boolean | undefined>)[id])
+  return Boolean((detail.permissions as unknown as Record<string, boolean | undefined> | null)?.[id])
 }
 
 function StatCard({
-  icon, iconBg, value, line1, line2,
+  icon, iconBg, value, line1, line2, muted,
 }: {
   icon: React.ReactNode
   iconBg: string
   value: string | number
   line1: string
   line2: string
+  muted?: boolean
 }) {
   return (
     <div className="up-stat-card">
       <div className="up-stat-icon" style={{ background: iconBg }}>{icon}</div>
-      <p className="up-stat-value">{value}</p>
+      <p className={`up-stat-value${muted ? ' muted' : ''}`}>{value}</p>
       <p className="up-stat-label">{line1}<br />{line2}</p>
     </div>
   )
@@ -238,6 +319,16 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [roleChangeError, setRoleChangeError] = useState<string | null>(null)
 
+  const [courses, setCourses] = useState<AdminCourseListItem[]>([])
+  const [coursesLoading, setCoursesLoading] = useState(false)
+  const [coursesError, setCoursesError] = useState<string | null>(null)
+
+  const [activities, setActivities] = useState<AdminActivityItem[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(false)
+  const [activitiesError, setActivitiesError] = useState<string | null>(null)
+  const [activitiesNextUrl, setActivitiesNextUrl] = useState<string | null>(null)
+  const [loadingMoreActivities, setLoadingMoreActivities] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -257,6 +348,69 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
       cancelled = true
     }
   }, [user.id])
+
+  useEffect(() => {
+    if (detail?.role !== 'trainer') return
+    let cancelled = false
+    setCoursesLoading(true)
+    setCoursesError(null)
+    apiClient
+      .get<{ results: AdminCourseListItem[] }>('/v1/admin/courses/', {
+        params: { trainer_id: user.id, page_size: 50 },
+      })
+      .then((res) => {
+        if (!cancelled) setCourses(res.data.results)
+      })
+      .catch(() => {
+        if (!cancelled) setCoursesError("Couldn't load this trainer's courses.")
+      })
+      .finally(() => {
+        if (!cancelled) setCoursesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [detail?.role, user.id])
+
+  // Activity feed applies to learners and trainers only (admins don't have
+  // a defined activity type set yet).
+  useEffect(() => {
+    if (detail?.role !== 'learner' && detail?.role !== 'trainer') return
+    let cancelled = false
+    setActivitiesLoading(true)
+    setActivitiesError(null)
+    setActivitiesNextUrl(null)
+    apiClient
+      .get<AdminActivityPage>(`/v1/admin/users/${user.id}/activity/`)
+      .then((res) => {
+        if (cancelled) return
+        setActivities(res.data.results)
+        setActivitiesNextUrl(res.data.next)
+      })
+      .catch(() => {
+        if (!cancelled) setActivitiesError("Couldn't load recent activity.")
+      })
+      .finally(() => {
+        if (!cancelled) setActivitiesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [detail?.role, user.id])
+
+  async function handleLoadMoreActivities() {
+    if (!activitiesNextUrl) return
+    setLoadingMoreActivities(true)
+    try {
+      const res = await apiClient.get<AdminActivityPage>(activitiesNextUrl)
+      setActivities((prev) => [...prev, ...res.data.results])
+      setActivitiesNextUrl(res.data.next)
+    } catch {
+      setActivitiesError("Couldn't load more activity.")
+    } finally {
+      setLoadingMoreActivities(false)
+    }
+  }
 
   // suspension is null when the user has never been suspended (or isn't
   // currently) — guard with ?. rather than assuming it's always an object.
@@ -465,13 +619,39 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
 )}
 
                   {roleIsTrainer && (
-                    <div className="up-section">
-                      <h4 className="up-section-title">Trainer stats</h4>
-                      <div className="up-section-pending">
-                        Backend hasn't confirmed the trainer detail response shape yet — not
-                        showing placeholder numbers here to avoid misleading you. Ask for a
-                        trainer example response before this section is built out.
-                      </div>
+                    <div className="up-stats-grid up-stats-4">
+                      <StatCard
+                        icon={<BookOpen size={17} color="#2492EB" />}
+                        iconBg="#DBEAFE"
+                        value={detail.stats?.total_courses_count ?? 0}
+                        line1="courses"
+                        line2="Total Courses"
+                      />
+                      <StatCard
+                        icon={<CheckCircle2 size={17} color="#059669" />}
+                        iconBg="#D1FAE5"
+                        value={detail.stats?.published_courses_count ?? 0}
+                        line1="courses"
+                        line2="Published"
+                      />
+                      <StatCard
+                        icon={<Users size={17} color="#D97706" />}
+                        iconBg="#FEF3C7"
+                        value={detail.stats?.students_registered ?? 0}
+                        line1="learners"
+                        line2="Students Registered"
+                      />
+                      <StatCard
+                        icon={<Star size={17} color="#7C3AED" />}
+                        iconBg="#EDE9FE"
+                        value={(() => {
+                          const rating = detail.stats?.avg_rating
+                          return rating != null ? rating.toFixed(1) : '—'
+                        })()}
+                        line1={detail.stats?.avg_rating != null ? 'avg' : 'No ratings'}
+                        line2={detail.stats?.avg_rating != null ? 'Rating' : 'yet'}
+                        muted={detail.stats?.avg_rating == null}
+                      />
                     </div>
                   )}
 
@@ -512,14 +692,105 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                     <DetailRow label="Last active" value={formatLastActive(detail.last_login_at)} />
                     {roleIsLearner && <DetailRow label="Courses enrolled" value={detail.stats?.courses_enrolled ?? 0} />}
                     {roleIsLearner && <DetailRow label="Certificates" value={detail.stats?.certificates_earned ?? 0} />}
+                    {roleIsTrainer && <DetailRow label="Total courses" value={detail.stats?.total_courses_count ?? 0} />}
+                    {roleIsTrainer && <DetailRow label="Published courses" value={detail.stats?.published_courses_count ?? 0} />}
+                    {roleIsTrainer && <DetailRow label="Students registered" value={detail.stats?.students_registered ?? 0} />}
                   </div>
 
-                  {/*
-                    "In progress" (per-course %) and "Recent activity" sections from the mock
-                    are dropped here — GET /admin/users/{id}/ doesn't return anything like
-                    in_progress[] or recent_activity[]. Re-add once backend confirms those,
-                    or point them at a different endpoint if one exists for activity feeds.
-                  */}
+                  {roleIsLearner && (
+                    <div className="up-section">
+                      <div className="up-section-head-row">
+                        <h4 className="up-section-title">In Progress</h4>
+                        <span className="up-section-count">{(detail.in_progress_courses ?? []).length} courses</span>
+                      </div>
+                      {(detail.in_progress_courses ?? []).length === 0 && (
+                        <div className="up-section-pending">No courses in progress.</div>
+                      )}
+                      {(detail.in_progress_courses ?? []).map((course) => (
+                        <div className="up-progress-row" key={course.course_id}>
+                          <div className="up-progress-head">
+                            <span className="up-progress-title">{course.course_title}</span>
+                            <span className="up-progress-pct">{course.percent_complete}%</span>
+                          </div>
+                          <div className="up-progress-track">
+                            <div className="up-progress-fill" style={{ width: `${course.percent_complete}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {roleIsTrainer && (
+                    <div className="up-section">
+                      <div className="up-section-head-row">
+                        <h4 className="up-section-title">Courses</h4>
+                        <span className="up-section-count">{courses.length} total</span>
+                      </div>
+                      {coursesLoading && <div className="up-section-pending">Loading courses…</div>}
+                      {!coursesLoading && coursesError && <div className="up-section-pending">{coursesError}</div>}
+                      {!coursesLoading && !coursesError && courses.length === 0 && (
+                        <div className="up-section-pending">No courses yet.</div>
+                      )}
+                      {!coursesLoading && !coursesError && courses.map((course) => (
+                        <div className="up-course-row" key={course.id}>
+                          <div className="up-course-icon">
+                            <BookOpen size={14} />
+                          </div>
+                          <div className="up-course-text">
+                            <p className="up-course-title">{course.title}</p>
+                            <p className="up-course-sub">
+                              {course.enrollment_count} students · {course.completion_percentage}% completed
+                            </p>
+                            {course.status === 'published' && !course.is_final_assignment_set && (
+                              <p className="up-course-warning">
+                                <AlertTriangle size={11} /> No capstone set — blocks certificates
+                              </p>
+                            )}
+                          </div>
+                          <span className={`up-course-status ${course.status}`}>{course.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(roleIsLearner || roleIsTrainer) && (
+                    <div className="up-section">
+                      <div className="up-section-head-row">
+                        <h4 className="up-section-title">Recent activity</h4>
+                      </div>
+                      {activitiesLoading && <div className="up-section-pending">Loading activity…</div>}
+                      {!activitiesLoading && activitiesError && (
+                        <div className="up-section-pending">{activitiesError}</div>
+                      )}
+                      {!activitiesLoading && !activitiesError && activities.length === 0 && (
+                        <div className="up-section-pending">No recent activity.</div>
+                      )}
+                      {!activitiesLoading && !activitiesError && activities.map((activity, idx) => {
+                        const Icon = ACTIVITY_ICON[activity.type] ?? Clock
+                        return (
+                          <div className="up-activity-row" key={`${activity.type}-${activity.created_at}-${idx}`}>
+                            <div className={`up-activity-icon ${activity.type}`}>
+                              <Icon size={15} />
+                            </div>
+                            <div>
+                              <p className="up-activity-title">{activity.description}</p>
+                              <p className="up-activity-time">{formatDate(activity.created_at)}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {!activitiesLoading && !activitiesError && activitiesNextUrl && (
+                        <button
+                          className="up-load-more-btn"
+                          type="button"
+                          onClick={handleLoadMoreActivities}
+                          disabled={loadingMoreActivities}
+                        >
+                          {loadingMoreActivities ? 'Loading…' : 'Load more'}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <div className="up-danger-zone">
                     <h4 className="up-danger-title">Danger zone</h4>

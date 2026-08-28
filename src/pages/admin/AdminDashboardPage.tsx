@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, BookOpen, GraduationCap, CreditCard, ChevronDown, Download,
-  UserPlus, Banknote, Award, FileText, Activity as ActivityIcon, TrendingUp, TrendingDown,
+  Banknote, FileText, Activity as ActivityIcon, TrendingUp, TrendingDown,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -51,23 +51,25 @@ const RANGE_OPTIONS: { label: string; period: DashboardPeriod; approx?: boolean 
 ]
 
 
-const ACTIVITY_TYPE_META: Record<
+// The dashboard overview endpoint now tags each recent_activity item with a
+// `category` field — payments | content | platform — instead of us guessing
+// a bucket from target_type text. There's deliberately no "certificates"
+// category (issuance is automatic/high-volume, kept out of the curated
+// feed). "platform" is a catch-all (invites, suspensions, role changes) and
+// doesn't have a confirmed tab treatment yet per Dan — until that's settled,
+// it's shown as its own tab like the other two.
+const ACTIVITY_CATEGORY_META: Record<
   string,
-  { Icon: typeof UserPlus; bg: string; color: string; label: string; tag: string }
+  { Icon: typeof Banknote; bg: string; color: string; label: string }
 > = {
-  signup: { Icon: UserPlus, bg: '#E9F5FF', color: '#2492EB', label: 'Signups', tag: 'signup' },
-  payment: { Icon: Banknote, bg: '#F0FDF4', color: '#10B981', label: 'Payments', tag: 'payment' },
-  certificate: { Icon: Award, bg: '#FFF7E6', color: '#FE9A00', label: 'Certificates', tag: 'certificate' },
-  content: { Icon: FileText, bg: '#F5F3FF', color: '#8B5CF6', label: 'Content', tag: 'content' },
+  payments: { Icon: Banknote, bg: '#F0FDF4', color: '#10B981', label: 'Payments' },
+  content: { Icon: FileText, bg: '#F5F3FF', color: '#8B5CF6', label: 'Content' },
+  platform: { Icon: ActivityIcon, bg: '#F3F4F6', color: '#6B7280', label: 'Platform' },
 }
-const ACTIVITY_FALLBACK_META = { Icon: ActivityIcon, bg: '#F3F4F6', color: '#6B7280' }
+const ACTIVITY_CATEGORY_FALLBACK = { Icon: ActivityIcon, bg: '#F3F4F6', color: '#6B7280', label: 'Other' }
 
-function activityMeta(targetType: string) {
-  return ACTIVITY_TYPE_META[targetType] ?? {
-    ...ACTIVITY_FALLBACK_META,
-    label: prettifyType(targetType),
-    tag: targetType.replace(/_/g, ' '),
-  }
+function activityCategoryMeta(category: string) {
+  return ACTIVITY_CATEGORY_META[category] ?? { ...ACTIVITY_CATEGORY_FALLBACK, label: prettifyType(category) }
 }
 
 function prettifyType(targetType: string) {
@@ -86,6 +88,33 @@ function timeAgo(iso: string) {
   if (hrs < 24) return `${hrs} hr ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
+}
+
+
+
+function csvField(value: string | number | null | undefined): string {
+  const str = value === null || value === undefined ? '' : String(value)
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+function csvRow(values: (string | number | null | undefined)[]): string {
+  return values.map(csvField).join(',')
+}
+
+function downloadCsv(filename: string, sections: string[][]) {
+  const csv = sections.map((rows) => rows.join('\n')).join('\n\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -107,6 +136,7 @@ const PAGE_CSS = `
   .ad-range-note { margin: 0.35rem 0 0; font-size: 0.72rem; color: #9CA3AF; text-align: right; }
 
   .ad-export-btn { display: flex; align-items: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.6rem 1.1rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+  .ad-export-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
   .ad-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
   .ad-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); }
@@ -207,6 +237,8 @@ export default function AdminDashboardPage() {
   const [revenueMonthly, setRevenueMonthly] = useState<MonthlyRevenuePoint[]>([])
   const [revenueError, setRevenueError] = useState<string | null>(null)
   const [loadingRevenueMonthly, setLoadingRevenueMonthly] = useState(true)
+
+  const [isExporting, setIsExporting] = useState(false)
 
   // Close the range dropdown on outside click.
   useEffect(() => {
@@ -329,19 +361,19 @@ export default function AdminDashboardPage() {
   const activityTabs = useMemo(() => {
     const counts: Record<string, number> = { all: activity.length }
     for (const item of activity) {
-      counts[item.target_type] = (counts[item.target_type] || 0) + 1
+      counts[item.category] = (counts[item.category] || 0) + 1
     }
     const tabs = [{ key: 'all', label: 'All', count: counts.all }]
-    for (const type of Object.keys(counts)) {
-      if (type === 'all') continue
-      tabs.push({ key: type, label: activityMeta(type).label, count: counts[type] })
+    for (const category of Object.keys(counts)) {
+      if (category === 'all') continue
+      tabs.push({ key: category, label: activityCategoryMeta(category).label, count: counts[category] })
     }
     return tabs
   }, [activity])
 
   const filteredActivity = activeTab === 'all'
     ? activity
-    : activity.filter((item) => item.target_type === activeTab)
+    : activity.filter((item) => item.category === activeTab)
 
   const maxTopCourseEnrollments = topCourses.length
     ? Math.max(...topCourses.map((c) => c.enrollments))
@@ -359,6 +391,73 @@ export default function AdminDashboardPage() {
     if (prev.revenue_kobo === 0) return null
     return ((latest.revenue_kobo - prev.revenue_kobo) / prev.revenue_kobo) * 100
   }, [revenueMonthly])
+
+  // Builds a CSV snapshot of everything currently on screen for the
+  // selected range. There's no backend endpoint for this yet — see the
+  // comment above csvField — so this reads straight from component state
+  // rather than making a fresh request.
+  function handleExport() {
+    setIsExporting(true)
+    try {
+      const sections: string[][] = []
+
+      sections.push([
+        csvRow(['Dashboard Overview']),
+        csvRow(['Range', selectedRangeLabel + (selectedRangeOption.approx ? ' (approx.)' : '')]),
+        csvRow(['Exported at', new Date().toISOString()]),
+      ])
+
+      sections.push([
+        csvRow(['Summary']),
+        csvRow(['Metric', 'Value']),
+        csvRow(['Total users', stats.total_users ?? '']),
+        csvRow(['Active courses', stats.active_courses ?? '']),
+        csvRow(['Total enrollments', totalEnrollments ?? '']),
+        csvRow(['Enrollment growth rate (%)', growthRate ?? '']),
+        csvRow(['Revenue (₦)', stats.revenue_naira ?? '']),
+      ])
+
+      if (enrollmentTrend.length) {
+        sections.push([
+          csvRow(['Enrollment Trend']),
+          csvRow(['Date', 'New enrollments', 'Total enrollments']),
+          ...enrollmentTrend.map((p) => csvRow([p.date, p.new_enrollments, p.total_enrollments])),
+        ])
+      }
+
+      if (revenueMonthly.length) {
+        sections.push([
+          csvRow(['Revenue Trend']),
+          csvRow(['Month', 'Revenue (₦)', 'Current month']),
+          ...revenueMonthly.map((m) => csvRow([m.month, m.revenue_kobo / 100, m.isCurrentMonth ? 'Yes' : 'No'])),
+        ])
+      }
+
+      if (topCourses.length) {
+        sections.push([
+          csvRow(['Top Courses']),
+          csvRow(['Title', 'Enrollments']),
+          ...topCourses.map((c) => csvRow([c.title, c.enrollments])),
+        ])
+      }
+
+      if (activity.length) {
+        sections.push([
+          csvRow(['Recent Activity']),
+          csvRow(['Description', 'Actor', 'Category', 'Type', 'Date']),
+          ...activity.map((a) => csvRow([a.description, a.actor, a.category, a.target_type, a.created_at])),
+        ])
+      }
+
+      const dateStamp = new Date().toISOString().slice(0, 10)
+      const rangeSlug = selectedRangeOption.period
+      downloadCsv(`tgpl-dashboard-${rangeSlug}-${dateStamp}.csv`, sections)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const exportDisabled = loadingStats && loadingOverview && loadingRevenueMonthly
 
   return (
     <AdminShell>
@@ -410,8 +509,14 @@ export default function AdminDashboardPage() {
                   : 'Applies to enrollments & activity only'}
               </p>
             </div>
-            <button className="ad-export-btn" type="button">
-              <Download size={16} /> Export
+            <button
+              className="ad-export-btn"
+              type="button"
+              onClick={handleExport}
+              disabled={exportDisabled || isExporting}
+              title={exportDisabled ? 'Waiting for dashboard data to load' : 'Download a CSV of the current view'}
+            >
+              <Download size={16} /> {isExporting ? 'Exporting…' : 'Export'}
             </button>
           </div>
         </div>
@@ -633,7 +738,7 @@ export default function AdminDashboardPage() {
             </div>
           ) : (
             filteredActivity.map((item, i) => {
-              const { Icon, bg, color, tag } = activityMeta(item.target_type)
+              const { Icon, bg, color } = activityCategoryMeta(item.category)
               return (
                 <div key={`${item.target_id}-${i}`} className="ad-activity-row">
                   <div className="ad-activity-icon" style={{ background: bg }}>
@@ -641,7 +746,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="ad-activity-text">
                     <p className="ad-activity-item-title">{item.description}</p>
-                    <p className="ad-activity-item-sub">{tag}</p>
+                    <p className="ad-activity-item-sub">{prettifyType(item.target_type)}</p>
                   </div>
                   <span className="ad-activity-time">{timeAgo(item.created_at)}</span>
                 </div>

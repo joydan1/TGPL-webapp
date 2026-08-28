@@ -19,6 +19,7 @@ export interface AdminUser {
   joined_at: string
   status: 'active' | 'inactive'
   avatar_color: string
+  avatar_url: string | null
 }
 
 // ─── Invites (unchanged — separate endpoint, not in scope of this fix) ─────
@@ -61,6 +62,7 @@ function toAdminUser(row: AdminUserListItem): AdminUser {
     joined_at: row.created_at,
     status: row.is_active ? 'active' : 'inactive',
     avatar_color: colorForId(row.id),
+    avatar_url: row.avatar_url ?? null,
   }
 }
 
@@ -112,7 +114,8 @@ const PAGE_CSS = `
   .au-table tr:last-child td { border-bottom: none; }
 
   .au-user-cell { display: flex; align-items: center; gap: 0.7rem; }
-  .au-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.75rem; flex-shrink: 0; object-fit: cover; }
+  .au-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.75rem; flex-shrink: 0; object-fit: cover; overflow: hidden; }
+  .au-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .au-user-meta { min-width: 0; }
   .au-user-name { font-weight: 600; color: #2B2B2C; white-space: nowrap; font-size: 0.8rem; }
 
@@ -208,6 +211,25 @@ const PAGE_CSS = `
 
 function initials(name: string) {
   return name.split(' ').map((p) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+}
+
+// Shared avatar renderer — used by both the desktop table row and the
+// mobile card. Shows the uploaded photo when avatar_url is set, falls
+// back to the initials-on-color-circle otherwise. `size`/`fontSize` let
+// the mobile card render slightly smaller than the table (34px vs 36px).
+function UserAvatar({ user, size = 36, fontSize = '0.75rem' }: { user: AdminUser; size?: number; fontSize?: string }) {
+  return (
+    <div
+      className="au-avatar"
+      style={{ background: user.avatar_url ? undefined : user.avatar_color, width: size, height: size, fontSize }}
+    >
+      {user.avatar_url ? (
+        <img src={user.avatar_url} alt={user.name} />
+      ) : (
+        initials(user.name)
+      )}
+    </div>
+  )
 }
 
 function formatJoinedDate(dateStr: string) {
@@ -450,8 +472,6 @@ export default function AdminUsersPage() {
     setReloadKey((k) => k + 1)
   }
 
-  // Exports every user matching the current filters, not just the visible
-  // page — pages through the server in the background via listAllMatching.
   async function handleExportCsv() {
     setExporting(true)
     setExportError(null)
@@ -478,9 +498,6 @@ export default function AdminUsersPage() {
     setInviteActionError(null)
   }
 
-  // The modal now sends exactly what POST /v1/admin/invites/ expects: email,
-  // role (already lowercased to match ApiRole), and — only for admin invites
-  // — the 8 permission toggle fields. Nothing left to translate here.
   async function handleInviteUser(payload: InviteUserPayload) {
     await apiClient.post('/v1/admin/invites/', payload)
     setInviting(false)
@@ -610,9 +627,7 @@ export default function AdminUsersPage() {
                             </td>
                             <td>
                               <div className="au-user-cell">
-                                <div className="au-avatar" style={{ background: user.avatar_color }}>
-                                  {initials(user.name)}
-                                </div>
+                                <UserAvatar user={user} />
                                 <div className="au-user-meta">
                                   <div className="au-user-name">{user.name}</div>
                                 </div>
@@ -685,9 +700,7 @@ export default function AdminUsersPage() {
                         <div className="au-user-card-main">
                           <div className="au-user-card-top">
                             <div className="au-user-card-identity">
-                              <div className="au-avatar" style={{ background: user.avatar_color, width: 34, height: 34, fontSize: '0.7rem' }}>
-                                {initials(user.name)}
-                              </div>
+                              <UserAvatar user={user} size={34} fontSize="0.7rem" />
                               <div style={{ minWidth: 0 }}>
                                 <div className="au-user-card-name">{user.name}</div>
                                 <div className="au-user-card-email">{user.email}</div>
