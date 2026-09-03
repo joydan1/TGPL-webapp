@@ -6,6 +6,7 @@ import type { Variants } from 'framer-motion'
 import { Card, CardBody } from '../../components/Card'
 import { Target, Telescope, Award, Users, TrendingUp, Building2, BookOpen, CheckCircle, Mail, Phone, MapPin, Send } from 'lucide-react'
 import Button from '../../components/Button'
+import Alert from '../../components/Alert'
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -27,13 +28,32 @@ const vp = { once: true, amount: 0.2 }
 
 const LandingPage: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    console.log('Form submitted:', formData)
-    setFormData({ name: '', email: '', message: '' })
+    setIsSubmitting(true)
+    setSubmitStatus(null)
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) throw new Error('Message could not be sent')
+
+      setFormData({ name: '', email: '', message: '' })
+      setSubmitStatus('success')
+    } catch {
+      setSubmitStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const aboutRef = useRef<HTMLDivElement>(null)
@@ -177,16 +197,19 @@ const navigate = useNavigate()
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
     style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '55%', maxWidth: '680px', zIndex: 1 }}
   >
-    <img
-      src="/Image4.png"
-      alt="TGPL Hero"
-      width={773}
-      height={463}
-      loading="eager"
-      decoding="async"
-      ref={(el) => { if (el) el.setAttribute('fetchpriority', 'high') }}
-      style={{ width: '100%', height: 'auto', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }}
-    />
+    <picture>
+      <source srcSet="/Image4.webp" type="image/webp" />
+      <img
+        src="/Image4.png"
+        alt="TGPL Hero"
+        width={773}
+        height={463}
+        loading="eager"
+        decoding="async"
+        ref={(el) => { if (el) el.setAttribute('fetchpriority', 'high') }}
+        style={{ width: '100%', height: 'auto', objectFit: 'contain', objectPosition: 'bottom', display: 'block' }}
+      />
+    </picture>
   </motion.div>
 
   {/* Diamonds */}
@@ -317,15 +340,18 @@ const navigate = useNavigate()
 <motion.div initial={{ opacity: 1 }} animate={{ opacity: 1 }} className="about-image-wrap">
               <div className="about-image-blue" />
               <div className="about-image-frame">
-                <img
-                  className="about-image"
-                  src="/image6.png"
-                  alt="TGPL Team"
-                  width={327}
-                  height={384}
-                  loading="eager"
-                  decoding="async"
-                />
+                <picture>
+                  <source srcSet="/image6.webp" type="image/webp" />
+                  <img
+                    className="about-image"
+                    src="/image6.png"
+                    alt="TGPL Team"
+                    width={327}
+                    height={384}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
               </div>
               <div className="about-image-accent" />
             </motion.div>
@@ -413,15 +439,18 @@ const navigate = useNavigate()
       <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={vp}>
         <div className="founder-img-wrap" style={{ position: 'relative', height: 460, width: 360, maxWidth: '100%' }}>
           <div style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 360, backgroundColor: '#2B3942', borderRadius: 20, zIndex: 1 }} />
-          <img
-            src="/ceo.png"
-            alt="Enobong Okposin"
-            width={360}
-            height={451}
-            loading="lazy"
-            decoding="async"
-            style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 460, objectFit: 'cover', objectPosition: 'top center', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }}
-          />
+          <picture>
+            <source srcSet="/ceo.webp" type="image/webp" />
+            <img
+              src="/ceo.png"
+              alt="Enobong Okposin"
+              width={360}
+              height={451}
+              loading="lazy"
+              decoding="async"
+              style={{ position: 'absolute', bottom: 0, left: 0, width: 340, height: 460, objectFit: 'cover', objectPosition: 'top center', borderRadius: 16, transform: 'scaleX(-1)', zIndex: 2 }}
+            />
+          </picture>
           <motion.div
             initial={{ opacity: 0, scale: 0.5 }} whileInView={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5, duration: 0.4, type: 'spring', stiffness: 200 }} viewport={vp}
@@ -531,6 +560,8 @@ const navigate = useNavigate()
             style={{ backgroundColor: '#f9f9f9', padding: '2.5rem', borderRadius: 12, alignSelf: 'start' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a2e3d', margin: '0 0 0.5rem 0' }}>Send us a message</h2>
             <p style={{ fontSize: '0.95rem', color: '#4a4a4a', margin: '0 0 2rem 0' }}>Fill in the form and we'll be in touch shortly.</p>
+            {submitStatus === 'success' && <Alert type="success">Your message has been sent. We'll get back to you shortly.</Alert>}
+            {submitStatus === 'error' && <Alert type="error">We couldn't send your message. Please try again or email us directly.</Alert>}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {[{ label: 'Name', name: 'name', type: 'text', placeholder: 'Your full name' }, { label: 'Email', name: 'email', type: 'email', placeholder: 'your@email.com' }].map(({ label, name, type, placeholder }) => (
                 <div key={name}>
@@ -550,7 +581,7 @@ const navigate = useNavigate()
                   onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.boxShadow = 'none' }}
                 />
               </div>
-              <Button variant="primary" size="medium" icon={<Send size={18} />} style={{ width: '100%', marginTop: '0.5rem' }}>Send Message</Button>
+              <Button type="submit" variant="primary" size="medium" icon={<Send size={18} />} disabled={isSubmitting} style={{ width: '100%', marginTop: '0.5rem' }}>{isSubmitting ? 'Sending...' : 'Send Message'}</Button>
             </form>
           </motion.div>
         </div>

@@ -37,12 +37,11 @@ export const useAuth = () => {
         store.setError('Login failed')
         return { success: false, error: 'Login failed' }
       }
-      const userResult = await authAPI.getCurrentUser()
-      if (!userResult.success || !userResult.data) {
+      const userData = result.user
+      if (!userData) {
         store.setError('Failed to fetch user info')
         return { success: false, error: 'Failed to fetch user info' }
       }
-      const userData = userResult.data
       const user: User = {
         id: parseInt(userData.id, 10),
         email: userData.email,

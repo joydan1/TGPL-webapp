@@ -1,9 +1,9 @@
 export type CommunityRole = 'learner' | 'trainer' | 'admin'
 
 export interface CommunityAuthor {
-  id: string | null // null when the author's account has been deleted
-  full_name: string // "Deleted user" when author is null
-  role: CommunityRole | null // null when the author's account has been deleted
+  id: string | null
+  full_name: string
+  role: CommunityRole | null
   avatar_url: string | null
 }
 
@@ -12,12 +12,19 @@ export interface CommunityMessage {
   author: CommunityAuthor
   body: string
   created_at: string
+  parent_message_id: string | null
+  reply_count?: number
 }
 
 export interface CommunityFeedResponse {
   results: CommunityMessage[]
-  active_members: number // posted in the last 15 min
-  total_members: number // platform's total enrolled learners
+  active_members: number
+  total_members: number
+}
+
+// GET /v1/community/messages/{id}/replies/ — no active_members/total_members on this one.
+export interface CommunityRepliesResponse {
+  results: CommunityMessage[]
 }
 
 export interface CommunityRule {

@@ -195,6 +195,9 @@ class ApiClient {
         }
 
         if (status === 403) {
+          if (error.response?.data?.code === 'missing_permission') {
+            return Promise.reject(error)
+          }
           if (
             SKIP_REFRESH_ROUTES.some((route) => url.includes(route)) ||
             SKIP_FORBIDDEN_REDIRECT_PATTERNS.some((pattern) => pattern.test(url))

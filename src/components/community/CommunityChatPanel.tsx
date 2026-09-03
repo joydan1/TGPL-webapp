@@ -1,20 +1,15 @@
 // components/community/CommunityChatPanel.tsx
-//
-// One shared chat UI for Learner / Trainer / Admin. The `role` prop (the
-// viewer's own role) drives what shows up in a message's context menu.
-// This component owns no data fetching — it's handed messages + handlers by
-// whichever page renders it (CommunityPage / TrainerCommunityPage /
-// AdminCommunityPage).
+
 
 import { useEffect, useRef, useState } from 'react'
 import {
   Hash, ShieldCheck, ChevronDown, ChevronUp, Pin, Reply, Copy, Trash2,
-  Smile, Send,
+  Smile, Send, X, MessageSquare,
 } from 'lucide-react'
 import type { CommunityMessage, CommunityRole } from '../../types/community'
 
 export const COMMUNITY_CHAT_CSS = `
-  .cc-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #F7F7F7; }
+  .cc-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #F7F7F7; position: relative; overflow: hidden; }
 
   .cc-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; background: #fff; border-bottom: 1px solid #EBEBEB; flex-shrink: 0; }
   .cc-header-left { display: flex; align-items: center; gap: 12px; }
@@ -37,7 +32,7 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-msg-row { display: flex; align-items: flex-start; gap: 12px; max-width: 640px; }
   .cc-msg-row.own { margin-left: auto; flex-direction: row-reverse; }
 
-  .cc-avatar { width: 36px; height: 36px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 12px; flex-shrink: 0; background: #2492EB; }
+  .cc-avatar { width: 36px; height: 36px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 12px; flex-shrink: 0; background: #2492EB; overflow: hidden; }
 
   .cc-msg-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .cc-msg-row.own .cc-msg-col { align-items: flex-end; }
@@ -52,6 +47,9 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-bubble-wrap { position: relative; }
   .cc-bubble { padding: 10px 16px; border-radius: 16px 16px 16px 8px; background: #fff; font-size: 13px; line-height: 1.6; color: #2B2B2C; word-break: break-word; }
   .cc-msg-row.own .cc-bubble { border-radius: 16px 16px 8px 16px; background: #2492EB; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  .cc-reply-btn { display: flex; align-items: center; gap: 5px; padding: 4px 4px; margin: 0 4px; background: none; border: none; font-size: 11px; font-weight: 600; color: #2492EB; cursor: pointer; }
+  .cc-reply-btn:hover { text-decoration: underline; }
 
   .cc-menu-btn { opacity: 0; position: absolute; top: 2px; background: #fff; border: 1px solid #EBEBEB; border-radius: 999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #99A1AF; transition: opacity .12s; }
   .cc-msg-row:not(.own) .cc-menu-btn { right: -32px; }
@@ -68,7 +66,7 @@ export const COMMUNITY_CHAT_CSS = `
 
   .cc-composer-wrap { padding: 8px 24px 20px; background: #F7F7F7; flex-shrink: 0; }
   .cc-composer { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 16px; padding: 12px 16px; position: relative; }
-  .cc-composer-avatar { width: 32px; height: 32px; border-radius: 999px; background: #2492EB; color: #fff; font-weight: 700; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cc-composer-avatar { width: 32px; height: 32px; border-radius: 999px; background: #2492EB; color: #fff; font-weight: 700; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
   .cc-composer-input { flex: 1; border: none; outline: none; font-family: inherit; font-size: 13px; color: #2B2B2C; background: none; resize: none; min-height: 20px; max-height: 120px; }
   .cc-composer-input::placeholder { color: #B0B8C4; }
   .cc-emoji-btn { width: 32px; height: 32px; border-radius: 14px; border: none; background: none; color: #99A1AF; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
@@ -83,10 +81,20 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
   .cc-emoji-grid button { border: none; background: none; font-size: 18px; cursor: pointer; padding: 4px; border-radius: 6px; }
   .cc-emoji-grid button:hover { background: #F7F7F7; }
+
+  /* Thread panel — slides in over the right side of the chat */
+  .cc-thread-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.15); z-index: 29; }
+  .cc-thread-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 380px; max-width: 90%; background: #fff; box-shadow: -8px 0 24px rgba(0,0,0,0.12); z-index: 30; display: flex; flex-direction: column; }
+  .cc-thread-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #EBEBEB; flex-shrink: 0; }
+  .cc-thread-header-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #2B2B2C; }
+  .cc-thread-close { border: none; background: none; color: #99A1AF; cursor: pointer; width: 28px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+  .cc-thread-close:hover { background: #F7F7F7; }
+  .cc-thread-parent { padding: 14px 20px; border-bottom: 1px solid #EBEBEB; flex-shrink: 0; }
+  .cc-thread-parent .cc-bubble { border-radius: 12px; background: #F7F7F7; }
+  .cc-thread-replies { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .cc-thread-composer-wrap { padding: 8px 16px 16px; flex-shrink: 0; border-top: 1px solid #EBEBEB; }
 `
 
-// Emoji picker for composing your own message text — client-side only,
-// unrelated to any backend "reactions" feature (there isn't one).
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
 const AVATAR_COLORS = ['#0891B2', '#10B981', '#D97706', '#8B5CF6', '#2492EB', '#EC4899']
 
@@ -109,6 +117,24 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+function Avatar({ author, size = 36 }: { author: { full_name: string; avatar_url: string | null }; size?: number }) {
+  return (
+    <div
+      className="cc-avatar"
+      style={{
+        width: size, height: size,
+        ...(!author.avatar_url ? { background: avatarColorFor(author.full_name) } : {}),
+      }}
+    >
+      {author.avatar_url ? (
+        <img src={author.avatar_url} alt={author.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        initialsOf(author.full_name)
+      )}
+    </div>
+  )
+}
+
 interface MessageMenuAction {
   key: string
   label: string
@@ -116,14 +142,10 @@ interface MessageMenuAction {
   danger?: boolean
 }
 
-// The one place role actually changes behavior. Per the confirmed backend:
-// - Anyone can delete their own message (DELETE /messages/{id}/).
-// - Only ADMIN can delete someone else's message (DELETE /messages/{id}/moderate/ is admin-only).
-//   Trainers get no moderation action on other people's messages.
-// - There's no pin, reaction, or warn-user endpoint, so none of those appear here.
+
 function buildMenuActions(isMine: boolean, viewerRole: CommunityRole): MessageMenuAction[] {
   const actions: MessageMenuAction[] = [
-    { key: 'reply', label: 'Reply', icon: Reply },
+    { key: 'reply', label: 'Reply in thread', icon: Reply },
     { key: 'copy', label: 'Copy text', icon: Copy },
   ]
 
@@ -142,9 +164,10 @@ interface MessageRowProps {
   currentUserId: string
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
+  onOpenThread: (topLevelMessage: CommunityMessage) => void
 }
 
-function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator }: MessageRowProps) {
+function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator, onOpenThread }: MessageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isMine = msg.author.id !== null && msg.author.id === currentUserId
   const actions = buildMenuActions(isMine, viewerRole)
@@ -156,25 +179,14 @@ function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteMode
     if (key === 'copy') { navigator.clipboard?.writeText(msg.body); return }
     if (key === 'delete-mine') return onDeleteMine(msg.id)
     if (key === 'delete-mod') return onDeleteModerator(msg.id)
-    // 'reply' — no-op here; wire to a reply/thread feature when that exists (backend doesn't have one yet).
+    if (key === 'reply') return onOpenThread(msg)
   }
+
+  const replyCount = msg.reply_count ?? 0
 
   return (
     <div className={`cc-msg-row${isMine ? ' own' : ''}`}>
-      <div
-        className="cc-avatar"
-        style={!msg.author.avatar_url ? { background: avatarColorFor(msg.author.full_name) } : undefined}
-      >
-        {msg.author.avatar_url ? (
-          <img
-            src={msg.author.avatar_url}
-            alt={msg.author.full_name}
-            style={{ width: '100%', height: '100%', borderRadius: '999px', objectFit: 'cover' }}
-          />
-        ) : (
-          initialsOf(msg.author.full_name)
-        )}
-      </div>
+      <Avatar author={msg.author} />
       <div className="cc-msg-col">
         <div className="cc-msg-meta">
           {isMine && <span className="cc-msg-time">{timeAgo(msg.created_at)}</span>}
@@ -202,30 +214,147 @@ function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteMode
             </div>
           )}
         </div>
+        {replyCount > 0 && (
+          <button className="cc-reply-btn" type="button" onClick={() => onOpenThread(msg)}>
+            <MessageSquare size={12} />
+            {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
+interface ThreadPanelProps {
+  parentMessage: CommunityMessage
+  replies: CommunityMessage[]
+  loading: boolean
+  error: string | null
+  sending: boolean
+  currentUserId: string
+  currentUserInitials: string
+  viewerRole: CommunityRole
+  onClose: () => void
+  onSendReply: (body: string) => void
+  onDeleteMine: (messageId: string) => void
+  onDeleteModerator: (messageId: string) => void
+}
+
+function ThreadPanel({
+  parentMessage, replies, loading, error, sending, currentUserId, currentUserInitials, viewerRole,
+  onClose, onSendReply, onDeleteMine, onDeleteModerator,
+}: ThreadPanelProps) {
+  const [draft, setDraft] = useState('')
+
+  function submit() {
+    const body = draft.trim()
+    if (!body || sending) return
+    onSendReply(body)
+    setDraft('')
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      submit()
+    }
+  }
+
+  return (
+    <>
+      <div className="cc-thread-backdrop" onClick={onClose} />
+      <div className="cc-thread-panel">
+        <div className="cc-thread-header">
+          <div className="cc-thread-header-title"><MessageSquare size={15} /> Thread</div>
+          <button className="cc-thread-close" type="button" onClick={onClose} aria-label="Close thread">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="cc-thread-parent">
+          <div className="cc-msg-meta">
+            <span className="cc-msg-name">{parentMessage.author.full_name}</span>
+            <span className="cc-msg-time">{timeAgo(parentMessage.created_at)}</span>
+          </div>
+          <div className="cc-bubble">{parentMessage.body}</div>
+        </div>
+
+        <div className="cc-thread-replies">
+          {loading && <p className="cc-state-note">Loading replies…</p>}
+          {!loading && error && <p className="cc-state-note error">{error}</p>}
+          {!loading && !error && replies.length === 0 && (
+            <p className="cc-state-note">No replies yet.</p>
+          )}
+          {!loading && !error && replies.map((r) => (
+            <MessageRow
+              msg={r}
+              viewerRole={viewerRole}
+              currentUserId={currentUserId}
+              key={r.id}
+              onDeleteMine={onDeleteMine}
+              onDeleteModerator={onDeleteModerator}
+              onOpenThread={() => {}} // replies can't have their own thread
+            />
+          ))}
+        </div>
+
+        <div className="cc-thread-composer-wrap">
+          <div className="cc-composer">
+            <div className="cc-composer-avatar">{currentUserInitials}</div>
+            <textarea
+              className="cc-composer-input"
+              placeholder="Reply in thread…"
+              rows={1}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <button
+              className={`cc-send-btn${draft.trim() ? ' active' : ''}`}
+              type="button"
+              disabled={!draft.trim() || sending}
+              onClick={submit}
+            >
+              <Send size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export interface CommunityChatPanelProps {
-  role: CommunityRole // the viewer's own role — drives menu permissions
-  currentUserId: string // used to determine isMine per message (author.id === currentUserId)
+  role: CommunityRole
+  currentUserId: string
   currentUserInitials: string
   messages: CommunityMessage[]
   activeMembers: number
   totalMembers: number
-  rules: string[] | null // from GET /v1/community/rules/ — fetched once by the page, not polled
+  rules: string[] | null
   loading: boolean
   error: string | null
   sending: boolean
   onSend: (body: string) => void
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
+
+  // Thread/reply state — owned by the page, same as the main feed.
+  openThreadParent: CommunityMessage | null
+  threadReplies: CommunityMessage[]
+  threadLoading: boolean
+  threadError: string | null
+  threadSending: boolean
+  onOpenThread: (topLevelMessage: CommunityMessage) => void
+  onCloseThread: () => void
+  onSendReply: (body: string) => void
 }
 
 export default function CommunityChatPanel({
   role, currentUserId, currentUserInitials, messages, activeMembers, totalMembers, rules,
   loading, error, sending, onSend, onDeleteMine, onDeleteModerator,
+  openThreadParent, threadReplies, threadLoading, threadError, threadSending,
+  onOpenThread, onCloseThread, onSendReply,
 }: CommunityChatPanelProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -298,6 +427,7 @@ export default function CommunityChatPanel({
             key={msg.id}
             onDeleteMine={onDeleteMine}
             onDeleteModerator={onDeleteModerator}
+            onOpenThread={onOpenThread}
           />
         ))}
       </div>
@@ -339,6 +469,23 @@ export default function CommunityChatPanel({
           Press <span className="cc-kbd">Enter</span> to send · <span className="cc-kbd">Shift + Enter</span> for new line
         </div>
       </div>
+
+      {openThreadParent && (
+        <ThreadPanel
+          parentMessage={openThreadParent}
+          replies={threadReplies}
+          loading={threadLoading}
+          error={threadError}
+          sending={threadSending}
+          currentUserId={currentUserId}
+          currentUserInitials={currentUserInitials}
+          viewerRole={role}
+          onClose={onCloseThread}
+          onSendReply={onSendReply}
+          onDeleteMine={onDeleteMine}
+          onDeleteModerator={onDeleteModerator}
+        />
+      )}
     </div>
   )
 }

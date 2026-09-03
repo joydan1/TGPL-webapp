@@ -26,6 +26,11 @@ const ACTIVITY_TYPE_META: Record<string, { Icon: typeof UserPlus; bg: string; co
   refund: { Icon: Undo2, bg: '#FEF3C7', color: '#D97706', label: 'Refunds' },
 }
 const ACTIVITY_FALLBACK_META = { Icon: ActivityIcon, bg: '#F3F4F6', color: '#6B7280' }
+const ACTIVITY_CATEGORY_META: Record<RecentActivityItem['category'], string> = {
+  payments: 'Payments',
+  content: 'Content',
+  platform: 'Platform',
+}
 
 function activityMeta(targetType: string) {
   return ACTIVITY_TYPE_META[targetType] ?? { ...ACTIVITY_FALLBACK_META, label: prettifyType(targetType) }
@@ -142,25 +147,32 @@ export default function AdminActivityPage() {
   }, [])
 
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: activity.length }
+    const counts: Record<string, number> = {
+      all: activity.length,
+      payments: 0,
+      content: 0,
+      platform: 0,
+    }
     for (const item of activity) {
-      counts[item.target_type] = (counts[item.target_type] || 0) + 1
+      counts[item.category] = (counts[item.category] || 0) + 1
     }
     return counts
   }, [activity])
 
   const filterTabs = useMemo(() => {
-    const tabs = [{ key: 'all', label: 'All', count: typeCounts.all }]
-    for (const type of Object.keys(typeCounts)) {
-      if (type === 'all') continue
-      tabs.push({ key: type, label: activityMeta(type).label, count: typeCounts[type] })
-    }
-    return tabs
+    return [
+      { key: 'all', label: 'All', count: typeCounts.all },
+      ...(['payments', 'content', 'platform'] as const).map((category) => ({
+        key: category,
+        label: ACTIVITY_CATEGORY_META[category],
+        count: typeCounts[category],
+      })),
+    ]
   }, [typeCounts])
 
   const filteredActivity = useMemo(() => {
     return activity.filter((item) => {
-      if (activeType !== 'all' && item.target_type !== activeType) return false
+      if (activeType !== 'all' && item.category !== activeType) return false
       if (debouncedSearch) {
         const haystack = `${item.description} ${item.actor}`.toLowerCase()
         if (!haystack.includes(debouncedSearch)) return false

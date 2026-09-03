@@ -418,7 +418,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const roleIsLearner = detail?.role === 'learner'
   const roleIsTrainer = detail?.role === 'trainer'
   const roleIsAdmin = detail?.role === 'admin'
-  const canDelete = detail?.role === 'learner'
+  const canDelete = roleIsLearner || roleIsTrainer
   const canChangeRole = roleIsLearner || roleIsTrainer
 
   const enabledPermCount = useMemo(() => {
@@ -480,7 +480,10 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
       onDeleted?.(user.id)
       onClose()
     } catch (err: any) {
-      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      const responseData = err?.response?.data
+      const apiMessage = responseData?.code === 'trainer_has_active_ownership'
+        ? `This trainer still has ${responseData.courses_remaining ?? 0} course(s) and ${responseData.sessions_remaining ?? 0} live session(s) assigned. Reassign them before deleting.`
+        : responseData?.detail || responseData?.message
       setDeleteError(apiMessage || "Couldn't delete this account. Please try again.")
     } finally {
       setBusyAction(null)
@@ -799,8 +802,10 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                         <p className="up-danger-label">Delete this account</p>
                         <p className="up-danger-sub">
                           {canDelete
-                            ? 'This is permanent and cannot be undone'
-                            : `${detail.role === 'trainer' ? 'Trainer' : 'Admin'} accounts can't be deleted yet — this needs a separate decision since it touches course ownership`}
+                            ? detail.role === 'trainer'
+                              ? 'Reassign all courses and live sessions before deleting if they still have ownership'
+                              : 'This is permanent and cannot be undone'
+                            : 'Admin accounts cannot be deleted from this screen'}
                         </p>
                       </div>
                       <button
@@ -808,7 +813,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                         onClick={openDeleteModal}
                         type="button"
                         disabled={!canDelete}
-                        title={canDelete ? undefined : 'Deletion is only available for learner accounts right now'}
+                        title={canDelete ? undefined : 'Deletion is not available for admin accounts'}
                       >
                         <Trash2 size={15} /> Delete account
                       </button>

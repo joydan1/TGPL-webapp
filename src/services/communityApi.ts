@@ -1,11 +1,12 @@
 import { apiClient } from './api'
-import type { CommunityFeedResponse, CommunityMessage, CommunityRules } from '../types/community'
+import type {
+  CommunityFeedResponse, CommunityMessage, CommunityRepliesResponse, CommunityRules,
+} from '../types/community'
 
 type ApiResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-// No `?since=` → initial load. Pass `?since=` → poll for new messages.
 async function getMessages(since?: string): Promise<ApiResult<CommunityFeedResponse>> {
   try {
     const res = await apiClient.get<CommunityFeedResponse>('/v1/community/messages/', {
@@ -18,9 +19,13 @@ async function getMessages(since?: string): Promise<ApiResult<CommunityFeedRespo
   }
 }
 
-async function sendMessage(body: string): Promise<ApiResult<CommunityMessage>> {
+
+async function sendMessage(body: string, parentMessageId?: string): Promise<ApiResult<CommunityMessage>> {
   try {
-    const res = await apiClient.post<CommunityMessage>('/v1/community/messages/', { body })
+    const res = await apiClient.post<CommunityMessage>('/v1/community/messages/', {
+      body,
+      ...(parentMessageId ? { parent_message_id: parentMessageId } : {}),
+    })
     return { success: true, data: res.data }
   } catch (err) {
     console.error('Failed to send message:', err)
@@ -28,7 +33,6 @@ async function sendMessage(body: string): Promise<ApiResult<CommunityMessage>> {
   }
 }
 
-// Deleting your own message.
 async function deleteMessage(messageId: string): Promise<ApiResult<null>> {
   try {
     await apiClient.delete(`/v1/community/messages/${messageId}/`)
@@ -39,7 +43,6 @@ async function deleteMessage(messageId: string): Promise<ApiResult<null>> {
   }
 }
 
-// Admin-only: delete anyone's message.
 async function moderateDeleteMessage(messageId: string): Promise<ApiResult<null>> {
   try {
     await apiClient.delete(`/v1/community/messages/${messageId}/moderate/`)
@@ -47,6 +50,20 @@ async function moderateDeleteMessage(messageId: string): Promise<ApiResult<null>
   } catch (err) {
     console.error('Failed to moderate-delete message:', err)
     return { success: false, error: 'Could not remove that message.' }
+  }
+}
+
+
+async function getReplies(parentId: string, since?: string): Promise<ApiResult<CommunityRepliesResponse>> {
+  try {
+    const res = await apiClient.get<CommunityRepliesResponse>(
+      `/v1/community/messages/${parentId}/replies/`,
+      { params: since ? { since } : undefined },
+    )
+    return { success: true, data: res.data }
+  } catch (err) {
+    console.error('Failed to fetch replies:', err)
+    return { success: false, error: 'Failed to load replies.' }
   }
 }
 
@@ -65,5 +82,6 @@ export const communityAPI = {
   sendMessage,
   deleteMessage,
   moderateDeleteMessage,
+  getReplies,
   getRules,
 }

@@ -1,13 +1,10 @@
 // pages/admin/AdminDashboardPage.tsx
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, BookOpen, GraduationCap, CreditCard, ChevronDown, Download,
   Banknote, FileText, Activity as ActivityIcon, TrendingUp, TrendingDown,
 } from 'lucide-react'
-import {
-  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
 import AdminShell from '../../layouts/AdminShell'
 import { adminUsersAPI } from '../../services/adminUsersApi'
 import { adminCoursesAPI } from '../../services/adminCoursesApi'
@@ -21,6 +18,8 @@ import {
   adminRevenueAPI,
   type MonthlyRevenuePoint,
 } from '../../services/adminRevenueApi'
+
+const DashboardCharts = lazy(() => import('../../components/admin/DashboardCharts'))
 
 const ADMIN_ACTIVITY_ROUTE = '/admin/activity'
 
@@ -201,11 +200,6 @@ function formatNaira(amount: number) {
   return `₦${amount.toLocaleString('en-NG')}`
 }
 
-function formatTrendDate(iso: string) {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<string>('all')
@@ -378,11 +372,6 @@ export default function AdminDashboardPage() {
   const maxTopCourseEnrollments = topCourses.length
     ? Math.max(...topCourses.map((c) => c.enrollments))
     : 1
-
-  const enrollmentChartData = enrollmentTrend.map((p) => ({
-    date: formatTrendDate(p.date),
-    value: p.new_enrollments,
-  }))
 
   const revenueGrowthRate = useMemo(() => {
     const complete = revenueMonthly.filter((m) => !m.isCurrentMonth)
@@ -594,76 +583,17 @@ export default function AdminDashboardPage() {
 
         {/* ── Charts + Top courses ── */}
         <div className="ad-charts">
-          <div className="ad-panel">
-            <div className="ad-panel-head">
-              <div>
-                <h3 className="ad-panel-title">Enrollments Over Time</h3>
-                <p className="ad-panel-sub">
-                  New enrollments · {selectedRangeLabel}
-                  {selectedRangeOption.approx && ' (approx.)'}
-                </p>
-              </div>
-              {growthRate != null && (
-                <span className={`ad-panel-badge${growthRate < 0 ? ' negative' : ''}`}>
-                  {growthRate >= 0 ? '+' : ''}{growthRate.toFixed(1)}%
-                  <span className="ad-panel-badge-sub">vs prior period</span>
-                </span>
-              )}
-            </div>
-            {loadingOverview ? (
-              <p className="ad-panel-empty">Loading…</p>
-            ) : enrollmentChartData.length === 0 ? (
-              <p className="ad-panel-empty">No enrollment data for this period.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={230}>
-                <LineChart data={enrollmentChartData} margin={{ left: -20, right: 8 }}>
-                  <CartesianGrid stroke="#F3F4F6" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#2492EB" strokeWidth={2.5} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          <div className="ad-panel">
-            <div className="ad-panel-head">
-              <div>
-                <h3 className="ad-panel-title">Revenue Over Time</h3>
-                <p className="ad-panel-sub">Monthly (₦) · succeeded payments</p>
-              </div>
-              {revenueGrowthRate != null && (
-                <span className={`ad-panel-badge${revenueGrowthRate < 0 ? ' negative' : ''}`}>
-                  {revenueGrowthRate >= 0 ? '+' : ''}{revenueGrowthRate.toFixed(0)}%
-                </span>
-              )}
-            </div>
-            {loadingRevenueMonthly ? (
-              <p className="ad-panel-empty">Loading…</p>
-            ) : revenueMonthly.length === 0 ? (
-              <p className="ad-panel-empty">{revenueError || 'No revenue data available.'}</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={230}>
-                <BarChart data={revenueMonthly} margin={{ left: -20, right: 8 }}>
-                  <CartesianGrid stroke="#F3F4F6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `₦${(v / 100_000_000).toFixed(0)}M`}
-                  />
-                  <Tooltip formatter={(value) => [formatNaira(Number(value) / 100), 'Revenue']} />
-                  <Bar dataKey="revenue_kobo" radius={[6, 6, 0, 0]}>
-                    {revenueMonthly.map((entry) => (
-                      <Cell key={entry.month} fill={entry.isCurrentMonth ? '#F97316' : '#FDBA74'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+          <DashboardCharts
+            enrollmentTrend={enrollmentTrend}
+            revenueMonthly={revenueMonthly}
+            loadingOverview={loadingOverview}
+            loadingRevenueMonthly={loadingRevenueMonthly}
+            revenueError={revenueError}
+            selectedRangeLabel={selectedRangeLabel}
+            rangeIsApprox={selectedRangeOption.approx === true}
+            growthRate={growthRate}
+            revenueGrowthRate={revenueGrowthRate}
+          />
 
           <div className="ad-panel">
             <div className="ad-panel-head">

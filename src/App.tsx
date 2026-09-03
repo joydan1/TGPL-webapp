@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import { ROUTES } from './constants/routes'
@@ -5,58 +6,58 @@ import { ROUTES } from './constants/routes'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
 
-import LandingPage from './pages/public/LandingPage'
+const LandingPage = lazy(() => import('./pages/public/LandingPage'))
 
 // Auth Pages (no header/footer)
-import LoginPage from './pages/auth/LoginPage'
-import SignupPage from './pages/auth/SignupPage'
-import AcceptInvitePage from './pages/auth/AcceptInvitePage'
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
-import ResetPasswordPage from './pages/auth/ResetPasswordPage'
-import TermsPage from './pages/auth/TermsPage'
-import PrivacyPage from './pages/auth/PrivacyPage'
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const SignupPage = lazy(() => import('./pages/auth/SignupPage'))
+const AcceptInvitePage = lazy(() => import('./pages/auth/AcceptInvitePage'))
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'))
+const TermsPage = lazy(() => import('./pages/auth/TermsPage'))
+const PrivacyPage = lazy(() => import('./pages/auth/PrivacyPage'))
 
 // App Pages (protected, no public layout)
-import OnboardingPage from './pages/app/OnboardingPage'
-import EmailVerificationPage from './pages/auth/EmailVerificationPage'
-import DashboardPage from './pages/app/DashboardPage'
-import CertificatesPage from './pages/app/CertificatesPage'
-import CourseCatalogPage from './pages/app/CourseCatalgue'
-import CourseDetailPage from './pages/app/CourseCatalgue/CourseDetail'
-import CoursePlayerPage from './pages/app/CourseCatalgue/CoursePlayer'
-import CourseLearnPage from './pages/app/CourseCatalgue/CourseLearnPage'
-import CommunityPage from './pages/app/CommunityPage'
-import AssignmentDetailPage from './pages/app/CourseCatalgue/AssignmentDetailPage'
-import NotFoundPage from './pages/NotFoundPage'
-import CheckoutPage from './pages/app/CourseCatalgue/Checkoutpage'
-import NotificationsPage from './pages/NotificationsPage'
-import LiveSessionsPage from './pages/app/LiveSessionsPage'
-import LiveSessionDetailPage from './pages/app/LiveSessionDetailPage'
-import LiveBookingsPage from './pages/app/CourseCatalgue/LiveBookingsPage'
-import TrainerDashboardPage from './pages/app/trainer/TrainerDashboardPage'
-import TrainerCoursesPage from './pages/app/trainer/TrainerCoursesPage'
-import TrainerProfilePage from './pages/app/trainer/TrainerProfilePage'
-import TrainerBookingsPage from './pages/app/trainer/bookings/TrainerBookingsPage'
-import TrainerCourseManagePage from './pages/app/trainer/courses/TrainerCourseManagePage'
-import TrainerLiveClassesPage from './pages/app/trainer/live-classes/TrainerLiveClassesPage'
-import AddCoursePage from './pages/app/trainer/courses/AddCoursePage'
-import TrainerReviewsPage from './pages/app/trainer/reviews/TrainerReviewsPage'
-import ProfilePage from './pages/app/ProfilePage.tsx'
-import SettingsPage from './pages/app/SettingsPage.tsx'
-import SettingsSecurityPage from './pages/app/SettingsSecurityPage'
-import HelpSupportPage from './pages/app/HelpSupportPage'
-import SettingsNotificationPage from './pages/app/SettingsNotificationPage'
-import TrainerCommunityPage from './pages/app/trainer/TrainerCommunityPage'
+const OnboardingPage = lazy(() => import('./pages/app/OnboardingPage'))
+const EmailVerificationPage = lazy(() => import('./pages/auth/EmailVerificationPage'))
+const DashboardPage = lazy(() => import('./pages/app/DashboardPage'))
+const CertificatesPage = lazy(() => import('./pages/app/CertificatesPage'))
+const CourseCatalogPage = lazy(() => import('./pages/app/CourseCatalgue'))
+const CourseDetailPage = lazy(() => import('./pages/app/CourseCatalgue/CourseDetail'))
+const CoursePlayerPage = lazy(() => import('./pages/app/CourseCatalgue/CoursePlayer'))
+const CourseLearnPage = lazy(() => import('./pages/app/CourseCatalgue/CourseLearnPage'))
+const CommunityPage = lazy(() => import('./pages/app/CommunityPage'))
+const AssignmentDetailPage = lazy(() => import('./pages/app/CourseCatalgue/AssignmentDetailPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const CheckoutPage = lazy(() => import('./pages/app/CourseCatalgue/Checkoutpage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const LiveSessionsPage = lazy(() => import('./pages/app/LiveSessionsPage'))
+const LiveSessionDetailPage = lazy(() => import('./pages/app/LiveSessionDetailPage'))
+const LiveBookingsPage = lazy(() => import('./pages/app/CourseCatalgue/LiveBookingsPage'))
+const TrainerDashboardPage = lazy(() => import('./pages/app/trainer/TrainerDashboardPage'))
+const TrainerCoursesPage = lazy(() => import('./pages/app/trainer/TrainerCoursesPage'))
+const TrainerProfilePage = lazy(() => import('./pages/app/trainer/TrainerProfilePage'))
+const TrainerBookingsPage = lazy(() => import('./pages/app/trainer/bookings/TrainerBookingsPage'))
+const TrainerCourseManagePage = lazy(() => import('./pages/app/trainer/courses/TrainerCourseManagePage'))
+const TrainerLiveClassesPage = lazy(() => import('./pages/app/trainer/live-classes/TrainerLiveClassesPage'))
+const AddCoursePage = lazy(() => import('./pages/app/trainer/courses/AddCoursePage'))
+const TrainerReviewsPage = lazy(() => import('./pages/app/trainer/reviews/TrainerReviewsPage'))
+const ProfilePage = lazy(() => import('./pages/app/ProfilePage'))
+const SettingsPage = lazy(() => import('./pages/app/SettingsPage'))
+const SettingsSecurityPage = lazy(() => import('./pages/app/SettingsSecurityPage'))
+const HelpSupportPage = lazy(() => import('./pages/app/HelpSupportPage'))
+const SettingsNotificationPage = lazy(() => import('./pages/app/SettingsNotificationPage'))
+const TrainerCommunityPage = lazy(() => import('./pages/app/trainer/TrainerCommunityPage'))
 //admin pages
-import AdminRevenuePage from './pages/admin/AdminRevenuePage'
-import AdminDashboardPage from './pages/admin/AdminDashboardPage'
-import AdminUsersPage from './pages/admin/AdminUsersPage'
-import AdminCoursesPage from './pages/admin/AdminCoursesPage'
-import AdminLoginPage from './pages/admin/AdminLoginPage.tsx'
-import AdminSettingsPage from './pages/admin/AdminSettingsPage.tsx'
-import AdminCommunityPage from './pages/admin/AdminCommunityPage.tsx'
-import AdminCourseManagePage from './pages/admin/AdminCourseManagePage'
-import AdminActivityPage from './pages/admin/AdminActivityPage.tsx'
+const AdminRevenuePage = lazy(() => import('./pages/admin/AdminRevenuePage'))
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'))
+const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage'))
+const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'))
+const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'))
+const AdminCommunityPage = lazy(() => import('./pages/admin/AdminCommunityPage'))
+const AdminCourseManagePage = lazy(() => import('./pages/admin/AdminCourseManagePage'))
+const AdminActivityPage = lazy(() => import('./pages/admin/AdminActivityPage'))
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -89,7 +90,8 @@ function App() {
 
   return (
     <Router>
-      <Routes>
+      <Suspense fallback={<div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#6B7280' }}>Loading…</div>}>
+        <Routes>
         {/* ===== PUBLIC ROUTES (with Header & Footer) ===== */}
         <Route element={<PublicLayout />}>
           <Route
@@ -411,7 +413,8 @@ element={
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </Router>
   )
 }

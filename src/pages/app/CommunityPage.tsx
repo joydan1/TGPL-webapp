@@ -18,6 +18,8 @@ export default function CommunityPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
   const [activeNav, setActiveNav] = useState('community')
+
+  // Main feed
   const [messages, setMessages] = useState<CommunityMessage[]>([])
   const [activeMembers, setActiveMembers] = useState(0)
   const [totalMembers, setTotalMembers] = useState(0)
@@ -25,8 +27,15 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
-
   const cursorRef = useRef<string | null>(null)
+
+  // Open thread
+  const [openThreadParent, setOpenThreadParent] = useState<CommunityMessage | null>(null)
+  const [threadReplies, setThreadReplies] = useState<CommunityMessage[]>([])
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [threadError, setThreadError] = useState<string | null>(null)
+  const [threadSending, setThreadSending] = useState(false)
+  const threadCursorRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
@@ -87,6 +96,50 @@ export default function CommunityPage() {
     return () => clearInterval(interval)
   }, [user])
 
+  // Poll the open thread's replies
+  useEffect(() => {
+    if (!user || !openThreadParent) return
+
+    let cancelled = false
+    async function initialThreadLoad() {
+      setThreadLoading(true)
+      setThreadError(null)
+      const res = await communityAPI.getReplies(openThreadParent!.id)
+      if (cancelled) return
+      if (res.success) {
+        setThreadReplies(res.data.results)
+        if (res.data.results.length > 0) {
+          threadCursorRef.current = res.data.results[res.data.results.length - 1].created_at
+        } else {
+          threadCursorRef.current = openThreadParent!.created_at
+        }
+      } else {
+        setThreadError(res.error)
+      }
+      setThreadLoading(false)
+    }
+    initialThreadLoad()
+
+    const interval = setInterval(async () => {
+      if (!openThreadParent || threadCursorRef.current === null) return
+      const res = await communityAPI.getReplies(openThreadParent.id, threadCursorRef.current)
+      if (!res.success) {
+        // 404 means the thread is gone — close the panel rather than keep polling.
+        setOpenThreadParent(null)
+        return
+      }
+      if (res.data.results.length > 0) {
+        setThreadReplies(prev => [...prev, ...res.data.results])
+        threadCursorRef.current = res.data.results[res.data.results.length - 1].created_at
+      }
+    }, POLL_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [user, openThreadParent?.id])
+
   async function handleSend(body: string) {
     setSending(true)
     const res = await communityAPI.sendMessage(body)
@@ -99,14 +152,42 @@ export default function CommunityPage() {
 
   async function handleDeleteMine(messageId: string) {
     const res = await communityAPI.deleteMessage(messageId)
-    if (res.success) setMessages(prev => prev.filter(m => m.id !== messageId))
+    if (res.success) {
+      setMessages(prev => prev.filter(m => m.id !== messageId))
+      setThreadReplies(prev => prev.filter(m => m.id !== messageId))
+    }
   }
 
-  // Learners have no moderation permissions — the shared panel already
-  // restricts the "delete message" action to role === 'admin', so this
-  // handler is unreachable from this page but still required by the
-  // component's prop contract.
+  
   function noopDeleteModerator() {}
+
+  function handleOpenThread(msg: CommunityMessage) {
+    const topLevelId = msg.parent_message_id ?? msg.id
+    const topLevelMsg = topLevelId === msg.id ? msg : messages.find(m => m.id === topLevelId) ?? msg
+    setThreadReplies([])
+    threadCursorRef.current = null
+    setOpenThreadParent(topLevelMsg)
+  }
+
+  function handleCloseThread() {
+    setOpenThreadParent(null)
+    setThreadReplies([])
+    threadCursorRef.current = null
+  }
+
+  async function handleSendReply(body: string) {
+    if (!openThreadParent) return
+    setThreadSending(true)
+    const res = await communityAPI.sendMessage(body, openThreadParent.id)
+    setThreadSending(false)
+    if (res.success) {
+      setThreadReplies(prev => [...prev, res.data])
+      threadCursorRef.current = res.data.created_at
+      setMessages(prev => prev.map(m =>
+        m.id === openThreadParent.id ? { ...m, reply_count: (m.reply_count ?? 0) + 1 } : m
+      ))
+    }
+  }
 
   if (!user) return null
 
@@ -129,6 +210,14 @@ export default function CommunityPage() {
             onSend={handleSend}
             onDeleteMine={handleDeleteMine}
             onDeleteModerator={noopDeleteModerator}
+            openThreadParent={openThreadParent}
+            threadReplies={threadReplies}
+            threadLoading={threadLoading}
+            threadError={threadError}
+            threadSending={threadSending}
+            onOpenThread={handleOpenThread}
+            onCloseThread={handleCloseThread}
+            onSendReply={handleSendReply}
           />
         </div>
       </AppShell>
