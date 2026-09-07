@@ -106,6 +106,7 @@ export const COMMUNITY_CHAT_CSS = `
 
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮']
+const REACTIONS_STORAGE_KEY = 'tgpl-community-reactions'
 const AVATAR_COLORS = ['#0891B2', '#10B981', '#D97706', '#8B5CF6', '#2492EB', '#EC4899']
 
 function initialsOf(name: string): string {
@@ -395,8 +396,22 @@ export default function CommunityChatPanel({
   const [rulesOpen, setRulesOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const [reactions, setReactions] = useState<Record<string, string[]>>({})
+  const [reactions, setReactions] = useState<Record<string, string[]>>(() => {
+    try {
+      const stored = localStorage.getItem(`${REACTIONS_STORAGE_KEY}:${currentUserId}`)
+      if (!stored) return {}
+      const parsed: unknown = JSON.parse(stored)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+      return parsed as Record<string, string[]>
+    } catch {
+      return {}
+    }
+  })
   const emojiRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    localStorage.setItem(`${REACTIONS_STORAGE_KEY}:${currentUserId}`, JSON.stringify(reactions))
+  }, [currentUserId, reactions])
 
   function onReact(messageId: string, emoji: string) {
     setReactions((prev) => {
