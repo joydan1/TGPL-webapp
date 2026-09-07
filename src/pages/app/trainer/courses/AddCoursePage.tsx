@@ -20,7 +20,6 @@ import AssignmentCreatorModal, {
   buildAssignmentRequirements,
   draftToGradingCriteria,
   draftToMaxAttempts,
-  deadlineToISOString,
 } from '../../../../components/AssignmentCreationModal'
 
 type Step = 1 | 2 | 3 | 4 | 5
@@ -140,10 +139,7 @@ const fileTypes = detail.requirements?.length
     title: detail.title ?? '',
     description: '',
     instructions: detail.instructions ?? '',
-    deadline: detail.deadline ? new Date(detail.deadline).toISOString().slice(0, 16) : '',
-    isFinal: Boolean(detail.is_final),
     maxAttempts: String(detail.max_attempts ?? 1),
-    acceptLate: Boolean(detail.accept_late),
     coverImages: [],
     whatYoullDo: [''],
     scenarios: [''],
@@ -153,10 +149,7 @@ const fileTypes = detail.requirements?.length
     wordCountMin: '',
     wordCountMax: '',
     acceptedFileTypes: fileTypes,
-    // Note: requirement drafts get fresh local ids here (makeId()), not the
-    // backend requirement id — see the comment in saveCurriculumAndContinue()
-    // for why that means edits to an already-saved assignment don't re-sync
-    // existing requirement rows.
+  
     requirements: requirementDrafts,
   }
 }
@@ -205,6 +198,8 @@ const PAGE_CSS = `
 
   .ac-stepper { display: flex; align-items: center; padding: 1.25rem 1.25rem 0; overflow-x: auto; gap: 0; }
   .ac-step { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; flex-shrink: 0; min-width: 64px; }
+  button.ac-step { border: none; padding: 0; background: none; font: inherit; cursor: pointer; }
+  button.ac-step:disabled { cursor: default; }
   .ac-step-circle { width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; background: #E5E7EB; color: #6B7280; flex-shrink: 0; }
   .ac-step-circle.active { background: #2492EB; color: #fff; }
   .ac-step-circle.done { background: #2492EB; color: #fff; }
@@ -484,10 +479,10 @@ export default function AddCoursePage() {
         coverImage: null,
         existingCoverImageUrl: draft.cover_image_url ?? null,
         description: draft.description ?? '',
-        expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes : ['', ''],
+        expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes.slice(0, 8) : ['', ''],
         targetAudience: draft.target_audience?.[0] ?? '',
         audienceDescription: draft.audience_description ?? '',
-        prerequisites: draft.prerequisites?.length ? draft.prerequisites : [''],
+        prerequisites: draft.prerequisites?.length ? draft.prerequisites.slice(0, 8) : [''],
         lessons: prefilledLessons.length ? prefilledLessons : [emptyLesson(), emptyLesson()],
         isFree: draft.is_free ?? false,
         priceNaira: draft.price_kobo ? String(draft.price_kobo / 100) : '',
@@ -517,6 +512,10 @@ export default function AddCoursePage() {
       return
     }
     setStep((s) => (s - 1) as Step)
+  }
+
+  function goToStep(target: Step) {
+    if (target < step && !saving) setStep(target)
   }
 
   async function saveBasicsAndContinue() {
@@ -674,11 +673,8 @@ export default function AddCoursePage() {
     module_id: activeModuleId,
     title: lesson.assignment.title,
     instructions: lesson.assignment.instructions,
-    deadline: deadlineToISOString(lesson.assignment.deadline),
     max_attempts: draftToMaxAttempts(lesson.assignment),
-    accept_late: lesson.assignment.acceptLate,
     grading_criteria: draftToGradingCriteria(lesson.assignment),
-    is_final: lesson.assignment.isFinal,
     order: i + 1, // position within this module's assignment list
   
   }
@@ -782,7 +778,7 @@ export default function AddCoursePage() {
     }
 
     setSaving(false)
-    setShowSuccessModal(true)
+    navigate(coursesListRoute, { replace: true })
   }
 
   function handleSaveDraft() {
@@ -802,6 +798,7 @@ export default function AddCoursePage() {
     })
   }
   function addListItem(field: 'expectedOutcomes' | 'prerequisites') {
+    if (form[field].length >= 8) return
     setForm((f) => ({ ...f, [field]: [...f[field], ''] }))
   }
   function removeListItem(field: 'expectedOutcomes' | 'prerequisites', index: number) {
@@ -895,12 +892,18 @@ export default function AddCoursePage() {
               const status = s.id < step ? 'done' : s.id === step ? 'active' : ''
               return (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-                  <div className="ac-step">
+                  <button
+                    type="button"
+                    className="ac-step"
+                    onClick={() => goToStep(s.id)}
+                    disabled={s.id >= step || saving}
+                    aria-label={`Go to ${s.label}`}
+                  >
                     <div className={`ac-step-circle ${status}`}>
                       {s.id < step ? <Check size={16} /> : s.id}
                     </div>
                     <span className={`ac-step-label ${status}`}>{s.label}</span>
-                  </div>
+                  </button>
                   {i < STEPS.length - 1 && <div className={`ac-step-line ${s.id < step ? 'done' : ''}`} />}
                 </div>
               )
@@ -1038,7 +1041,7 @@ export default function AddCoursePage() {
                       </button>
                     </div>
                   ))}
-                  <button className="ac-add-item-btn" onClick={() => addListItem('expectedOutcomes')}>
+                  <button className="ac-add-item-btn" onClick={() => addListItem('expectedOutcomes')} disabled={form.expectedOutcomes.length >= 8}>
                     <Plus size={16} /> Add item
                   </button>
                   <p className="ac-hint">List 4–8 concrete outcomes. These appear as bullet points on the course page.</p>
@@ -1084,7 +1087,7 @@ export default function AddCoursePage() {
                       </button>
                     </div>
                   ))}
-                  <button className="ac-add-item-btn" onClick={() => addListItem('prerequisites')}>
+                  <button className="ac-add-item-btn" onClick={() => addListItem('prerequisites')} disabled={form.prerequisites.length >= 8}>
                     <Plus size={16} /> Add item
                   </button>
                   <p className="ac-hint">List any prior knowledge or tools learners need before starting.</p>

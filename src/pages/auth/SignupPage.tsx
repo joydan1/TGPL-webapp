@@ -6,22 +6,31 @@
  *    (clearError is stable — empty deps [] is safe, no re-fire loop)
  *
  * 2. Role toggle: "I'm a learner" / "I'm a trainer"
- *    - Trainer: shows an info Alert immediately + disables the submit button.
- *      Trainer accounts are created internally, not via this form.
  *    - Learner: normal signup flow.
+ *    - Trainer: same form, plus a 6-digit "Unique Code" field (issued by an
+ *      admin). No alert, no disabled button anymore — trainers can self-serve
+ *      as long as they have a valid code.
+ *    - "Contact admin to get a code" swaps the card into a short contact
+ *      form (name/email/subject/message) for trainers who don't have a code
+ *      yet. "Go back" returns to the signup form without losing what was
+ *      already typed there.
  *
  * 3. isFormFilled: gates the button before any submission attempt.
  *    Checks: firstName, lastName, valid email format, password >= 8 chars,
- *    confirmPassword non-empty, terms accepted.
+ *    confirmPassword non-empty, terms accepted, and — for trainers — a
+ *    complete 6-digit unique code.
  *
  * 4. Submit:
  *    a. clearError() + setFormErrors({}) — wipes stale errors
  *    b. validateForm() — sets per-field error messages if invalid
- *    c. Calls useAuth.signup() → authAPI.signup() → POST /api/v1/auth/signup/
+ *    c. Trainer only: validates the unique code (currently MOCKED — see
+ *       mockValidateUniqueCode below — until the backend endpoint exists)
+ *    d. Calls useAuth.signup() → authAPI.signup() → POST /api/v1/auth/signup/
  *       Payload is camelCase here; authAPI maps to snake_case before sending.
- *    d. SUCCESS: switches to the email verification screen (emailSent = true)
+ *       Trainer signups also include `trainerCode`.
+ *    e. SUCCESS: switches to the email verification screen (emailSent = true)
  *       No tokens issued at this stage — user must verify email first.
- *    e. FAILURE: error stored in Zustand, displayed via {error} Alert above the form.
+ *    f. FAILURE: error stored in Zustand, displayed via {error} Alert above the form.
  *
  * 5. Email verification screen (after successful signup):
  *    - Shows the email address submitted
@@ -30,12 +39,20 @@
  *
  * 6. Password strength indicator: shown live as user types, hidden if error is showing
  * 7. Live password mismatch: shown as user types in confirm field, before submit
+ *
+ * MOCKED — BACKEND NOT READY YET:
+ * - mockValidateUniqueCode(): stands in for POST /api/v1/auth/validate-trainer-code/
+ * - mockSubmitContactForm(): stands in for POST /api/v1/support/contact/
+ * Both are called with a fake network delay and simple pass/fail logic so the
+ * UI/UX can be built and demoed now. Swap the bodies for real authAPI calls
+ * (and thread trainerCode into useAuth's signup() payload type) once the
+ * backend ships these endpoints — search "TODO" below.
  */
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ChevronLeft, Send } from 'lucide-react'
 import { authAPI } from '../../services/api'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
@@ -43,6 +60,9 @@ import Alert from '../../components/Alert'
 import { ROUTES } from '../../constants/routes'
 
 type StrengthLevel = { score: number; label: string; color: string }
+type ContactFormData = { name: string; email: string; subject: string; message: string }
+
+const TRAINER_CODE_LENGTH = 6
 
 function getPasswordStrength(password: string): StrengthLevel {
   if (!password) return { score: 0, label: '', color: '' }
@@ -88,6 +108,22 @@ function Spinner() {
   )
 }
 
+// TODO: replace with a real call once the backend ships
+// POST /api/v1/auth/validate-trainer-code/
+async function mockValidateUniqueCode(code: string): Promise<{ valid: boolean }> {
+  await new Promise((resolve) => setTimeout(resolve, 600))
+  // Temporary mock: any complete 6-digit code is accepted except all zeros,
+  // which simulates an invalid/expired code so the error state is testable.
+  return { valid: code.length === TRAINER_CODE_LENGTH && code !== '000000' }
+}
+
+// TODO: replace with a real call once the backend ships
+// POST /api/v1/support/contact/
+async function mockSubmitContactForm(_data: ContactFormData): Promise<{ success: boolean }> {
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  return { success: true }
+}
+
 export default function SignupPage() {
   const { signup, isLoading, error, clearError } = useAuth()
 
@@ -101,6 +137,18 @@ export default function SignupPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [termsAccepted, setTermsAccepted] = useState(false)
 
+  // Trainer unique-code field
+  const [uniqueCode, setUniqueCode] = useState<string[]>(Array(TRAINER_CODE_LENGTH).fill(''))
+  const [codeValidating, setCodeValidating] = useState(false)
+  const codeInputRefs = useRef<Array<HTMLInputElement | null>>([])
+
+  // "Contact admin to get a code" panel (swaps in place of the signup form)
+  const [showContactForm, setShowContactForm] = useState(false)
+  const [contactFormData, setContactFormData] = useState<ContactFormData>({ name: '', email: '', subject: '', message: '' })
+  const [contactErrors, setContactErrors] = useState<Record<string, string>>({})
+  const [contactSubmitting, setContactSubmitting] = useState(false)
+  const [contactSubmitted, setContactSubmitted] = useState(false)
+
   // clearError is stable (empty deps in useAuth) — safe in deps array,
   // but using [] + eslint-disable is cleaner and equally correct
   React.useEffect(() => {
@@ -113,7 +161,8 @@ export default function SignupPage() {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
     formData.password.length >= 8 &&
     formData.confirmPassword.length > 0 &&
-    termsAccepted
+    termsAccepted &&
+    (role === 'learner' || uniqueCode.every((digit) => digit.length === 1))
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
@@ -135,6 +184,9 @@ export default function SignupPage() {
       errors.confirmPassword = 'Passwords do not match'
     }
     if (!termsAccepted) errors.terms = 'You must agree to the Terms of Service and Privacy Policy'
+    if (role === 'trainer' && uniqueCode.join('').length < TRAINER_CODE_LENGTH) {
+      errors.uniqueCode = 'Enter your 6-digit trainer code'
+    }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -146,13 +198,26 @@ export default function SignupPage() {
 
     if (!validateForm()) return
 
+    if (role === 'trainer') {
+      setCodeValidating(true)
+      const codeResult = await mockValidateUniqueCode(uniqueCode.join(''))
+      setCodeValidating(false)
+      if (!codeResult.valid) {
+        setFormErrors((prev) => ({ ...prev, uniqueCode: 'That code is invalid or has expired. Contact admin for a new one.' }))
+        return
+      }
+    }
+
     const result = await signup({
       email: formData.email,
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
       role,
-    })
+      // TODO: add `trainerCode?: string` to useAuth's signup() payload type
+      // once the backend accepts it — this cast can come out at that point.
+      ...(role === 'trainer' ? { trainerCode: uniqueCode.join('') } : {}),
+    } as Parameters<typeof signup>[0])
 
     if (result.success) setEmailSent(true)
   }
@@ -169,6 +234,87 @@ export default function SignupPage() {
     const result = await authAPI.sendVerificationEmail({ email: formData.email })
     setResendMessage(result.success ? 'Email sent! Check your inbox.' : 'Failed to resend email. Please try again.')
     setResendLoading(false)
+  }
+
+  const handleRoleChange = (r: 'learner' | 'trainer') => {
+    setRole(r)
+    if (formErrors.submit) setFormErrors((prev) => ({ ...prev, submit: '' }))
+    if (r === 'learner' && formErrors.uniqueCode) {
+      setFormErrors((prev) => {
+        const next = { ...prev }
+        delete next.uniqueCode
+        return next
+      })
+    }
+  }
+
+  const handleCodeChange = (index: number, rawValue: string) => {
+    const value = rawValue.replace(/[^0-9]/g, '').slice(-1)
+    setUniqueCode((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+    if (formErrors.uniqueCode) setFormErrors((prev) => ({ ...prev, uniqueCode: '' }))
+    if (value && index < TRAINER_CODE_LENGTH - 1) {
+      codeInputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !uniqueCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handleCodePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, TRAINER_CODE_LENGTH)
+    if (!pasted) return
+    setUniqueCode((prev) => {
+      const next = [...prev]
+      pasted.split('').forEach((digit, i) => {
+        next[i] = digit
+      })
+      return next
+    })
+    if (formErrors.uniqueCode) setFormErrors((prev) => ({ ...prev, uniqueCode: '' }))
+    codeInputRefs.current[Math.min(pasted.length, TRAINER_CODE_LENGTH - 1)]?.focus()
+  }
+
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setContactFormData((prev) => ({ ...prev, [name]: value }))
+    if (contactErrors[name]) setContactErrors((prev) => ({ ...prev, [name]: '' }))
+  }
+
+  const validateContactForm = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!contactFormData.name.trim()) errors.name = 'Name is required'
+    if (!contactFormData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactFormData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+    if (!contactFormData.subject.trim()) errors.subject = 'Subject is required'
+    if (!contactFormData.message.trim()) errors.message = 'Message is required'
+    setContactErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!validateContactForm()) return
+    setContactSubmitting(true)
+    const result = await mockSubmitContactForm(contactFormData)
+    setContactSubmitting(false)
+    if (result.success) setContactSubmitted(true)
+  }
+
+  const handleBackFromContact = () => {
+    setShowContactForm(false)
+    setContactSubmitted(false)
+    setContactErrors({})
   }
 
   // ── Email verification screen ──────────────────────────────────────────────
@@ -294,6 +440,24 @@ export default function SignupPage() {
         .terms-error { font-size: 0.75rem; color: var(--danger); margin-top: 4px; }
         .password-match-error { font-size: 0.75rem; color: var(--danger); margin-top: 4px; }
 
+        .field-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.375rem; color: var(--black); }
+
+        .code-input-row { display: flex; align-items: center; gap: 6px; }
+        .code-input-box { width: 100%; text-align: center; padding: 0.625rem 0; border-radius: var(--radius-md); font-size: 1rem; font-family: inherit; border: 1px solid #D1D5DB; }
+        .code-input-box:focus { outline: none; border-color: var(--primary-500); box-shadow: 0 0 0 3px rgba(36,146,235,0.12); }
+        .code-input-box.has-error { border-color: var(--danger); }
+        .code-dash { color: #999999; font-size: 1rem; }
+
+        .contact-admin-link { display: inline-block; background: none; border: none; padding: 0; margin-top: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--primary-500); cursor: pointer; font-family: inherit; }
+        .contact-admin-link:hover { text-decoration: underline; }
+
+        .go-back-link { display: inline-flex; align-items: center; gap: 2px; background: none; border: none; padding: 0; margin-bottom: 1rem; font-size: 0.875rem; color: #666666; cursor: pointer; font-family: inherit; }
+        .go-back-link:hover { color: var(--black); }
+
+        .contact-textarea { width: 100%; padding: 0.625rem 0.75rem; border: 1px solid #D1D5DB; border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; resize: vertical; }
+        .contact-textarea:focus { outline: none; border-color: var(--primary-500); box-shadow: 0 0 0 3px rgba(36,146,235,0.12); }
+        .contact-textarea.has-error { border-color: var(--danger); }
+
         .signup-footer { text-align: center; margin-top: 1.25rem; font-size: 0.8125rem; }
         .signup-footer p { margin: 0.375rem 0; color: #999999; }
         .signup-footer a { font-weight: 600; color: var(--primary-500); text-decoration: none; }
@@ -329,103 +493,193 @@ export default function SignupPage() {
           </div>
 
           {/* Error alerts */}
-          <div role="alert" aria-live="polite" className="signup-error-alert">
-            {error && <Alert type="error" title="Signup failed">{error}</Alert>}
-            {formErrors.submit && <Alert type="error" title="Signup failed">{formErrors.submit}</Alert>}
-          </div>
+          {!showContactForm && (
+            <div role="alert" aria-live="polite" className="signup-error-alert">
+              {error && <Alert type="error" title="Signup failed">{error}</Alert>}
+              {formErrors.submit && <Alert type="error" title="Signup failed">{formErrors.submit}</Alert>}
+            </div>
+          )}
 
           <div className="signup-card">
-            <h2 className="signup-title">Create your account</h2>
-
-            <div className="role-toggle">
-              {(['learner', 'trainer'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  className={`role-btn ${role === r ? 'active' : ''}`}
-                  onClick={() => {
-                    setRole(r)
-                    if (formErrors.submit) setFormErrors((prev) => ({ ...prev, submit: '' }))
-                  }}
-                >
-                  {r === 'learner' ? "I'm a learner" : "I'm a trainer"}
-                </button>
-              ))}
-            </div>
-
-            <form className="signup-form" onSubmit={handleSubmit}>
-              <div className="name-row">
-                <Input label="First name" name="firstName" type="text" placeholder="Enter your first name" value={formData.firstName} onChange={handleInputChange} error={formErrors.firstName} />
-                <Input label="Last name" name="lastName" type="text" placeholder="Enter your last name" value={formData.lastName} onChange={handleInputChange} error={formErrors.lastName} />
-              </div>
-
-              <Input label="Email" name="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleInputChange} error={formErrors.email} />
-
-              <div className="password-wrapper">
-                <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={formData.password} onChange={handleInputChange} error={formErrors.password} />
-                <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {formData.password && !formErrors.password && <PasswordStrengthIndicator password={formData.password} />}
-
-              <div className="password-wrapper">
-                <Input label="Confirm password" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter your password" value={formData.confirmPassword} onChange={handleInputChange} error={formErrors.confirmPassword} />
-                <button type="button" className="eye-button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {formData.confirmPassword && formData.password !== formData.confirmPassword && !formErrors.confirmPassword && (
-                <p className="password-match-error">Passwords do not match</p>
-              )}
-
-              <div>
-                <div className="terms-group">
-                  <input
-                    type="checkbox"
-                    id="terms"
-                    className="terms-checkbox"
-                    checked={termsAccepted}
-                    onChange={(e) => {
-                      setTermsAccepted(e.target.checked)
-                      if (e.target.checked && formErrors.terms) {
-                        setFormErrors((prev) => {
-                          const next = { ...prev }
-                          delete next.terms
-                          return next
-                        })
-                      }
-                    }}
-                  />
-                  <label htmlFor="terms" className="terms-label">
-                    I agree to the{' '}
-                    <a href={`${ROUTES.TERMS}?from=${role}`} target="_blank" rel="noopener noreferrer">Terms of Service</a>
-                    {' '}and{' '}
-                    <a href={`${ROUTES.PRIVACY}?from=${role}`} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-                  </label>
+            {showContactForm ? (
+              contactSubmitted ? (
+                // ── Contact form: success state ────────────────────────────
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#EBF5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </div>
+                  <h2 className="signup-title" style={{ marginBottom: '0.5rem' }}>Message sent</h2>
+                  <p style={{ color: '#4a4a4a', lineHeight: 1.6, fontSize: '0.9rem', margin: '0 0 1.5rem' }}>
+                    Our team will review your request and follow up by email with a trainer code.
+                  </p>
+                  <button type="button" className="go-back-link" style={{ marginBottom: 0, justifyContent: 'center', width: '100%' }} onClick={handleBackFromContact}>
+                    <ChevronLeft size={16} /> Back to signup
+                  </button>
                 </div>
-                {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}
-              </div>
+              ) : (
+                // ── Contact form ────────────────────────────────────────────
+                <>
+                  <button type="button" className="go-back-link" onClick={handleBackFromContact}>
+                    <ChevronLeft size={16} /> Go back
+                  </button>
+                  <h2 className="signup-title" style={{ textAlign: 'left', marginBottom: '0.375rem' }}>Send us a message</h2>
+                  <p style={{ color: '#666666', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>Fill in the form and we'll be in touch shortly.</p>
+                  <form className="signup-form" onSubmit={handleContactSubmit}>
+                    <Input label="Name" name="name" type="text" placeholder="Your full name" value={contactFormData.name} onChange={handleContactChange} error={contactErrors.name} />
+                    <Input label="Email" name="email" type="email" placeholder="your@email.com" value={contactFormData.email} onChange={handleContactChange} error={contactErrors.email} />
+                    <Input label="Subject" name="subject" type="text" placeholder="Subject of your message here" value={contactFormData.subject} onChange={handleContactChange} error={contactErrors.subject} />
+                    <div>
+                      <label className="field-label" htmlFor="message">Message</label>
+                      <textarea
+                        id="message"
+                        name="message"
+                        placeholder="Tell us how we can help you..."
+                        value={contactFormData.message}
+                        onChange={handleContactChange}
+                        rows={4}
+                        className={`contact-textarea ${contactErrors.message ? 'has-error' : ''}`}
+                      />
+                      {contactErrors.message && <p className="terms-error">{contactErrors.message}</p>}
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={contactSubmitting}
+                      icon={contactSubmitting ? <Spinner /> : <Send size={16} />}
+                      iconPosition="left"
+                      style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
+                    >
+                      {contactSubmitting ? 'Sending...' : 'Send Message'}
+                    </Button>
+                  </form>
+                </>
+              )
+            ) : (
+              // ── Signup form ────────────────────────────────────────────────
+              <>
+                <h2 className="signup-title">Create your account</h2>
 
-              <Button
-                type="submit"
-                disabled={!isFormFilled || isLoading}
-                className="submit-button"
-                icon={isLoading ? <Spinner /> : undefined}
-                iconPosition="left"
-                style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
-              >
-                {isLoading ? 'Creating account...' : 'Create account'}
-              </Button>
-            </form>
+                <div className="role-toggle">
+                  {(['learner', 'trainer'] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      className={`role-btn ${role === r ? 'active' : ''}`}
+                      onClick={() => handleRoleChange(r)}
+                    >
+                      {r === 'learner' ? "I'm a learner" : "I'm a trainer"}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="signup-footer">
-              <p>or</p>
-              <p>Already have an account? <Link to={ROUTES.LOGIN} style={{ fontWeight: 600 }}>Log in</Link></p>
-            </div>
+                <form className="signup-form" onSubmit={handleSubmit}>
+                  <div className="name-row">
+                    <Input label="First name" name="firstName" type="text" placeholder="Enter your first name" value={formData.firstName} onChange={handleInputChange} error={formErrors.firstName} />
+                    <Input label="Last name" name="lastName" type="text" placeholder="Enter your last name" value={formData.lastName} onChange={handleInputChange} error={formErrors.lastName} />
+                  </div>
+
+                  <Input label="Email" name="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleInputChange} error={formErrors.email} />
+
+                  {role === 'trainer' && (
+                    <div>
+                      <label className="field-label">Unique Code</label>
+                      <div className="code-input-row">
+                        {uniqueCode.map((digit, i) => (
+                          <React.Fragment key={i}>
+                            <input
+                              ref={(el) => (codeInputRefs.current[i] = el)}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={1}
+                              value={digit}
+                              onChange={(e) => handleCodeChange(i, e.target.value)}
+                              onKeyDown={(e) => handleCodeKeyDown(i, e)}
+                              onPaste={handleCodePaste}
+                              className={`code-input-box ${formErrors.uniqueCode ? 'has-error' : ''}`}
+                              aria-label={`Trainer code digit ${i + 1}`}
+                            />
+                            {i === 2 && <span className="code-dash">–</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      {formErrors.uniqueCode && <p className="terms-error">{formErrors.uniqueCode}</p>}
+                      <button type="button" className="contact-admin-link" onClick={() => setShowContactForm(true)}>
+                        Contact admin to get a code
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="password-wrapper">
+                    <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={formData.password} onChange={handleInputChange} error={formErrors.password} />
+                    <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {formData.password && !formErrors.password && <PasswordStrengthIndicator password={formData.password} />}
+
+                  <div className="password-wrapper">
+                    <Input label="Confirm password" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter your password" value={formData.confirmPassword} onChange={handleInputChange} error={formErrors.confirmPassword} />
+                    <button type="button" className="eye-button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {formData.confirmPassword && formData.password !== formData.confirmPassword && !formErrors.confirmPassword && (
+                    <p className="password-match-error">Passwords do not match</p>
+                  )}
+
+                  <div>
+                    <div className="terms-group">
+                      <input
+                        type="checkbox"
+                        id="terms"
+                        className="terms-checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => {
+                          setTermsAccepted(e.target.checked)
+                          if (e.target.checked && formErrors.terms) {
+                            setFormErrors((prev) => {
+                              const next = { ...prev }
+                              delete next.terms
+                              return next
+                            })
+                          }
+                        }}
+                      />
+                      <label htmlFor="terms" className="terms-label">
+                        I agree to the{' '}
+                        <a href={`${ROUTES.TERMS}?from=${role}`} target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                        {' '}and{' '}
+                        <a href={`${ROUTES.PRIVACY}?from=${role}`} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                      </label>
+                    </div>
+                    {formErrors.terms && <p className="terms-error">{formErrors.terms}</p>}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={!isFormFilled || isLoading || codeValidating}
+                    className="submit-button"
+                    icon={isLoading || codeValidating ? <Spinner /> : undefined}
+                    iconPosition="left"
+                    style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
+                  >
+                    {codeValidating ? 'Checking code...' : isLoading ? 'Creating account...' : 'Create account'}
+                  </Button>
+                </form>
+
+                <div className="signup-footer">
+                  <p>or</p>
+                  <p>Already have an account? <Link to={ROUTES.LOGIN} style={{ fontWeight: 600 }}>Log in</Link></p>
+                </div>
+              </>
+            )}
           </div>
 
-          <p className="signup-trust-badge">Trusted by 50,000+ learners across emerging markets</p>
+          {!showContactForm && (
+            <p className="signup-trust-badge">Trusted by 50,000+ learners across emerging markets</p>
+          )}
         </div>
       </div>
     </>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings,
   Search, Bell, ChevronDown,Calendar, ChevronLeft,
@@ -37,6 +37,9 @@ export const SHELL_CSS = `
   /* ── Navbar ── */
   .navbar { height: 64px; background: #fff; border-bottom: 1px solid #F3F4F6; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; gap: 1rem; position: sticky; top: 0; z-index: 200; width: 100%; }
   .navbar-logo img { height: 2.25rem; display: block; }
+  .navbar-home-back { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid #E5E7EB; border-radius: 0.5rem; background: #fff; color: #6B7280; cursor: pointer; flex-shrink: 0; }
+  .navbar-home-back:hover { background: #EFF6FF; color: #2492EB; border-color: #BFDBFE; }
+  .navbar-brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
   .navbar-right { display: flex; align-items: center; gap: 1rem; }
   .search-wrap { display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 2rem; padding: 0.45rem 1.1rem; width: 240px; }
   .search-wrap input { background: none; border: none; outline: none; font-size: 0.875rem; color: #111; width: 100%; }
@@ -103,6 +106,9 @@ export const SHELL_CSS = `
 
   /* ── Main slot ── */
   .main { flex: 1; min-width: 0; overflow-y: auto; }
+  .page-dashboard-back { padding: 0.75rem 1.5rem 0; }
+  .page-dashboard-back button { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #E5E7EB; border-radius: 50%; background: #fff; color: #6B7280; cursor: pointer; }
+  .page-dashboard-back button:hover { color: #2492EB; border-color: #BFDBFE; background: #EFF6FF; }
 
   /* ── Mobile tab bar ── */
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
@@ -152,6 +158,7 @@ function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; 
 
 export default function AppShell({ children, activeNav = 'home', onNavChange, pageHeader }: AppShellProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
@@ -239,8 +246,10 @@ function requestLogout() {
             </div>
           ) : (
             <>
-              <div className="navbar-logo">
-                <img src="/Logo.png" alt="The Global Project Leaders" />
+              <div className="navbar-brand">
+                <div className="navbar-logo">
+                  <img src="/Logo.png" alt="The Global Project Leaders" />
+                </div>
               </div>
 
               <div className="navbar-right">
@@ -360,6 +369,13 @@ function requestLogout() {
 
           {/* ── Page content ── */}
           <main className="main">
+            {location.pathname !== ROUTES.DASHBOARD && !pageHeader && (
+              <div className="page-dashboard-back">
+                <button type="button" onClick={() => navigate(ROUTES.DASHBOARD)} aria-label="Back to dashboard" title="Back to dashboard">
+                  <ChevronLeft size={18} />
+                </button>
+              </div>
+            )}
             {children}
           </main>
         </div>

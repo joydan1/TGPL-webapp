@@ -2190,10 +2190,7 @@ export interface CreateTrainerAssignmentPayload {
   module_id: string
   description?: string
   instructions?: string
-  deadline: string
-  is_final?: boolean
   max_attempts: number
-  accept_late: boolean
   grading_criteria?: TrainerGradingCriterion[]
   order: number
 }

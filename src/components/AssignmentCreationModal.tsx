@@ -34,10 +34,7 @@ export type AssignmentDraft = {
   title: string
   description: string // local-only — not sent, no confirmed field for it
   instructions: string
-  deadline: string // value of a <input type="datetime-local"> — see deadlineToISOString()
-  isFinal: boolean
   maxAttempts: string // confirmed field: max_attempts
-  acceptLate: boolean // confirmed field: accept_late
   coverImages: File[]
   whatYoullDo: string[]
   scenarios: string[]
@@ -73,10 +70,7 @@ export function emptyAssignmentDraft(): AssignmentDraft {
     title: '',
     description: '',
     instructions: '',
-    deadline: '',
-    isFinal: false,
     maxAttempts: '1',
-    acceptLate: false,
     coverImages: [],
     whatYoullDo: [''],
     scenarios: [''],
@@ -125,12 +119,6 @@ export function draftToGradingCriteria(draft: AssignmentDraft): Array<{ label: s
     }))
 }
 
-
-export function deadlineToISOString(localValue: string): string {
-  if (!localValue) return ''
-  const date = new Date(localValue)
-  return date.toISOString()
-}
 
 /** max_attempts is a plain integer field on the assignment — parse defensively, default to 1. */
 export function draftToMaxAttempts(draft: AssignmentDraft): number {
@@ -188,6 +176,7 @@ const MODAL_CSS = `
   .acm-field-half { flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px; }
   .acm-field-full { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; }
   .acm-field-label { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11px; line-height: 16px; letter-spacing: 0.55px; text-transform: uppercase; color: #99A1AF; }
+  .acm-required { color: #EF4444; }
   .acm-input, .acm-textarea { box-sizing: border-box; width: 100%; background: #F7F7F7; border: 1px solid #EBEBEB; border-radius: 14px; padding: 0 12px; height: 40px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 14px; color: #2B2B2C; }
   .acm-input.readonly { color: #616873; font-weight: 400; }
   .acm-textarea { height: auto; padding: 12px 16px; min-height: 90px; font-weight: 400; font-size: 13px; line-height: 21px; resize: vertical; }
@@ -363,7 +352,7 @@ function EditableList({
           </button>
         </div>
       ))}
-      <button type="button" className={`acm-add-item-btn${addMuted ? ' muted' : ''}`} onClick={onAdd}>
+      <button type="button" className={`acm-add-item-btn${addMuted ? ' muted' : ''}`} onClick={onAdd} disabled={items.length >= 8}>
         <Plus size={12} /> {addLabel}
       </button>
     </>
@@ -404,6 +393,7 @@ export default function AssignmentCreatorModal({
     })
   }
   function addListItem(field: ListField) {
+    if (draft[field].length >= 8) return
     setDraft((d) => ({ ...d, [field]: [...d[field], ''] }))
   }
   function removeListItem(field: ListField, index: number) {
@@ -478,14 +468,10 @@ export default function AssignmentCreatorModal({
     }))
   }
 
-  const deadlineDate = draft.deadline ? new Date(draft.deadline) : null
-  const deadlineMissing = !draft.deadline
-  const deadlineInPast = !!deadlineDate && deadlineDate.getTime() < Date.now()
-
   const maxAttemptsNum = Number(draft.maxAttempts)
   const maxAttemptsInvalid = draft.maxAttempts.trim() !== '' && (!Number.isFinite(maxAttemptsNum) || maxAttemptsNum < 1)
 
-  const canSave = draft.title.trim().length > 0 && !deadlineMissing && !deadlineInPast && criteriaValid && !maxAttemptsInvalid
+  const canSave = draft.title.trim().length > 0 && draft.instructions.trim().length > 0 && criteriaValid && !maxAttemptsInvalid
 
   function handleSave() {
     if (!canSave) return
@@ -502,10 +488,10 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-body">
-          {/* Assignment title / Module / Course / Deadline / Max attempts / Accept late / Final */}
+          {/* Assignment title / Module / Course / Max attempts */}
           <div className="acm-top-fields">
             <div className="acm-field-half">
-              <span className="acm-field-label">Assignment title</span>
+              <span className="acm-field-label">Assignment title <span className="acm-required">*</span></span>
               <input
                 className="acm-input"
                 placeholder="e.g. Stakeholder Map Project"
@@ -536,17 +522,6 @@ export default function AssignmentCreatorModal({
             </div>
 
             <div className="acm-field-half">
-              <span className="acm-field-label">Deadline</span>
-              <input
-                type="datetime-local"
-                className="acm-input"
-                value={draft.deadline}
-                onChange={(e) => update('deadline', e.target.value)}
-              />
-              {deadlineInPast && <span className="acm-field-error">Deadline must be in the future.</span>}
-            </div>
-
-            <div className="acm-field-half">
               <span className="acm-field-label">Max attempts</span>
               <input
                 type="number"
@@ -559,35 +534,6 @@ export default function AssignmentCreatorModal({
               {maxAttemptsInvalid && <span className="acm-field-error">Enter a number of 1 or more.</span>}
             </div>
 
-            <div className="acm-toggle-field">
-              <div className="acm-toggle-labels">
-                <span className="acm-toggle-title">Accept late submissions</span>
-                <span className="acm-toggle-sub">Learners can still submit after the deadline (flagged as late)</span>
-              </div>
-              <label className="acm-toggle">
-                <input
-                  type="checkbox"
-                  checked={draft.acceptLate}
-                  onChange={(e) => update('acceptLate', e.target.checked)}
-                />
-                <span className="track" />
-              </label>
-            </div>
-
-            <div className="acm-toggle-field">
-              <div className="acm-toggle-labels">
-                <span className="acm-toggle-title">Final assignment</span>
-                <span className="acm-toggle-sub">Only one allowed per course</span>
-              </div>
-              <label className="acm-toggle">
-                <input
-                  type="checkbox"
-                  checked={draft.isFinal}
-                  onChange={(e) => update('isFinal', e.target.checked)}
-                />
-                <span className="track" />
-              </label>
-            </div>
           </div>
 
           {/* Instructions */}
@@ -595,7 +541,7 @@ export default function AssignmentCreatorModal({
             <div className="acm-section-head">
               <div className="acm-section-icon"><AlignLeft size={15} /></div>
               <div>
-                <div className="acm-section-title">Instructions</div>
+                <div className="acm-section-title">Instructions <span className="acm-required">*</span></div>
                 <div className="acm-section-sub">Main task description shown to learners at the top</div>
               </div>
             </div>
@@ -719,9 +665,9 @@ export default function AssignmentCreatorModal({
             </div>
             <div className="acm-grading-table">
               <div className="acm-grading-head">
-                <span>Criterion</span>
+                <span>Criterion <span className="acm-required">*</span></span>
                 <span>Description</span>
-                <span>Max points</span>
+                <span>Max points <span className="acm-required">*</span></span>
                 <span />
               </div>
               {draft.gradingCriteria.map((c) => (
@@ -826,7 +772,7 @@ export default function AssignmentCreatorModal({
                 </div>
               )}
               <div>
-                <div className="acm-cover-label" style={{ marginBottom: 8 }}>Submission slots</div>
+                <div className="acm-cover-label" style={{ marginBottom: 8 }}>Submission slots <span className="acm-required">*</span></div>
                 <div className="acm-slot-list">
                   {draft.requirements.map((requirement, index) => (
                     <div className="acm-slot-card" key={requirement.id}>
@@ -951,9 +897,6 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-footer">
-          {deadlineMissing && (
-            <span className="acm-footer-warning">Set a deadline before saving.</span>
-          )}
           {maxAttemptsInvalid && (
             <span className="acm-footer-warning">Max attempts must be 1 or more.</span>
           )}

@@ -20,7 +20,7 @@ export default function EmailVerificationPage() {
   const [resendMessage, setResendMessage] = useState('')
 
   const [profileStatus, setProfileStatus] = useState<string | null>(null)
-  const [role] = useState<string | null>(null)
+  const [role, setRole] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) {
@@ -46,9 +46,18 @@ export default function EmailVerificationPage() {
             avatar_url: userData.avatar_url || null,
           }
           useAuthStore.getState().setUser(user)
+          setRole(userData.role)
           // Capture status into local state — safe to read synchronously in handleContinue
           setProfileStatus(userData.learner_profile?.completion_status ?? null)
           setResendEmail(userData.email)
+
+          const destination = userData.role === 'trainer'
+            ? RouteBuilder.trainerDashboard()
+            : userData.learner_profile?.completion_status === 'complete'
+              ? RouteBuilder.dashboard()
+              : RouteBuilder.onboarding()
+          navigate(destination, { replace: true })
+          return
         }
         setState('success')
       } else {
