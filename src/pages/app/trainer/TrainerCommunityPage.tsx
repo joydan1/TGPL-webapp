@@ -147,6 +147,10 @@ export default function TrainerCommunityPage() {
     if (res.success) {
       setMessages(prev => prev.filter(m => m.id !== messageId))
       setThreadReplies(prev => prev.filter(m => m.id !== messageId))
+      if (openThreadParent?.id === messageId) {
+        setOpenThreadParent(null)
+        threadCursorRef.current = null
+      }
     }
   }
 

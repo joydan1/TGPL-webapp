@@ -37,7 +37,7 @@ export default function EmailVerificationPage() {
         if (userResult.success && userResult.data) {
           const userData = userResult.data
           const user: User = {
-            id: parseInt(userData.id, 10),
+            id: userData.id,
             email: userData.email,
             name: `${userData.first_name} ${userData.last_name}`.trim(),
             role: userData.role,

@@ -43,7 +43,7 @@ export const useAuth = () => {
         return { success: false, error: 'Failed to fetch user info' }
       }
       const user: User = {
-        id: parseInt(userData.id, 10),
+        id: userData.id,
         email: userData.email,
         name: `${userData.first_name} ${userData.last_name}`.trim(),
         role: userData.role,
@@ -159,7 +159,7 @@ export const useAuth = () => {
       const userData = result.data
       if (result.success && userData) {
         const user: User = {
-          id: parseInt(userData.id, 10),
+          id: userData.id,
           email: userData.email,
           name: `${userData.first_name} ${userData.last_name}`.trim(),
           role: userData.role,
@@ -194,7 +194,7 @@ export const useAuth = () => {
       if (userResult.success && userResult.data) {
         const userData = userResult.data
         const user: User = {
-          id: parseInt(userData.id, 10),
+          id: userData.id,
           email: userData.email,
           name: `${userData.first_name} ${userData.last_name}`.trim(),
           role: userData.role,

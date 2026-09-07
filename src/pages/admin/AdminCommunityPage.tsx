@@ -144,6 +144,10 @@ export default function AdminCommunityPage() {
     if (res.success) {
       setMessages(prev => prev.filter(m => m.id !== messageId))
       setThreadReplies(prev => prev.filter(m => m.id !== messageId))
+      if (openThreadParent?.id === messageId) {
+        setOpenThreadParent(null)
+        threadCursorRef.current = null
+      }
     }
   }
 
@@ -152,6 +156,10 @@ export default function AdminCommunityPage() {
     if (res.success) {
       setMessages(prev => prev.filter(m => m.id !== messageId))
       setThreadReplies(prev => prev.filter(m => m.id !== messageId))
+      if (openThreadParent?.id === messageId) {
+        setOpenThreadParent(null)
+        threadCursorRef.current = null
+      }
     }
   }
 

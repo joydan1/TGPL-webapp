@@ -56,6 +56,15 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-msg-row.own .cc-menu-btn { left: -32px; }
   .cc-bubble-wrap:hover .cc-menu-btn, .cc-menu-btn.open { opacity: 1; }
 
+  .cc-reactions { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .cc-reaction-btn { border: 1px solid #EBEBEB; background: #fff; border-radius: 999px; padding: 3px 7px; font-size: 13px; cursor: pointer; line-height: 1; }
+  .cc-reaction-btn.active { background: #E9F5FF; border-color: #2492EB; }
+  .cc-reaction-add { border: 1px solid #EBEBEB; background: #fff; color: #99A1AF; border-radius: 999px; padding: 3px 7px; font-size: 12px; cursor: pointer; }
+  .cc-reaction-add:hover, .cc-reaction-btn:hover { border-color: #2492EB; }
+  .cc-reaction-picker { display: flex; gap: 2px; padding: 4px; background: #fff; border: 1px solid #EBEBEB; border-radius: 999px; box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+  .cc-reaction-picker button { border: none; background: none; padding: 3px; font-size: 15px; cursor: pointer; border-radius: 50%; }
+  .cc-reaction-picker button:hover { background: #F7F7F7; }
+
   .cc-menu { position: absolute; top: 30px; width: 210px; background: #fff; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); padding: 6px 0; z-index: 20; }
   .cc-msg-row:not(.own) .cc-menu { right: -32px; }
   .cc-msg-row.own .cc-menu { left: -32px; }
@@ -96,6 +105,7 @@ export const COMMUNITY_CHAT_CSS = `
 `
 
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮']
 const AVATAR_COLORS = ['#0891B2', '#10B981', '#D97706', '#8B5CF6', '#2492EB', '#EC4899']
 
 function initialsOf(name: string): string {
@@ -164,11 +174,14 @@ interface MessageRowProps {
   currentUserId: string
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
+  selectedReactions: string[]
+  onReact: (messageId: string, emoji: string) => void
   onOpenThread: (topLevelMessage: CommunityMessage) => void
 }
 
-function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator, onOpenThread }: MessageRowProps) {
+function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator, selectedReactions, onReact, onOpenThread }: MessageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const isMine = msg.author.id !== null && msg.author.id === currentUserId
   const actions = buildMenuActions(isMine, viewerRole)
   const displayName = isMine ? 'You' : msg.author.full_name
@@ -214,6 +227,24 @@ function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteMode
             </div>
           )}
         </div>
+        <div className="cc-reactions">
+          {selectedReactions.map((emoji) => (
+            <button key={emoji} className="cc-reaction-btn active" type="button" onClick={() => onReact(msg.id, emoji)} aria-label={`Remove ${emoji} reaction`}>
+              {emoji}
+            </button>
+          ))}
+          {reactionPickerOpen ? (
+            <div className="cc-reaction-picker">
+              {REACTION_EMOJIS.map((emoji) => (
+                <button key={emoji} type="button" onClick={() => { onReact(msg.id, emoji); setReactionPickerOpen(false) }} aria-label={`React with ${emoji}`}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button className="cc-reaction-add" type="button" onClick={() => setReactionPickerOpen(true)} aria-label="Add reaction">+</button>
+          )}
+        </div>
         {replyCount > 0 && (
           <button className="cc-reply-btn" type="button" onClick={() => onOpenThread(msg)}>
             <MessageSquare size={12} />
@@ -238,11 +269,14 @@ interface ThreadPanelProps {
   onSendReply: (body: string) => void
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
+  reactions: Record<string, string[]>
+  onReact: (messageId: string, emoji: string) => void
 }
 
 function ThreadPanel({
   parentMessage, replies, loading, error, sending, currentUserId, currentUserInitials, viewerRole,
   onClose, onSendReply, onDeleteMine, onDeleteModerator,
+  reactions, onReact,
 }: ThreadPanelProps) {
   const [draft, setDraft] = useState('')
 
@@ -293,6 +327,8 @@ function ThreadPanel({
               key={r.id}
               onDeleteMine={onDeleteMine}
               onDeleteModerator={onDeleteModerator}
+              selectedReactions={reactions[r.id] ?? []}
+              onReact={onReact}
               onOpenThread={() => {}} // replies can't have their own thread
             />
           ))}
@@ -359,7 +395,18 @@ export default function CommunityChatPanel({
   const [rulesOpen, setRulesOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [reactions, setReactions] = useState<Record<string, string[]>>({})
   const emojiRef = useRef<HTMLDivElement>(null)
+
+  function onReact(messageId: string, emoji: string) {
+    setReactions((prev) => {
+      const selected = prev[messageId] ?? []
+      const next = selected.includes(emoji)
+        ? selected.filter((item) => item !== emoji)
+        : [...selected, emoji]
+      return { ...prev, [messageId]: next }
+    })
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -427,6 +474,8 @@ export default function CommunityChatPanel({
             key={msg.id}
             onDeleteMine={onDeleteMine}
             onDeleteModerator={onDeleteModerator}
+            selectedReactions={reactions[msg.id] ?? []}
+            onReact={onReact}
             onOpenThread={onOpenThread}
           />
         ))}
@@ -484,6 +533,8 @@ export default function CommunityChatPanel({
           onSendReply={onSendReply}
           onDeleteMine={onDeleteMine}
           onDeleteModerator={onDeleteModerator}
+          reactions={reactions}
+          onReact={onReact}
         />
       )}
     </div>

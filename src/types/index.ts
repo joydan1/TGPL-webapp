@@ -7,7 +7,7 @@ export type CurrentStatus = 'student' | 'working' | 'between_roles' | 'freelance
 export type PreferredLearningHours = '1-3' | '4-6' | '7-10' | '10+'
 
 export interface User {
-  id: number
+  id: string
   email: string
   name: string
   role: 'learner' | 'trainer' | 'admin'

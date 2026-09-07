@@ -50,13 +50,6 @@ const RANGE_OPTIONS: { label: string; period: DashboardPeriod; approx?: boolean 
 ]
 
 
-// The dashboard overview endpoint now tags each recent_activity item with a
-// `category` field — payments | content | platform — instead of us guessing
-// a bucket from target_type text. There's deliberately no "certificates"
-// category (issuance is automatic/high-volume, kept out of the curated
-// feed). "platform" is a catch-all (invites, suspensions, role changes) and
-// doesn't have a confirmed tab treatment yet per Dan — until that's settled,
-// it's shown as its own tab like the other two.
 const ACTIVITY_CATEGORY_META: Record<
   string,
   { Icon: typeof Banknote; bg: string; color: string; label: string }
