@@ -66,12 +66,6 @@ const DURATIONS = [
   { key: 'indefinite', label: 'Indefinite' },
 ] as const
 
-// Display label -> backend reason enum. Backend's message only confirmed ONE
-// value ("violation_of_guidelines"), so only that entry is mapped for real.
-// The other five below are my best-guess snake_case codes, NOT confirmed —
-// treat them as placeholders. Get the full `reason` enum from backend before
-// shipping this modal, or a suspend attempt with any reason other than the
-// first option will likely 400.
 const REASONS: { label: string; code: string; confirmed: boolean }[] = [
   { label: 'Violation of community guidelines', code: 'violation_of_guidelines', confirmed: true },
   { label: 'Suspicious or fraudulent activity', code: 'suspicious_activity', confirmed: false },

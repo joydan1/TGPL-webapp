@@ -17,7 +17,7 @@ interface DashboardChartsProps {
 }
 
 function formatNaira(amount: number) {
-  return `\u20A6${amount.toLocaleString('en-NG')}`
+  return `₦${amount.toLocaleString('en-NG')}`
 }
 
 export default function DashboardCharts({
@@ -75,7 +75,7 @@ export default function DashboardCharts({
         <div className="ad-panel-head">
           <div>
             <h3 className="ad-panel-title">Revenue Over Time</h3>
-            <p className="ad-panel-sub">Monthly (\u20A6) · succeeded payments</p>
+            <p className="ad-panel-sub">Monthly (₦) · succeeded payments</p>
           </div>
           {revenueGrowthRate != null && (
             <span className={`ad-panel-badge${revenueGrowthRate < 0 ? ' negative' : ''}`}>
@@ -96,7 +96,7 @@ export default function DashboardCharts({
                 tick={{ fontSize: 11, fill: '#9CA3AF' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(value) => `\u20A6${(value / 100_000_000).toFixed(0)}M`}
+                tickFormatter={(value) => `₦${(value / 100_000_000).toFixed(0)}M`}
               />
               <Tooltip formatter={(value) => [formatNaira(Number(value) / 100), 'Revenue']} />
               <Bar dataKey="revenue_kobo" radius={[6, 6, 0, 0]}>

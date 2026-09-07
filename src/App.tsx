@@ -62,9 +62,10 @@ const AdminActivityPage = lazy(() => import('./pages/admin/AdminActivityPage'))
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredRole?: 'learner' | 'trainer' | 'admin'
+  requiredPermission?: keyof NonNullable<import('./types').User['permissions']>
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole, requiredPermission }) => {
   const { isAuthenticated, user } = useAuthStore()
 
   if (!isAuthenticated) {
@@ -72,6 +73,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   }
 
   if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to={ROUTES.FORBIDDEN} replace />
+  }
+
+  if (requiredPermission && user?.role === 'admin' && user.permissions?.[requiredPermission] === false) {
     return <Navigate to={ROUTES.FORBIDDEN} replace />
   }
 
@@ -365,7 +370,7 @@ element={
         <Route
           path={ROUTES.ADMIN_DASHBOARD}
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="admin" requiredPermission="view_analytics">
               <AdminDashboardPage />
             </ProtectedRoute>
           }
@@ -373,7 +378,7 @@ element={
         <Route
           path={ROUTES.ADMIN_REVENUE}
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="admin" requiredPermission="view_revenue">
               <AdminRevenuePage />
             </ProtectedRoute>
           }
@@ -381,7 +386,7 @@ element={
         <Route
           path={ROUTES.ADMIN_USERS}
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_users">
               <AdminUsersPage />
             </ProtectedRoute>
           }
@@ -389,7 +394,7 @@ element={
         <Route
           path={ROUTES.ADMIN_COURSES}
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_courses">
               <AdminCoursesPage />
             </ProtectedRoute>
           }
@@ -403,13 +408,43 @@ element={
         <Route
         path={ROUTES.ADMIN_SETTINGS}
         element={
-          <AdminSettingsPage />
+          <ProtectedRoute requiredRole="admin" requiredPermission="system_settings">
+            <AdminSettingsPage />
+          </ProtectedRoute>
         }
         />
-        <Route path={ROUTES.ADMIN_ACTIVITY} element={<AdminActivityPage />} />  
-        <Route path={ROUTES.ADMIN_COMMUNITY} element={<AdminCommunityPage />} />
-        <Route path="/admin/courses/create" element={<AddCoursePage />} />
-<Route path="/admin/courses/:slug/edit" element={<AdminCourseManagePage />} />
+        <Route
+          path={ROUTES.ADMIN_ACTIVITY}
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="view_analytics">
+              <AdminActivityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_COMMUNITY}
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="moderate_content">
+              <AdminCommunityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses/create"
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_courses">
+              <AddCoursePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses/:slug/edit"
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_courses">
+              <AdminCourseManagePage />
+            </ProtectedRoute>
+          }
+        />
         {/* ===== ERROR ROUTES ===== */}
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />

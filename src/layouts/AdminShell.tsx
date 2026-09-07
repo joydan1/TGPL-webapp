@@ -117,12 +117,12 @@ function Avatar({ avatarUrl, initials, className }: { avatarUrl: string | null; 
 }
 
 const navItems = [
-  { key: 'dashboard', label: 'Dashboard', route: ROUTES.ADMIN_DASHBOARD, Icon: LayoutGrid },
-  { key: 'users',     label: 'Users',     route: ROUTES.ADMIN_USERS,     Icon: Users },
-  { key: 'courses',   label: 'Courses',   route: ROUTES.ADMIN_COURSES,    Icon: BookOpen },
-  {key: 'community', label: 'Community', route: ROUTES.ADMIN_COMMUNITY, Icon: MessageCircle},
-  { key: 'revenue',   label: 'Revenue',   route: ROUTES.ADMIN_REVENUE,    Icon: CreditCard },
-  { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon },
+  { key: 'dashboard', label: 'Dashboard', route: ROUTES.ADMIN_DASHBOARD, Icon: LayoutGrid, permission: 'view_analytics' as const },
+  { key: 'users',     label: 'Users',     route: ROUTES.ADMIN_USERS,     Icon: Users, permission: 'manage_users' as const },
+  { key: 'courses',   label: 'Courses',   route: ROUTES.ADMIN_COURSES,    Icon: BookOpen, permission: 'manage_courses' as const },
+  { key: 'community', label: 'Community', route: ROUTES.ADMIN_COMMUNITY, Icon: MessageCircle, permission: 'moderate_content' as const },
+  { key: 'revenue',   label: 'Revenue',   route: ROUTES.ADMIN_REVENUE,    Icon: CreditCard, permission: 'view_revenue' as const },
+  { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon, permission: 'system_settings' as const },
 ]
 
 const ROLE_SWITCH_OPTIONS = [
@@ -143,9 +143,10 @@ export default function AdminShell({ children }: AdminShellProps) {
 
   if (!user) return null
 
+  const visibleNavItems = navItems.filter((item) => user.permissions?.[item.permission] !== false)
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
   const avatarUrl = user.avatar_url ?? null
-  const activeRoute = navItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.ADMIN_DASHBOARD
+  const activeRoute = visibleNavItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.ADMIN_DASHBOARD
 
   function requestLogout() {
     setProfileOpen(false)
@@ -250,7 +251,7 @@ export default function AdminShell({ children }: AdminShellProps) {
             </div>
 
             <nav className="sidebar-nav">
-              {navItems.map(({ key, label, route, Icon }) => {
+              {visibleNavItems.map(({ key, label, route, Icon }) => {
                 const active = activeRoute === route
                 return (
                   <div
@@ -303,7 +304,7 @@ export default function AdminShell({ children }: AdminShellProps) {
               {/* ── Mobile tab bar ── */}
 <div className="mobile-tabbar">
   <div className="mobile-tabbar-inner">
-    {navItems.map(({ key, label, route, Icon }) => (
+    {visibleNavItems.map(({ key, label, route, Icon }) => (
       <button
         key={key}
         className={`tab-item${activeRoute === route ? ' active' : ''}`}

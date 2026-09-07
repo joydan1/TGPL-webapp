@@ -11,6 +11,7 @@ import { useAuthStore } from '../../../store/auth'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 
 type Screen = 'checkout' | 'processing' | 'success' | 'failed'
+type PromoStatus = 'idle' | 'validating' | 'applied' | 'error'
 
 interface CourseInfo {
   slug: string
@@ -32,6 +33,13 @@ interface PaymentResult {
   created_at: string
 }
 
+interface AppliedPromo {
+  code: string
+  originalPriceKobo: number
+  discountKobo: number
+  finalPriceKobo: number
+}
+
 interface CheckoutCtx {
   screen: Screen
   go: (s: Screen) => void
@@ -39,6 +47,10 @@ interface CheckoutCtx {
   setEmail: (v: string) => void
   promoCode: string
   setPromoCode: (v: string) => void
+  promoStatus: PromoStatus
+  appliedPromo: AppliedPromo | null
+  promoError: string | null
+  applyPromo: () => Promise<void>
   reference: string | null
   result: PaymentResult | null
   courseInfo: CourseInfo
@@ -78,9 +90,39 @@ function fmtNaira(raw: string): string {
   return `\u20a6${num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// kobo is an integer amount; format it the same way as fmtNaira without
+// a string round-trip through naira.
+function fmtKobo(kobo: number): string {
+  return `\u20a6${(kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function toKobo(value: unknown, fallback = 0): number {
+  if (value === null || value === undefined || value === '') return fallback
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : fallback
+}
+
 const POLL_INTERVAL_MS  = 3000
 const POLL_MAX_ATTEMPTS = 10  // 10 × 3s = 30s max
 const POLL_MAX_ERRORS   = 3   // 3 consecutive fetch errors → give up
+
+
+const PROMO_REASON_COPY: Record<string, string> = {
+  course_is_free: 'This course is already free — promo codes don\u2019t apply.',
+  promo_code_exhausted: 'This code has reached its usage limit.',
+  course_not_applicable: 'This promo code is not applicable to this course.',
+  promo_code_not_applicable: 'This promo code is not applicable to this course.',
+  promo_not_applicable: 'This promo code is not applicable to this course.',
+  course_not_eligible: 'This promo code is not applicable to this course.',
+}
+
+function promoRejectionMessage(reason: string, detail?: string): string {
+  if (PROMO_REASON_COPY[reason]) return PROMO_REASON_COPY[reason]
+  if (detail && /not applicable|not eligible|does not apply|doesn\u2019t apply/i.test(detail)) {
+    return 'This promo code is not applicable to this course.'
+  }
+  return detail ?? 'That code can\u2019t be used right now.'
+}
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
@@ -89,7 +131,10 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
 
   const [screen, setScreen]       = useState<Screen>('checkout')
   const [email, setEmail]         = useState(user?.email ?? '')
-  const [promoCode, setPromoCode] = useState('')
+  const [promoCode, setPromoCodeRaw] = useState('')
+  const [promoStatus, setPromoStatus]   = useState<PromoStatus>('idle')
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
+  const [promoError, setPromoError]     = useState<string | null>(null)
   const [reference, setReference] = useState<string | null>(null)
   const [result, setResult]       = useState<PaymentResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -164,6 +209,63 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
     }, POLL_INTERVAL_MS)
   }, [stopPolling, failPayment])
 
+  
+  const setPromoCode = useCallback((v: string) => {
+    setPromoCodeRaw(v)
+    setPromoStatus(prev => {
+      if (prev !== 'idle') {
+        setAppliedPromo(null)
+        setPromoError(null)
+        return 'idle'
+      }
+      return prev
+    })
+  }, [])
+
+  const applyPromo = useCallback(async () => {
+    const code = promoCode.trim()
+    if (!code) return
+    setPromoStatus('validating')
+    setPromoError(null)
+
+    const res = await paymentAPI.validatePromoCode(code, courseInfo.slug)
+
+    if (!res.success) {
+      setPromoStatus('error')
+      setPromoError('Not applicable to this course. Please try again.')
+      return
+    }
+
+    const data = res.data!
+    if (!data.valid) {
+      setPromoStatus('error')
+      setAppliedPromo(null)
+      setPromoError(promoRejectionMessage(data.reason, data.detail))
+      return
+    }
+
+    setPromoStatus('applied')
+    const originalPriceKobo = toKobo(data.original_price_kobo, courseInfo.priceKobo)
+    const discountKobo = toKobo(data.discount_kobo)
+    const finalPriceKobo = toKobo(
+      data.final_price_kobo,
+      Math.max(0, originalPriceKobo - discountKobo),
+    )
+    setAppliedPromo({
+      code: data.code,
+      originalPriceKobo,
+      discountKobo,
+      finalPriceKobo,
+    })
+    setPromoCodeRaw(data.code) // normalize to backend's canonical uppercase form
+  }, [promoCode, courseInfo.slug])
+
+  const clearPromo = useCallback(() => {
+    setPromoStatus('idle')
+    setAppliedPromo(null)
+    setPromoError(null)
+  }, [])
+
   const initiatePayment = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -182,14 +284,14 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       const { public_key } = configRes.data
       if (!public_key) throw new Error('Payment is not configured yet. Please try again later.')
 
-      const checkoutRes = await paymentAPI.checkout(courseInfo.slug)
+      const checkoutRes = await paymentAPI.checkout(courseInfo.slug, appliedPromo?.code)
       if (!checkoutRes.success) {
         throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment.')
       }
 
       const checkoutData: CheckoutResponse | FreeCourseCheckoutResponse = checkoutRes.data
 
-      // Free course — skip Paystack entirely
+      // Free course, OR a 100%-off promo on a paid course — skip Paystack entirely
       if (checkoutData.is_free) {
         setResult({
           reference: checkoutData.reference,
@@ -207,14 +309,16 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         return
       }
 
-      const { reference: ref, access_code } = checkoutData as CheckoutResponse
+      const { reference: ref, access_code, amount_kobo } = checkoutData as CheckoutResponse
       setReference(ref)
       setIsLoading(false)
 
       const handler = window.PaystackPop.setup({
         key: public_key,
         email,
-        amount: courseInfo.priceKobo,
+        // Charge whatever the backend confirms (post-discount if a promo was applied),
+        // not the original courseInfo.priceKobo.
+        amount: amount_kobo,
         ref,
         access_code,
         onClose: () => {
@@ -230,21 +334,23 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       setIsLoading(false)
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     }
-  }, [email, courseInfo, pollStatus])
+  }, [email, courseInfo, pollStatus, appliedPromo])
 
   const retryPayment = useCallback(() => {
     stopPolling()
     setResult(null)
     setReference(null)
     setError(null)
+    clearPromo()
     setScreen('checkout')
-  }, [stopPolling])
+  }, [stopPolling, clearPromo])
 
   return (
     <CheckoutContext.Provider value={{
       screen, go: setScreen,
       email, setEmail,
       promoCode, setPromoCode,
+      promoStatus, appliedPromo, promoError, applyPromo,
       reference, result,
       courseInfo,
       initiatePayment, retryPayment,
@@ -350,9 +456,17 @@ const wrap: React.CSSProperties = {
 // ─── Checkout screen ──────────────────────────────────────────────────────────
 
 function CheckoutScreen({ onBack }: { onBack: () => void }) {
-  const { email, setEmail, promoCode, setPromoCode, initiatePayment, isLoading, error, courseInfo } = useCheckout()
+  const {
+    email, setEmail,
+    promoCode, setPromoCode, promoStatus, appliedPromo, promoError, applyPromo,
+    initiatePayment, isLoading, error, courseInfo,
+  } = useCheckout()
   const [promoOpen, setPromoOpen] = useState(false)
   const canPay = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !isLoading
+
+  const displayTotalKobo = appliedPromo
+    ? toKobo(appliedPromo.finalPriceKobo, Math.max(0, courseInfo.priceKobo - appliedPromo.discountKobo))
+    : toKobo(courseInfo.priceKobo)
 
   return (
     <>
@@ -369,10 +483,16 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
               <span>Course price</span>
               <span>{fmtNaira(courseInfo.priceNaira)}</span>
             </div>
+            {appliedPromo && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: '#16A34A' }}>
+                <span>Promo ({appliedPromo.code})</span>
+                <span>−{fmtKobo(appliedPromo.discountKobo)}</span>
+              </div>
+            )}
             <div style={{ height: 1, background: '#F3F4F6' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111' }}>Total</span>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2492EB' }}>{fmtNaira(courseInfo.priceNaira)}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#2492EB' }}>{fmtKobo(displayTotalKobo)}</span>
             </div>
           </CardBody>
           <div style={{ height: 1, background: '#F3F4F6' }} />
@@ -390,9 +510,25 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
               </svg>
             </div>
             {promoOpen && (
-              <div style={{ padding: '0 1.25rem 1.25rem', display: 'flex', gap: '0.625rem' }}>
-                <Input placeholder="Enter promo code" value={promoCode} onChange={e => setPromoCode(e.target.value)} style={{ padding: '0.65rem 0.875rem' }} />
-                <Button size="small" style={{ whiteSpace: 'nowrap' }}>Apply</Button>
+              <div style={{ padding: '0 1.25rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.625rem' }}>
+                  <Input
+                    placeholder="Enter promo code"
+                    value={promoCode}
+                    onChange={e => setPromoCode(e.target.value)}
+                    disabled={promoStatus === 'applied'}
+                    style={{ padding: '0.65rem 0.875rem' }}
+                  />
+                  <Button
+                    size="small"
+                    onClick={applyPromo}
+                    disabled={!promoCode.trim() || promoStatus === 'validating' || promoStatus === 'applied'}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {promoStatus === 'validating' ? 'Checking\u2026' : promoStatus === 'applied' ? 'Applied' : 'Apply'}
+                  </Button>
+                </div>
+                {promoError && <Alert type="error">{promoError}</Alert>}
               </div>
             )}
           </div>
@@ -422,7 +558,7 @@ function CheckoutScreen({ onBack }: { onBack: () => void }) {
             <PaystackLogo />
           </div>
           <Button size="large" disabled={!canPay} onClick={initiatePayment} style={{ width: '100%', borderRadius: '0.75rem' }}>
-            {isLoading ? 'Please wait\u2026' : `Pay ${fmtNaira(courseInfo.priceNaira)}`}
+            {isLoading ? 'Please wait\u2026' : `Pay ${fmtKobo(displayTotalKobo)}`}
           </Button>
         </div>
 

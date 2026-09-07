@@ -26,6 +26,16 @@ export interface UserResponse {
   country: string | null
   bio: string | null
   avatar_url: string | null
+  permissions?: {
+    manage_users?: boolean
+    moderate_content?: boolean
+    manage_courses?: boolean
+    view_analytics?: boolean
+    send_announcements?: boolean
+    view_revenue?: boolean
+    manage_payouts?: boolean
+    system_settings?: boolean
+  } | null
 }
 
 export interface LearnerProfile {
@@ -132,7 +142,21 @@ export interface PaymentConfigResponse {
   public_key: string
   callback_url_pattern: string
 }
+export interface PromoDiscountResponse {
+  valid: true
+  code: string
+  original_price_kobo: number
+  discount_kobo: number
+  final_price_kobo: number
+}
 
+export interface PromoRejectionResponse {
+  valid: false
+  reason: 'course_is_free' | 'promo_code_exhausted' | string // widen as Mark sends more
+  detail?: string
+}
+
+export type PromoValidateResponse = PromoDiscountResponse | PromoRejectionResponse
 // ─── Explicit API result types ────────────────────────────────────────────────
 
 export type LoginResult =
@@ -516,11 +540,27 @@ export const paymentAPI = {
     }
   },
 
-  checkout: async (courseSlug: string): Promise<CheckoutResult> => {
+  validatePromoCode: async (code: string, courseSlug: string) => {
+    try {
+      const response = await apiClient.post<PromoValidateResponse>(
+        '/v1/payments/promo-codes/validate/',
+        { code: code.trim().toUpperCase(), course_slug: courseSlug },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to validate promo code')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
+  checkout: async (courseSlug: string, promoCode?: string): Promise<CheckoutResult> => {
     try {
       const response = await apiClient.post<CheckoutResponse | FreeCourseCheckoutResponse>(
         '/v1/payments/checkout/',
-        { course_slug: courseSlug },
+        {
+          course_slug: courseSlug,
+          ...(promoCode ? { promo_code: promoCode.trim().toUpperCase() } : {}),
+        },
       )
       return { success: true as const, data: response.data }
     } catch (error) {

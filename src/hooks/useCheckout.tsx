@@ -35,16 +35,49 @@ const POLL_INTERVAL_MS = 3000
 const POLL_MAX_ATTEMPTS = 10
 const POLL_MAX_ERRORS = 3
 
+type PromoStatus = 'idle' | 'validating' | 'applied' | 'error'
+
+interface AppliedPromo {
+  code: string
+  originalPriceKobo: number
+  discountKobo: number
+  finalPriceKobo: number
+}
+
+// Copy for the rejection reasons confirmed so far. Extend this map as
+// Mark sends the remaining shapes (expired / not-started / already-used / not-found) —
+// anything not listed here falls back to the backend's own `detail` string.
+const PROMO_REASON_COPY: Record<string, string> = {
+  course_is_free: 'This course is already free — promo codes don\u2019t apply.',
+  promo_code_exhausted: 'This code has reached its usage limit.',
+  course_not_applicable: 'This promo code is not applicable to this course.',
+  promo_code_not_applicable: 'This promo code is not applicable to this course.',
+  promo_not_applicable: 'This promo code is not applicable to this course.',
+  course_not_eligible: 'This promo code is not applicable to this course.',
+}
+
+function promoRejectionMessage(reason: string, detail?: string): string {
+  if (PROMO_REASON_COPY[reason]) return PROMO_REASON_COPY[reason]
+  if (detail && /not applicable|not eligible|does not apply|doesn\u2019t apply/i.test(detail)) {
+    return 'This promo code is not applicable to this course.'
+  }
+  return detail ?? 'That code can\u2019t be used right now.'
+}
+
 interface CheckoutState {
   screen: CheckoutScreen
   email: string
   promoCode: string
+  promoStatus: PromoStatus
+  appliedPromo: AppliedPromo | null
+  promoError: string | null
   reference: string | null
   result: PaymentResult | null
   isProcessing: boolean
   error: string | null
   setEmail: (email: string) => void
   setPromoCode: (code: string) => void
+  applyPromo: (courseSlug: string) => Promise<void>
   go: (screen: CheckoutScreen) => void
   initiatePayment: (courseSlug: string) => Promise<void>
   retryPayment: () => void
@@ -58,6 +91,9 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
   const [screen, setScreen]       = useState<CheckoutScreen>('checkout')
   const [email, setEmail]         = useState(user?.email ?? '')
   const [promoCode, setPromoCode] = useState('')
+  const [promoStatus, setPromoStatus]   = useState<PromoStatus>('idle')
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
+  const [promoError, setPromoError]     = useState<string | null>(null)
   const [reference, setReference] = useState<string | null>(null)
   const [result, setResult]       = useState<PaymentResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -137,6 +173,58 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     }, POLL_INTERVAL_MS)
   }, [stopPolling, failPayment])
 
+  // Editing the promo box after a code was applied or rejected clears that
+  // state, so a stale discount can't ride along on a changed input.
+  const setPromoCodeChecked = useCallback((code: string) => {
+    setPromoCode(code)
+    setPromoStatus(prevStatus => {
+      if (prevStatus !== 'idle') {
+        setAppliedPromo(null)
+        setPromoError(null)
+        return 'idle'
+      }
+      return prevStatus
+    })
+  }, [])
+
+  const applyPromo = useCallback(async (courseSlug: string) => {
+    const code = promoCode.trim()
+    if (!code) return
+    setPromoStatus('validating')
+    setPromoError(null)
+
+    const res = await paymentAPI.validatePromoCode(code, courseSlug)
+
+    if (!res.success) {
+      setPromoStatus('error')
+      setPromoError('Something went wrong checking that code. Please try again.')
+      return
+    }
+
+    const data = res.data!
+    if (!data.valid) {
+      setPromoStatus('error')
+      setAppliedPromo(null)
+      setPromoError(promoRejectionMessage(data.reason, data.detail))
+      return
+    }
+
+    setPromoStatus('applied')
+    setAppliedPromo({
+      code: data.code,
+      originalPriceKobo: data.original_price_kobo,
+      discountKobo: data.discount_kobo,
+      finalPriceKobo: data.final_price_kobo,
+    })
+    setPromoCode(data.code)
+  }, [promoCode])
+
+  const clearPromo = useCallback(() => {
+    setPromoStatus('idle')
+    setAppliedPromo(null)
+    setPromoError(null)
+  }, [])
+
   const initiatePayment = useCallback(async (courseSlug: string) => {
     setIsProcessing(true)
     setError(null)
@@ -147,7 +235,7 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Could not load payment configuration')
       }
       const { public_key } = configRes.data
-      const checkoutRes = await paymentAPI.checkout(courseSlug)
+      const checkoutRes = await paymentAPI.checkout(courseSlug, appliedPromo?.code)
       if (!checkoutRes.success) {
         throw new Error('error' in checkoutRes ? checkoutRes.error : 'Failed to initiate payment')
       }
@@ -197,7 +285,7 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
       setIsProcessing(false)
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     }
-  }, [email, pollStatus])
+  }, [email, pollStatus, appliedPromo])
 
   const retryPayment = useCallback(() => {
     stopPolling()
@@ -205,13 +293,15 @@ export function CheckoutProvider({ children }: { children: React.ReactNode }) {
     setResult(null)
     setError(null)
     setIsProcessing(false)
+    clearPromo()
     setScreen('checkout')
-  }, [stopPolling])
+  }, [stopPolling, clearPromo])
 
   return (
     <CheckoutContext.Provider value={{
-      screen, email, promoCode, reference, result, isProcessing, error,
-      setEmail, setPromoCode,
+      screen, email, promoCode, promoStatus, appliedPromo, promoError,
+      reference, result, isProcessing, error,
+      setEmail, setPromoCode: setPromoCodeChecked, applyPromo,
       go: setScreen,
       initiatePayment, retryPayment,
     }}>

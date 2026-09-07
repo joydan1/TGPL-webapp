@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
 import { useAuth } from '../../hooks/useAuth' 
 
@@ -25,6 +25,8 @@ const TRAINER_CATEGORIES: CategoryPrefs[] = [
   { id: 'studentQuestions', label: 'Students questions & feedback', inApp: true, email: false, push: true },
   { id: 'liveClassReminder', label: 'Live class reminder', inApp: false, email: true, push: true },
 ]
+
+const NOTIFICATION_SETTINGS_KEY = 'tgpl.notification-settings'
 
 const PAGE_CSS = `
   .notif-card { max-width: 720px; margin: 1.5rem auto 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; overflow: hidden; }
@@ -72,7 +74,30 @@ const isTrainer = user?.role === 'trainer'
 
   const [pauseAll, setPauseAll] = useState(false)
   const [categories, setCategories] = useState<CategoryPrefs[]>(DEFAULT_CATEGORIES)
+  const [savedSettings, setSavedSettings] = useState({ pauseAll: false, categories: DEFAULT_CATEGORIES })
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NOTIFICATION_SETTINGS_KEY)
+      if (!stored) return
+
+      const parsed = JSON.parse(stored) as {
+        role?: string
+        pauseAll?: boolean
+        categories?: CategoryPrefs[]
+      }
+      if (parsed.role && parsed.role !== user?.role) return
+
+      const nextPauseAll = parsed.pauseAll === true
+      const nextCategories = Array.isArray(parsed.categories) ? parsed.categories : DEFAULT_CATEGORIES
+      setPauseAll(nextPauseAll)
+      setCategories(nextCategories)
+      setSavedSettings({ pauseAll: nextPauseAll, categories: nextCategories })
+    } catch {
+      // Ignore malformed local settings and keep the defaults.
+    }
+  }, [user?.role])
 
   const toggleChannel = (id: string, channel: Channel) => {
     setSaved(false)
@@ -82,16 +107,16 @@ const isTrainer = user?.role === 'trainer'
   }
 
   const handleSave = () => {
-    // No notification-preferences endpoint exists yet — persisting locally only.
-    // Wire this up to PATCH /api/v1/users/me/notification-preferences/ (or similar)
-    // once the backend exposes it.
+    const nextSettings = { pauseAll, categories }
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify({ ...nextSettings, role: user?.role }))
+    setSavedSettings(nextSettings)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const handleCancel = () => {
-    setCategories(DEFAULT_CATEGORIES)
-    setPauseAll(false)
+    setCategories(savedSettings.categories)
+    setPauseAll(savedSettings.pauseAll)
     setSaved(false)
   }
 
