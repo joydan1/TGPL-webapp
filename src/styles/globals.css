@@ -144,3 +144,42 @@ input:disabled, textarea:disabled, select:disabled {
   h2 { font-size: 1.5rem; }
   h3 { font-size: 1.25rem; }
 }
+
+/* Keep existing pages and modal markup usable on narrow and short viewports. */
+@media (max-width: 640px), (max-height: 640px) {
+  .ac-overlay, .at-overlay, .cr-overlay, .dm-overlay, .da-overlay,
+  .dc-overlay, .mc-overlay, .sp-overlay, .pc-modal-overlay,
+  .logout-modal-overlay, .confirm-dialog-overlay {
+    padding: 0.75rem;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .ac-modal, .at-modal, .cr-modal, .dm-modal, .da-modal,
+  .dc-modal, .mc-modal, .sp-modal, .pc-modal, .logout-modal,
+  .confirm-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
+
+  .acm-modal, .admincdm-modal, .tx-modal, .up-modal {
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .ac-overlay, .at-overlay, .cr-overlay, .dm-overlay, .da-overlay,
+  .dc-overlay, .mc-overlay, .sp-overlay, .pc-modal-overlay,
+  .logout-modal-overlay, .confirm-dialog-overlay {
+    padding: 0.5rem;
+  }
+
+  .ac-modal, .at-modal, .cr-modal, .dm-modal, .da-modal,
+  .dc-modal, .mc-modal, .sp-modal, .pc-modal, .logout-modal,
+  .confirm-dialog, .admincdm-modal, .tx-modal, .up-modal {
+    border-radius: 0.75rem;
+  }
+}

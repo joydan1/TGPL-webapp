@@ -91,6 +91,10 @@ export const ADMIN_SHELL_CSS = `
   .mobile-tabbar { display: block; }
   .main { padding-bottom: 60px; }
 }
+@media (max-width: 900px) {
+  .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .navbar-right { gap: 0.625rem; }
+}
 `
 
 interface AdminShellProps {

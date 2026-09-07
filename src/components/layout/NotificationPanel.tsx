@@ -190,6 +190,17 @@ export const NOTIF_CSS = `
   }
   .notif-see-all:hover { opacity: 0.8; }
 
+  .notif-detail-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.35); z-index: 510; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .notif-detail { width: min(440px, 100%); background: #fff; border-radius: 1rem; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; }
+  .notif-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid #F3F4F6; }
+  .notif-detail-heading { display: flex; align-items: flex-start; gap: 0.75rem; min-width: 0; }
+  .notif-detail-title { margin: 0; font-size: 1rem; font-weight: 700; color: #111; line-height: 1.35; }
+  .notif-detail-time { margin: 0.25rem 0 0; font-size: 0.75rem; color: #9CA3AF; }
+  .notif-detail-body { padding: 1.25rem; color: #374151; font-size: 0.9rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .notif-detail-actions { display: flex; justify-content: flex-end; gap: 0.625rem; padding: 0 1.25rem 1.25rem; }
+  .notif-detail-btn { border: 1px solid #E5E7EB; background: #fff; color: #374151; border-radius: 0.625rem; padding: 0.55rem 0.8rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+  .notif-detail-btn.primary { border-color: #2492EB; background: #2492EB; color: #fff; }
+
   @media (max-width: 640px) {
     .notif-item { padding: 1rem 1.25rem; } /* slightly bigger tap targets on touch */
   }
@@ -261,6 +272,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Fetch a first page as soon as the panel opens.
@@ -326,6 +338,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   }
 
   async function openNotification(n: Notification) {
+    setSelectedNotification({ ...n, unread: false })
     if (n.unread) {
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: false } : x))
       const result = await notificationsAPI.markRead(n.id)
@@ -333,8 +346,13 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: true } : x))
       }
     }
+  }
+
+  function openRelatedPage() {
+    if (!selectedNotification?.actionUrl) return
+    setSelectedNotification(null)
     onClose()
-    if (n.actionUrl) navigate(n.actionUrl)
+    navigate(selectedNotification.actionUrl)
   }
 
   function goToAll() {
@@ -419,6 +437,31 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
           </button>
         </div>
       </div>
+      {selectedNotification && (
+        <div className="notif-detail-backdrop" onClick={() => setSelectedNotification(null)}>
+          <div className="notif-detail" role="dialog" aria-modal="true" aria-labelledby="notification-detail-title" onClick={(e) => e.stopPropagation()}>
+            <div className="notif-detail-header">
+              <div className="notif-detail-heading">
+                {notifIcon(selectedNotification.category, selectedNotification.iconBg)}
+                <div>
+                  <h2 id="notification-detail-title" className="notif-detail-title">{selectedNotification.title}</h2>
+                  <p className="notif-detail-time">{selectedNotification.time}</p>
+                </div>
+              </div>
+              <button className="notif-close" type="button" onClick={() => setSelectedNotification(null)} aria-label="Close notification details">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="notif-detail-body">{selectedNotification.sub}</div>
+            <div className="notif-detail-actions">
+              <button className="notif-detail-btn" type="button" onClick={() => setSelectedNotification(null)}>Close</button>
+              {selectedNotification.actionUrl && (
+                <button className="notif-detail-btn primary" type="button" onClick={openRelatedPage}>Open related page</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

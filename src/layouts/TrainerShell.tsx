@@ -115,6 +115,10 @@ export const SHELL_CSS = `
   .mobile-tabbar { display: block; }
   .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }  
 }
+@media (max-width: 900px) {
+  .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .navbar-right { gap: 0.625rem; }
+}
 `
 
 interface TrainerShellProps {

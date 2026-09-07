@@ -118,6 +118,10 @@ export const SHELL_CSS = `
     .navbar-page-subtitle { display: none; }
     .mobile-tabbar { display: block; }
   }
+  @media (max-width: 900px) {
+    .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .navbar-right { gap: 0.625rem; }
+  }
 `
 
 interface AppShellProps {
