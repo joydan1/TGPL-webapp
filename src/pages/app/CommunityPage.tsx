@@ -6,7 +6,7 @@ import CommunityChatPanel, { COMMUNITY_CHAT_CSS } from '../../components/communi
 import { communityAPI } from '../../services/communityApi'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
-import type { CommunityMessage } from '../../types/community'
+import type { CommunityMessage, CommunityRule } from '../../types/community'
 
 const PAGE_CSS = `
   .community-page-content { padding: 20px; height: calc(100vh - 90px); box-sizing: border-box; }
@@ -23,7 +23,8 @@ export default function CommunityPage() {
   const [messages, setMessages] = useState<CommunityMessage[]>([])
   const [activeMembers, setActiveMembers] = useState(0)
   const [totalMembers, setTotalMembers] = useState(0)
-  const [rules, setRules] = useState<string[] | null>(null)
+ const [rules, setRules] = useState<CommunityRule[] | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -72,7 +73,7 @@ export default function CommunityPage() {
   useEffect(() => {
     if (!user) return
     communityAPI.getRules().then((res) => {
-      if (res.success) setRules(res.data.rules.map((r) => r.text))
+      if (res.success) setRules(res.data.rules)
     })
   }, [user])
 

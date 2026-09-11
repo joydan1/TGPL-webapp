@@ -1,12 +1,12 @@
 // components/community/CommunityChatPanel.tsx
 
-
 import { useEffect, useRef, useState } from 'react'
 import {
   Hash, ShieldCheck, ChevronDown, ChevronUp, Pin, Reply, Copy, Trash2,
   Smile, Send, X, MessageSquare,
 } from 'lucide-react'
-import type { CommunityMessage, CommunityRole } from '../../types/community'
+import type { CommunityMessage, CommunityRole, CommunityReaction, CommunityRule } from '../../types/community'
+import { communityAPI } from '../../services/communityApi'
 
 export const COMMUNITY_CHAT_CSS = `
   .cc-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #F7F7F7; position: relative; overflow: hidden; }
@@ -57,8 +57,10 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-bubble-wrap:hover .cc-menu-btn, .cc-menu-btn.open { opacity: 1; }
 
   .cc-reactions { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
-  .cc-reaction-btn { border: 1px solid #EBEBEB; background: #fff; border-radius: 999px; padding: 3px 7px; font-size: 13px; cursor: pointer; line-height: 1; }
+  .cc-reaction-btn { border: 1px solid #EBEBEB; background: #fff; border-radius: 999px; padding: 3px 7px; font-size: 13px; cursor: pointer; line-height: 1; display: flex; align-items: center; gap: 4px; }
   .cc-reaction-btn.active { background: #E9F5FF; border-color: #2492EB; }
+  .cc-reaction-count { font-size: 11px; font-weight: 600; color: #616873; }
+  .cc-reaction-btn.active .cc-reaction-count { color: #2492EB; }
   .cc-reaction-add { border: 1px solid #EBEBEB; background: #fff; color: #99A1AF; border-radius: 999px; padding: 3px 7px; font-size: 12px; cursor: pointer; }
   .cc-reaction-add:hover, .cc-reaction-btn:hover { border-color: #2492EB; }
   .cc-reaction-picker { display: flex; gap: 2px; padding: 4px; background: #fff; border: 1px solid #EBEBEB; border-radius: 999px; box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
@@ -106,7 +108,6 @@ export const COMMUNITY_CHAT_CSS = `
 
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮']
-const REACTIONS_STORAGE_KEY = 'tgpl-community-reactions'
 const AVATAR_COLORS = ['#0891B2', '#10B981', '#D97706', '#8B5CF6', '#2492EB', '#EC4899']
 
 function initialsOf(name: string): string {
@@ -152,8 +153,6 @@ interface MessageMenuAction {
   icon: typeof Reply
   danger?: boolean
 }
-
-
 function buildMenuActions(isMine: boolean, viewerRole: CommunityRole): MessageMenuAction[] {
   const actions: MessageMenuAction[] = [
     { key: 'reply', label: 'Reply in thread', icon: Reply },
@@ -175,16 +174,16 @@ interface MessageRowProps {
   currentUserId: string
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
-  selectedReactions: string[]
+  reactions: CommunityReaction[]
   onReact: (messageId: string, emoji: string) => void
   onOpenThread: (topLevelMessage: CommunityMessage) => void
 }
 
-function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator, selectedReactions, onReact, onOpenThread }: MessageRowProps) {
+function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteModerator, reactions, onReact, onOpenThread }: MessageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const isMine = msg.author.id !== null && msg.author.id === currentUserId
-  const actions = buildMenuActions(isMine, viewerRole)
+ const actions = buildMenuActions(isMine, viewerRole)
   const displayName = isMine ? 'You' : msg.author.full_name
   const roleLabel = msg.author.role ? msg.author.role[0].toUpperCase() + msg.author.role.slice(1) : null
 
@@ -229,9 +228,16 @@ function MessageRow({ msg, viewerRole, currentUserId, onDeleteMine, onDeleteMode
           )}
         </div>
         <div className="cc-reactions">
-          {selectedReactions.map((emoji) => (
-            <button key={emoji} className="cc-reaction-btn active" type="button" onClick={() => onReact(msg.id, emoji)} aria-label={`Remove ${emoji} reaction`}>
-              {emoji}
+          {reactions.map((r) => (
+            <button
+              key={r.emoji}
+              className={`cc-reaction-btn${r.reacted_by_me ? ' active' : ''}`}
+              type="button"
+              onClick={() => onReact(msg.id, r.emoji)}
+              aria-label={r.reacted_by_me ? `Remove ${r.emoji} reaction` : `React with ${r.emoji}`}
+            >
+              <span>{r.emoji}</span>
+              <span className="cc-reaction-count">{r.count}</span>
             </button>
           ))}
           {reactionPickerOpen ? (
@@ -270,7 +276,7 @@ interface ThreadPanelProps {
   onSendReply: (body: string) => void
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
-  reactions: Record<string, string[]>
+  reactions: Record<string, CommunityReaction[]>
   onReact: (messageId: string, emoji: string) => void
 }
 
@@ -328,7 +334,7 @@ function ThreadPanel({
               key={r.id}
               onDeleteMine={onDeleteMine}
               onDeleteModerator={onDeleteModerator}
-              selectedReactions={reactions[r.id] ?? []}
+              reactions={reactions[r.id] ?? []}
               onReact={onReact}
               onOpenThread={() => {}} // replies can't have their own thread
             />
@@ -368,7 +374,7 @@ export interface CommunityChatPanelProps {
   messages: CommunityMessage[]
   activeMembers: number
   totalMembers: number
-  rules: string[] | null
+  rules: CommunityRule[] | null
   loading: boolean
   error: string | null
   sending: boolean
@@ -396,32 +402,32 @@ export default function CommunityChatPanel({
   const [rulesOpen, setRulesOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const [reactions, setReactions] = useState<Record<string, string[]>>(() => {
-    try {
-      const stored = localStorage.getItem(`${REACTIONS_STORAGE_KEY}:${currentUserId}`)
-      if (!stored) return {}
-      const parsed: unknown = JSON.parse(stored)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      return parsed as Record<string, string[]>
-    } catch {
-      return {}
-    }
-  })
+  const [reactions, setReactions] = useState<Record<string, CommunityReaction[]>>({})
   const emojiRef = useRef<HTMLDivElement>(null)
 
+  // Server is the source of truth for reactions — messages/replies already carry
+  // a `reactions` array on every poll, so just mirror it into local state.
   useEffect(() => {
-    localStorage.setItem(`${REACTIONS_STORAGE_KEY}:${currentUserId}`, JSON.stringify(reactions))
-  }, [currentUserId, reactions])
-
-  function onReact(messageId: string, emoji: string) {
     setReactions((prev) => {
-      const selected = prev[messageId] ?? []
-      const next = selected.includes(emoji)
-        ? selected.filter((item) => item !== emoji)
-        : [...selected, emoji]
-      return { ...prev, [messageId]: next }
+      const next = { ...prev }
+      messages.forEach((m) => { next[m.id] = m.reactions ?? [] })
+      threadReplies.forEach((r) => { next[r.id] = r.reactions ?? [] })
+      return next
     })
+  }, [messages, threadReplies])
+
+  async function onReact(messageId: string, emoji: string) {
+  const current = reactions[messageId] ?? []
+  const mine = current.some((r) => r.emoji === emoji && r.reacted_by_me)
+
+  const result = mine
+    ? await communityAPI.removeReaction(messageId, emoji)
+    : await communityAPI.addReaction(messageId, emoji)
+
+  if (result.success) {
+    setReactions((prev) => ({ ...prev, [messageId]: result.data.reactions }))
   }
+}
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -468,8 +474,8 @@ export default function CommunityChatPanel({
         <div className="cc-rules-panel">
           <p className="cc-rules-eyebrow"><Pin size={11} /> Pinned · Community rules</p>
           <ul className="cc-rules-list">
-            {rules.map((r, i) => (
-              <li key={i}><span className="cc-rules-num">{i + 1}</span>{r}</li>
+            {rules.map((rule, i) => (
+              <li key={rule.id}><span className="cc-rules-num">{i + 1}</span>{rule.text}</li>
             ))}
           </ul>
         </div>
@@ -489,7 +495,7 @@ export default function CommunityChatPanel({
             key={msg.id}
             onDeleteMine={onDeleteMine}
             onDeleteModerator={onDeleteModerator}
-            selectedReactions={reactions[msg.id] ?? []}
+            reactions={reactions[msg.id] ?? []}
             onReact={onReact}
             onOpenThread={onOpenThread}
           />

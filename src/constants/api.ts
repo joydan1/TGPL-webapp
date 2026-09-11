@@ -29,7 +29,7 @@ export const API_ENDPOINTS = {
     `/v1/courses/manage/modules/${moduleId}/lessons/reorder/`,
   COURSES_MANAGE_LESSON_DETAIL: (lessonId: string) => `/v1/courses/manage/lessons/${lessonId}/`,
 
-   // Courses — uploads (used for cover image, lesson video, lesson resources)
+  // Courses — uploads (used for lesson video and lesson resources)
   COURSES_UPLOADS_PRESIGN: '/v1/courses/uploads/presign/',
   COURSES_UPLOADS_CONFIRM: '/v1/courses/uploads/confirm/',
  

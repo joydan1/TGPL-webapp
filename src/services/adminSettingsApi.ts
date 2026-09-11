@@ -49,17 +49,10 @@ export const adminSettingsAPI = {
 
 export const NO_OP_ERROR_MESSAGE = NO_OP_MESSAGE
 
-// ── Admin's own profile — endpoints below remain UNCONFIRMED placeholders.
-// Only /admin/settings/, /admin/settings/audit-log/, /admin/settings/sections/,
-// and the admin-recovery group have been verified against Swagger so far.
-// Nothing under /admin/profile/ has been confirmed to exist. Treat this whole
-// block as provisional until a backend dev confirms real paths — the Profile
-// tab shows an "unconfirmed" banner and its Save/Update actions should be
-// expected to fail until then.
 export const adminProfileAPI = {
   async getProfile(): Promise<ApiResult<AdminProfile>> {
     try {
-      const res = await apiClient.get<AdminProfile>('/admin/profile/')
+      const res = await apiClient.get<AdminProfile>('/v1/auth/me/')
       return { success: true, data: res.data }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to load profile')
@@ -69,24 +62,35 @@ export const adminProfileAPI = {
 
   async updateProfile(payload: Partial<Pick<AdminProfile, 'full_name' | 'email' | 'phone'>>): Promise<ApiResult<AdminProfile>> {
     try {
-      const res = await apiClient.patch<AdminProfile>('/admin/profile/', payload)
+      const res = await apiClient.patch<AdminProfile>('/v1/auth/me/', payload)
       return { success: true, data: res.data }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to update profile')
       return { success: false, error: message, statusCode }
     }
   },
-
+ async uploadAvatar(file: File): Promise<ApiResult<{ avatar_url: string }>> {
+    try {
+      const form = new FormData()
+      form.append('avatar', file)
+      const res = await apiClient.post<{ avatar_url: string }>('/v1/auth/me/avatar/', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return { success: true, data: res.data }
+    } catch (err) {
+      const { message, statusCode } = parseApiError(err, 'Failed to upload photo')
+      return { success: false, error: message, statusCode }
+    }
+  },
   async changePassword(payload: { current_password: string; new_password: string }): Promise<ApiResult<{ message: string }>> {
     try {
-      const res = await apiClient.post<{ message: string }>('/admin/profile/change-password/', payload)
+      const res = await apiClient.post<{ message: string }>('/v1/auth/password-change/', payload)
       return { success: true, data: res.data }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to change password')
       return { success: false, error: message, statusCode }
     }
   },
-
   async setTwoFactor(enabled: boolean): Promise<ApiResult<{ two_factor_enabled: boolean }>> {
     try {
       const res = await apiClient.patch<{ two_factor_enabled: boolean }>('/admin/profile/two-factor/', { enabled })

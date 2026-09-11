@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import {
   Settings as SettingsIcon, User, CreditCard, Bell, Award, Wrench, Check,
   ShieldCheck, ExternalLink, Upload, Eye, EyeOff, AlertTriangle, Camera,
-  Loader2, Lock,
+  Loader2,
 } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
+import MaintenanceScreen from '../../components/MaintenanceScreen'
 import { adminSettingsAPI, adminProfileAPI, NO_OP_ERROR_MESSAGE } from '../../services/adminSettingsApi'
 import {
-  SETTINGS_SECTIONS, CERTIFICATE_TEMPLATES, SESSION_TIMEOUT_OPTIONS,
+  SETTINGS_SECTIONS, CERTIFICATE_TEMPLATES,
   type SystemSettings, type PatchedSystemSettings, type FieldConfig, type FieldGroup,
-  type AdminProfile, type AdminSession, type SectionConfig, type SelectOption,
+  type AdminProfile, type SectionConfig, type SelectOption,
 } from '../../types/adminSettings'
 
 // Link out to manage live Paystack credentials — replace with your actual dashboard URL.
@@ -120,13 +121,6 @@ const PAGE_CSS = `
   .as-password-btn { height: 36px; padding: 0 20px; background: #2492EB; color: #fff; border: none; border-radius: 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .as-password-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .as-session-list { display: flex; flex-direction: column; gap: 8px; width: 240px; }
-  .as-session-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #F7F7F7; border: 1px solid #EBEBEB; border-radius: 14px; }
-  .as-session-device { font-size: 11px; font-weight: 600; color: #2B2B2C; }
-  .as-session-location { font-size: 10px; color: #99A1AF; margin-top: 1px; }
-  .as-session-current { padding: 2px 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 999px; font-size: 10px; font-weight: 600; color: #10B981; }
-  .as-session-revoke { border: none; background: none; color: #FF6467; font-size: 10px; font-weight: 600; cursor: pointer; }
-
   .as-loading, .as-error, .as-empty { padding: 3rem 1.5rem; text-align: center; color: #99A1AF; font-size: 0.875rem; }
   .as-error { color: #DC2626; }
   .as-feedback { margin: 16px 24px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
@@ -140,7 +134,7 @@ const PAGE_CSS = `
     .as-content { padding: 0 16px 16px; }
     .as-content-inner { padding: 16px 0 0; }
     .as-row { flex-direction: column; align-items: stretch; gap: 8px; }
-    .as-row-input.wide, .as-password-input-wrap, .as-session-list { width: 100%; }
+    .as-row-input.wide, .as-password-input-wrap { width: 100%; }
     .as-cert-grid { grid-template-columns: 1fr; }
   }
 `
@@ -155,7 +149,9 @@ const SECTION_ICONS: Record<string, typeof SettingsIcon> = {
 }
 
 const NAV_ORDER = ['general', 'profile', 'payment', 'notifications', 'certificates', 'maintenance']
-
+const FIELD_AVAILABILITY: Partial<Record<keyof SystemSettings, boolean>> = Object.fromEntries(
+  SETTINGS_SECTIONS.flatMap((s) => s.groups.flatMap((g) => g.fields.map((f) => [f.key, f.available])))
+)
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function timeToInputValue(v: string | null): string {
@@ -231,6 +227,12 @@ export default function AdminSettingsPage() {
       setFeedback({ type: 'error', text: 'Set both quiet-hours times before saving, or turn quiet hours off.' })
       return
     }
+
+   const unavailableKeys = Object.keys(dirty).filter((k) => FIELD_AVAILABILITY[k as keyof SystemSettings] === false)
+   if (unavailableKeys.length > 0) {
+     setFeedback({ type: 'error', text: "These settings aren't supported by the backend yet, so nothing was saved for them." })
+     return
+   }
     setSaving(true)
     setFeedback(null)
     const result = await adminSettingsAPI.updateSettings({ ...dirty })
@@ -527,7 +529,7 @@ function MaintenancePanel({
           <div>
             <p className="as-maint-toggle-title">Maintenance mode</p>
             <p className="as-maint-toggle-sub">
-              {isOn ? 'Non-admin users currently see a 503 page. Admin settings remain reachable.' : 'Platform is live and accessible to all users.'}
+              {isOn ? 'Non-admin users currently see the maintenance screen below. Admin settings remain reachable.' : 'Platform is live and accessible to all users.'}
             </p>
           </div>
         </div>
@@ -572,16 +574,7 @@ function MaintenancePanel({
 
           <div className="as-card">
             <div className="as-preview-card-head">Maintenance screen preview</div>
-            <div className="as-preview-body">
-              <div className="as-preview-icon"><AlertTriangle size={26} /></div>
-              <p className="as-preview-title">TGPL — The Global Project Leaders</p>
-              <p className="as-preview-text">{message || 'The platform is currently undergoing scheduled maintenance. We\u2019ll back shortly — thank you for your patience.'}</p>
-              {endTime && <p className="as-preview-eta">Expected back: {new Date(endTime).toLocaleString()}</p>}
-              <div className="as-preview-contact">
-                <span className="as-preview-dot" />
-                Need help? Contact <a href="mailto:support@tgpl.academy">support@tgpl.academy</a>
-              </div>
-            </div>
+            <MaintenanceScreen message={message} endTime={endTime} />
           </div>
         </>
       )}
@@ -589,40 +582,72 @@ function MaintenancePanel({
   )
 }
 
+// ─── Profile panel ──────────────────────────────────────────────────────────
 
-// ─── Profile panel (unconfirmed backend — see adminSettingsApi.ts comment) ──
- 
 function ProfilePanel() {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
-  const [sessions, setSessions] = useState<AdminSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
- 
+
+  const [nameDraft, setNameDraft] = useState('')
+  const [emailDraft, setEmailDraft] = useState('')
+  const [phoneDraft, setPhoneDraft] = useState('')
+  const [infoSaving, setInfoSaving] = useState(false)
+  const [infoFeedback, setInfoFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwFeedback, setPwFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
- 
+
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
       setError(null)
-      const [profileRes, sessionsRes] = await Promise.all([adminProfileAPI.getProfile(), adminProfileAPI.getSessions()])
+      const res = await adminProfileAPI.getProfile()
       if (cancelled) return
-      if (profileRes.success) setProfile(profileRes.data)
-      else setError(profileRes.error)
-      if (sessionsRes.success) setSessions(sessionsRes.data)
+      if (res.success) {
+        setProfile(res.data)
+        setNameDraft(res.data.full_name)
+        setEmailDraft(res.data.email)
+        setPhoneDraft(res.data.phone ?? '')
+      } else {
+        setError(res.error)
+      }
       setLoading(false)
     }
     load()
     return () => { cancelled = true }
   }, [])
- 
+
+  const infoDirty = profile
+    ? (nameDraft !== profile.full_name || emailDraft !== profile.email || phoneDraft !== (profile.phone ?? ''))
+    : false
+
+  async function handleSaveInfo() {
+    if (!infoDirty) return
+    setInfoSaving(true)
+    setInfoFeedback(null)
+    const res = await adminProfileAPI.updateProfile({ full_name: nameDraft, email: emailDraft, phone: phoneDraft || null })
+    setInfoSaving(false)
+    if (res.success) { setProfile(res.data); setInfoFeedback({ type: 'success', text: 'Profile updated.' }) }
+    else setInfoFeedback({ type: 'error', text: apiErrorMessage(res.error) })
+  }
+
+  async function handleAvatarChange(file: File) {
+    setAvatarUploading(true)
+    const res = await adminProfileAPI.uploadAvatar(file)
+    setAvatarUploading(false)
+    if (res.success && profile) setProfile({ ...profile, avatar_url: res.data.avatar_url })
+  }
+
   const pwValid = currentPw.length > 0 && newPw.length >= 8 && newPw === confirmPw
- 
+
   async function handleChangePassword() {
     if (!pwValid) return
     setPwSaving(true)
@@ -632,64 +657,57 @@ function ProfilePanel() {
     if (res.success) { setPwFeedback({ type: 'success', text: 'Password updated.' }); setCurrentPw(''); setNewPw(''); setConfirmPw('') }
     else setPwFeedback({ type: 'error', text: apiErrorMessage(res.error) })
   }
- 
-  async function handleToggle2FA(enabled: boolean) {
-    if (!profile) return
-    setProfile({ ...profile, two_factor_enabled: enabled })
-    const res = await adminProfileAPI.setTwoFactor(enabled)
-    if (!res.success) setProfile({ ...profile, two_factor_enabled: !enabled })
-  }
- 
-  async function handleRevoke(sessionId: string) {
-    const prev = sessions
-    setSessions((s) => s.filter((sess) => sess.id !== sessionId))
-    const res = await adminProfileAPI.revokeSession(sessionId)
-    if (!res.success) setSessions(prev)
-  }
- 
+
   if (loading) return <div className="as-loading">Loading profile…</div>
   if (error || !profile) return <div className="as-error">{error || 'Could not load profile.'}</div>
- 
+
   return (
     <>
-      <div className="as-unavailable-banner" style={{ margin: '0 0 20px' }}>
-        <Lock size={13} /> The Profile tab's endpoints aren't confirmed against the backend yet — actions here may not persist.
-      </div>
- 
       <div className="as-profile-head">
         <div className="as-avatar">
           {profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 16, objectFit: 'cover' }} /> : initials(profile.full_name)}
-          <span className="as-avatar-edit"><Camera size={11} /></span>
+          <label className="as-avatar-edit" style={{ cursor: 'pointer' }}>
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f) }} />
+            <Camera size={11} />
+          </label>
         </div>
         <div>
           <p className="as-profile-name">{profile.full_name}</p>
           <p className="as-profile-email">{profile.email}</p>
           <span className="as-profile-role"><ShieldCheck size={10} /> {profile.role}</span>
         </div>
-        <button className="as-upload-photo-btn" type="button"><Camera size={13} /> Upload photo</button>
+        <label className="as-upload-photo-btn" style={{ cursor: 'pointer' }}>
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f) }} />
+          <Camera size={13} /> {avatarUploading ? 'Uploading…' : 'Upload photo'}
+        </label>
       </div>
- 
+
       <div className="as-card">
         <div className="as-card-head">
           <div className="as-card-icon"><User size={15} /></div>
           <div><p className="as-card-title">Personal information</p><p className="as-card-desc">Your name and contact details visible to the platform</p></div>
         </div>
         <div className="as-card-body">
+          {infoFeedback && <div className={`as-feedback ${infoFeedback.type}`} style={{ margin: '12px 0 0' }}>{infoFeedback.text}</div>}
           <div className="as-row">
             <div className="as-row-label"><p className="as-row-label-title">Full name</p><p className="as-row-label-help">Displayed in admin activity logs and certificates</p></div>
-            <div className="as-row-input wide"><input className="as-input" value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} /></div>
+            <div className="as-row-input wide"><input className="as-input" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} /></div>
           </div>
           <div className="as-row">
             <div className="as-row-label"><p className="as-row-label-title">Email address</p><p className="as-row-label-help">Used for login and all admin notifications</p></div>
-            <div className="as-row-input wide"><input className="as-input" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} /></div>
+            <div className="as-row-input wide"><input className="as-input" type="email" value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} /></div>
           </div>
           <div className="as-row">
-            <div className="as-row-label"><p className="as-row-label-title">Phone number</p><p className="as-row-label-help">Used for 2FA and urgent account alerts</p></div>
-            <div className="as-row-input wide"><input className="as-input" type="tel" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></div>
+            <div className="as-row-label"><p className="as-row-label-title">Phone number</p><p className="as-row-label-help">Used for urgent account alerts</p></div>
+            <div className="as-row-input wide"><input className="as-input" type="tel" value={phoneDraft} onChange={(e) => setPhoneDraft(e.target.value)} /></div>
+          </div>
+          <div className="as-row" style={{ borderBottom: 'none' }}>
+            <div />
+            <button className="as-password-btn" type="button" disabled={!infoDirty || infoSaving} onClick={handleSaveInfo}>{infoSaving ? 'Saving…' : 'Save changes'}</button>
           </div>
         </div>
       </div>
- 
+
       <div className="as-card">
         <div className="as-card-head">
           <div className="as-card-icon"><ShieldCheck size={15} /></div>
@@ -715,41 +733,36 @@ function ProfilePanel() {
           </div>
         </div>
       </div>
- 
-      <div className="as-card">
+
+      <div className="as-card" style={{ opacity: 0.6 }}>
         <div className="as-card-head">
           <div className="as-card-icon"><ShieldCheck size={15} /></div>
-          <div><p className="as-card-title">Security</p><p className="as-card-desc">Two-factor authentication and session management</p></div>
+          <div>
+            <p className="as-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              Security
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#99A1AF', background: '#F3F4F6', border: '1px solid #EBEBEB', borderRadius: 999, padding: '2px 8px' }}>
+                Coming soon
+              </span>
+            </p>
+            <p className="as-card-desc">Two-factor authentication and session management — not yet available</p>
+          </div>
         </div>
         <div className="as-card-body">
           <div className="as-row">
             <div className="as-row-label"><p className="as-row-label-title">Two-factor authentication</p><p className="as-row-label-help">Adds an OTP step via SMS or authenticator app on every login</p></div>
             <div className="as-toggle-row">
-              <span className={`as-toggle-label ${profile.two_factor_enabled ? 'on' : 'off'}`}>{profile.two_factor_enabled ? 'Enabled' : 'Disabled'}</span>
+              <span className="as-toggle-label off">Disabled</span>
               <label className="as-toggle">
-                <input type="checkbox" checked={profile.two_factor_enabled} onChange={(e) => handleToggle2FA(e.target.checked)} />
+                <input type="checkbox" checked={false} disabled />
                 <span className="as-toggle-track" />
                 <span className="as-toggle-thumb" />
               </label>
             </div>
           </div>
-          <div className="as-row">
-            <div className="as-row-label"><p className="as-row-label-title">Session timeout</p><p className="as-row-label-help">Automatically log out after this period of inactivity</p></div>
-            <div className="as-row-input wide">
-              <select className="as-input" value={String(profile.session_timeout_minutes)} onChange={(e) => { const m = Number(e.target.value); setProfile({ ...profile, session_timeout_minutes: m }); adminProfileAPI.setSessionTimeout(m) }}>
-                {SESSION_TIMEOUT_OPTIONS.map((opt: SelectOption) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
-            </div>
-          </div>
           <div className="as-row" style={{ borderBottom: 'none' }}>
-            <div className="as-row-label"><p className="as-row-label-title">Active sessions</p><p className="as-row-label-help">Devices currently logged into your admin account</p></div>
-            <div className="as-session-list">
-              {sessions.map((s) => (
-                <div className="as-session-item" key={s.id}>
-                  <div><div className="as-session-device">{s.device_label}</div><div className="as-session-location">{s.location}</div></div>
-                  {s.is_current ? <span className="as-session-current">This device</span> : <button className="as-session-revoke" type="button" onClick={() => handleRevoke(s.id)}>Revoke</button>}
-                </div>
-              ))}
+            <div className="as-row-label"><p className="as-row-label-title">Session timeout &amp; active sessions</p><p className="as-row-label-help">Session tracking isn't built yet — this will let you see and revoke logged-in devices once it is</p></div>
+            <div className="as-row-input wide">
+              <input className="as-input readonly" readOnly value="Not available yet" />
             </div>
           </div>
         </div>
@@ -757,6 +770,7 @@ function ProfilePanel() {
     </>
   )
 }
+
 function PasswordInput({
   value, onChange, show, onToggleShow, placeholder,
 }: {

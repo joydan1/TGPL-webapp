@@ -278,6 +278,7 @@ const PAGE_CSS = `
   .ac-visibility-check { margin-left: auto; color: #2492EB; flex-shrink: 0; }
 
   .ac-preview-player { border: 1px solid #E5E7EB; border-radius: 1rem; overflow: hidden; margin-bottom: 1.25rem; }
+  .ac-preview-cover { width: 100%; aspect-ratio: 16 / 9; display: block; object-fit: cover; background: #F3F4F6; }
   .ac-preview-video-real { width: 100%; aspect-ratio: 16 / 9; display: block; background: #111; }
   .ac-preview-video { position: relative; background: #111; aspect-ratio: 16 / 9; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; color: #fff; background-image: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.45)); background-size: cover; background-position: center; }
   .ac-preview-video-empty { justify-content: flex-start; color: #D1D5DB; }
@@ -375,6 +376,7 @@ export default function AddCoursePage() {
 
   const previewLesson = form.lessons.find((l) => l.videoFile) ?? form.lessons.find((l) => l.existingVideoUrl)
   const [previewVideoSrc, setPreviewVideoSrc] = useState<string | null>(null)
+  const [previewCoverSrc, setPreviewCoverSrc] = useState<string | null>(null)
 
   useEffect(() => {
     if (previewLesson?.videoFile) {
@@ -391,6 +393,16 @@ export default function AddCoursePage() {
     // Only re-run when the actual video source changes, not on every keystroke elsewhere in the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewLesson?.videoFile, previewLesson?.existingVideoUrl])
+
+  useEffect(() => {
+    if (form.coverImage) {
+      const objectUrl = URL.createObjectURL(form.coverImage)
+      setPreviewCoverSrc(objectUrl)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+    setPreviewCoverSrc(form.existingCoverImageUrl)
+    return
+  }, [form.coverImage, form.existingCoverImageUrl])
 
   // Edit mode: load the existing course + curriculum and pre-fill every step.
   useEffect(() => {
@@ -477,7 +489,7 @@ export default function AddCoursePage() {
         language: draft.language ?? '',
         level: draft.level ?? '',
         coverImage: null,
-        existingCoverImageUrl: draft.cover_image_url ?? null,
+        existingCoverImageUrl: draft.cover_image_url ?? (draft as typeof draft & { thumbnail_url?: string | null }).thumbnail_url ?? null,
         description: draft.description ?? '',
         expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes.slice(0, 8) : ['', ''],
         targetAudience: draft.target_audience?.[0] ?? '',
@@ -551,8 +563,6 @@ export default function AddCoursePage() {
       if (result.data.slug) setCourseSlug(result.data.slug)
     }
 
-    
-
     setSaving(false)
     setStep(2)
   }
@@ -582,6 +592,13 @@ export default function AddCoursePage() {
     if (!courseId) return
     setSaving(true)
     setSaveError(null)
+
+    const titledLessons = form.lessons.filter((lesson) => lesson.title.trim())
+    if (titledLessons.length === 0) {
+      setSaveError('Add a lesson title before continuing. Empty lesson cards are not saved.')
+      setSaving(false)
+      return
+    }
 
     let activeModuleId = moduleId
     if (!activeModuleId) {
@@ -643,6 +660,10 @@ export default function AddCoursePage() {
           setSaving(false)
           return
         }
+        updateLesson(lesson.id, {
+          existingVideoUrl: uploadResult.data.url ?? lesson.existingVideoUrl,
+          videoUploaded: true,
+        })
       }
 
       if (lesson.materialFiles.length > 0 && !lesson.materialsUploaded) {
@@ -1003,7 +1024,7 @@ export default function AddCoursePage() {
                         </>
                       )}
                     </label>
-                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · upload isn't wired up yet — the backend endpoint for this doesn't exist/isn't confirmed</p>
+                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · cover images are shown in this preview but are not saved until the backend adds course-cover uploads.</p>
                   </div>
                 </div>
               </>
@@ -1293,6 +1314,9 @@ export default function AddCoursePage() {
                 <p className="ac-section-sub">Check everything looks right before going live.</p>
 
                 <div className="ac-preview-player">
+                  {previewCoverSrc && (
+                    <img className="ac-preview-cover" src={previewCoverSrc} alt="Course cover preview" />
+                  )}
                   {previewVideoSrc ? (
                     <video
                       key={previewVideoSrc}

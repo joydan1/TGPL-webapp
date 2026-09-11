@@ -299,6 +299,34 @@ export const apiClient = new ApiClient()
 
 // ─── Error parser helper ──────────────────────────────────────────────────────
 
+function formatApiErrorValue(value: unknown): string | null {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+
+  if (Array.isArray(value)) {
+    const messages = value.map(formatApiErrorValue).filter((message): message is string => Boolean(message))
+    return messages.length ? messages.join('; ') : null
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const message = formatApiErrorValue(record.message ?? record.detail)
+    if (message && typeof record.field === 'string') return `${record.field}: ${message}`
+    if (message) return message
+
+    const entries = Object.entries(record)
+      .filter(([key]) => key !== 'code')
+      .map(([key, entry]) => {
+        const formatted = formatApiErrorValue(entry)
+        return formatted ? `${key}: ${formatted}` : null
+      })
+      .filter((entry): entry is string => Boolean(entry))
+    return entries.length ? entries.join('; ') : null
+  }
+
+  return null
+}
+
 export function parseApiError(error: unknown, fallback: string): { message: string; statusCode?: number; code?: string } {
   const err = error as AxiosError<ApiErrorResponse>
   const data = err.response?.data
@@ -311,11 +339,7 @@ export function parseApiError(error: unknown, fallback: string): { message: stri
       message = data.detail
     } else {
       const firstKey = Object.keys(data).find((k) => k !== 'code')
-      if (firstKey) {
-        const val = data[firstKey]
-        if (Array.isArray(val)) message = val[0]
-        else if (typeof val === 'string') message = val
-      }
+      if (firstKey) message = formatApiErrorValue(data[firstKey]) ?? fallback
     }
   }
 
@@ -1413,7 +1437,7 @@ export interface CourseCurriculumModule extends CourseModule {
 export interface CourseCurriculumResponse {
   modules: CourseCurriculumModule[]
 }
-export type UploadTarget = 'course_cover' | 'lesson_video' | 'lesson_resource'
+export type UploadTarget = 'lesson_video' | 'lesson_resource'
  
 export interface PresignUploadPayload {
   target: UploadTarget
@@ -1443,7 +1467,7 @@ export interface ConfirmUploadPayload {
  
 export interface ConfirmUploadResponse {
   key: string
-  url: string
+  url?: string
 }
  
 // ─── Courses Manage API (trainer course-builder wizard) ───────────────────
@@ -1703,6 +1727,23 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
+   uploadCoverImage: async (courseId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('cover_image_url', file)
+
+    try {
+      const response = await apiClient.patch<CourseDraft>(
+        API_ENDPOINTS.COURSES_MANAGE_DETAIL(courseId),
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      return { success: true as const, data: response.data }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to upload cover image')
+      return { success: false as const, error: message, statusCode }
+    }
+  },
+
 
 }
 export interface TrainerDashboardSummary {

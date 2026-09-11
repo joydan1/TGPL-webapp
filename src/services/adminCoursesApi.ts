@@ -62,12 +62,10 @@ export const adminCoursesAPI = {
       return { success: true as const, data: null }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to delete course')
-      // 409 here means protected payment/enrollment/certificate history —
-      // surface that plainly so the admin knows to archive instead.
       if (statusCode === 409) {
         return {
           success: false as const,
-          error: 'This course has payment, enrollment, or certificate history and can\'t be deleted — archive it instead.',
+          error: message,
           statusCode,
         }
       }

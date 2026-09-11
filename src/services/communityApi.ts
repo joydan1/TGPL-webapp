@@ -1,6 +1,8 @@
+// services/communityApi.ts
+
 import { apiClient } from './api'
 import type {
-  CommunityFeedResponse, CommunityMessage, CommunityRepliesResponse, CommunityRules,
+  CommunityFeedResponse, CommunityMessage, CommunityRepliesResponse, CommunityRules, CommunityReaction,
 } from '../types/community'
 
 type ApiResult<T> =
@@ -18,7 +20,6 @@ async function getMessages(since?: string): Promise<ApiResult<CommunityFeedRespo
     return { success: false, error: 'Failed to load the community chat.' }
   }
 }
-
 
 async function sendMessage(body: string, parentMessageId?: string): Promise<ApiResult<CommunityMessage>> {
   try {
@@ -53,6 +54,31 @@ async function moderateDeleteMessage(messageId: string): Promise<ApiResult<null>
   }
 }
 
+async function addReaction(messageId: string, emoji: string): Promise<ApiResult<{ reactions: CommunityReaction[] }>> {
+  try {
+    const res = await apiClient.post<{ reactions: CommunityReaction[] }>(
+      `/v1/community/messages/${messageId}/reactions/`,
+      { emoji },
+    )
+    return { success: true, data: res.data }
+  } catch (err) {
+    console.error('Failed to add reaction:', err)
+    return { success: false, error: 'Could not add that reaction.' }
+  }
+}
+
+async function removeReaction(messageId: string, emoji: string): Promise<ApiResult<{ reactions: CommunityReaction[] }>> {
+  try {
+    const res = await apiClient.delete<{ reactions: CommunityReaction[] }>(
+      `/v1/community/messages/${messageId}/reactions/`,
+      { params: { emoji } }, // query string — DELETE bodies aren't reliably transmitted
+    )
+    return { success: true, data: res.data }
+  } catch (err) {
+    console.error('Failed to remove reaction:', err)
+    return { success: false, error: 'Could not remove that reaction.' }
+  }
+}
 
 async function getReplies(parentId: string, since?: string): Promise<ApiResult<CommunityRepliesResponse>> {
   try {
@@ -82,6 +108,8 @@ export const communityAPI = {
   sendMessage,
   deleteMessage,
   moderateDeleteMessage,
+  addReaction,
+  removeReaction,
   getReplies,
   getRules,
 }

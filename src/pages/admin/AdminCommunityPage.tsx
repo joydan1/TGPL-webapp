@@ -4,7 +4,8 @@ import AdminShell from '../../layouts/AdminShell'
 import CommunityChatPanel, { COMMUNITY_CHAT_CSS } from '../../components/community/CommunityChatPanel'
 import { communityAPI } from '../../services/communityApi'
 import { useAuth } from '../../hooks/useAuth'
-import type { CommunityMessage } from '../../types/community'
+import type { CommunityMessage, CommunityRule } from '../../types/community'
+
 
 const PAGE_CSS = `
   .community-page-content { padding: 20px; height: calc(100vh - 90px); box-sizing: border-box; }
@@ -19,7 +20,8 @@ export default function AdminCommunityPage() {
   const [messages, setMessages] = useState<CommunityMessage[]>([])
   const [activeMembers, setActiveMembers] = useState(0)
   const [totalMembers, setTotalMembers] = useState(0)
-  const [rules, setRules] = useState<string[] | null>(null)
+  const [rules, setRules] = useState<CommunityRule[] | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -60,7 +62,7 @@ export default function AdminCommunityPage() {
   // Rules — fetched once
   useEffect(() => {
     communityAPI.getRules().then((res) => {
-      if (res.success) setRules(res.data.rules.map((r) => r.text))
+      if (res.success) setRules(res.data.rules)
     })
   }, [])
 
@@ -164,8 +166,7 @@ export default function AdminCommunityPage() {
   }
 
   function handleOpenThread(msg: CommunityMessage) {
-    // Threads are one level deep — always open on the top-level message id,
-    // even if the user clicked "reply" on something that's itself a reply.
+    
     const topLevelId = msg.parent_message_id ?? msg.id
     const topLevelMsg = topLevelId === msg.id ? msg : messages.find(m => m.id === topLevelId) ?? msg
     setThreadReplies([])
@@ -201,7 +202,7 @@ export default function AdminCommunityPage() {
         <CommunityChatPanel
           role="admin"
           currentUserId={String(user?.id ?? '')}
-          currentUserInitials="AN"
+          currentUserInitials={(user?.name || user?.email || '').slice(0, 2).toUpperCase() || 'AD'}
           messages={messages}
           activeMembers={activeMembers}
           totalMembers={totalMembers}

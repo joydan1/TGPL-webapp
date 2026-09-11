@@ -37,8 +37,6 @@ export interface SystemSettings {
   secondary_color: string
   logo_url: string | null
   favicon_url: string | null
-
-  // ── NOT confirmed on backend — Figma/guide only, UI renders disabled ──
   default_timezone: string
   locale: string
 
@@ -76,11 +74,12 @@ export type PatchedSystemSettings = Partial<Omit<SystemSettings, 'updated_at' | 
 export interface AdminProfile {
   full_name: string
   email: string
-  phone: string
+  phone: string | null
   role: string
   avatar_url: string | null
   two_factor_enabled: boolean
   session_timeout_minutes: number
+  
 }
 
 export interface AdminSession {

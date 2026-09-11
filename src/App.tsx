@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import { ROUTES } from './constants/routes'
-
+import MaintenanceGate from './components/MaintenanceGate'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
 
@@ -88,6 +88,9 @@ function DashboardPageWrapper() {
   return <DashboardPage key={location.key} />
 }
 
+
+
+
 function App() {
   const { isAuthenticated, user } = useAuthStore()
   const getAuthenticatedHome = () =>
@@ -96,6 +99,7 @@ function App() {
   return (
     <Router>
       <Suspense fallback={<div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#6B7280' }}>Loading…</div>}>
+        <MaintenanceGate>
         <Routes>
         {/* ===== PUBLIC ROUTES (with Header & Footer) ===== */}
         <Route element={<PublicLayout />}>
@@ -124,19 +128,12 @@ function App() {
             isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <SignupPage />
           }
         />
-                <Route
-          path={ROUTES.SIGNUP}
-          element={
-            isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <SignupPage />
-          }
-        />
         <Route
           path={ROUTES.ACCEPT_INVITE}
           element={
             isAuthenticated ? <Navigate to={getAuthenticatedHome()} replace /> : <AcceptInvitePage />
           }
         />
-        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
@@ -169,37 +166,37 @@ function App() {
           }
         />
         <Route
-  path={ROUTES.SETTINGS_SECURITY}
-  element={
-    <ProtectedRoute>
-      <SettingsSecurityPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.SETTINGS_NOTIFICATIONS}
-  element={
-    <ProtectedRoute>
-      <SettingsNotificationPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.HELP_SUPPORT}
-  element={
-    <ProtectedRoute>
-      <HelpSupportPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-path={ROUTES.COMMUNITY}
-element={
-  <ProtectedRoute>
-<CommunityPage />
-</ProtectedRoute>
-}
-/>
+          path={ROUTES.SETTINGS_SECURITY}
+          element={
+            <ProtectedRoute>
+              <SettingsSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.SETTINGS_NOTIFICATIONS}
+          element={
+            <ProtectedRoute>
+              <SettingsNotificationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_SUPPORT}
+          element={
+            <ProtectedRoute>
+              <HelpSupportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.COMMUNITY}
+          element={
+            <ProtectedRoute>
+              <CommunityPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.CHECKOUT}
           element={
@@ -224,83 +221,80 @@ element={
             </ProtectedRoute>
           }
         />
-
         <Route
-  path={ROUTES.TRAINER_COURSES}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <TrainerCoursesPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.TRAINER_PROFILE}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <TrainerProfilePage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.TRAINER_COURSE_ADD}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <AddCoursePage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.TRAINER_COURSE_MANAGE}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <TrainerCourseManagePage />
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path={ROUTES.TRAINER_REVIEWS}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <TrainerReviewsPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.TRAINER_COURSE_EDIT}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <AddCoursePage />
-    </ProtectedRoute>
-  }
-/>
-<Route path={ROUTES.TRAINER_BOOKINGS} element={<TrainerBookingsPage />} />
-<Route path={ROUTES.TRAINER_COMMUNITY} element={<TrainerCommunityPage />} />
-<Route
-  path={ROUTES.TRAINER_LIVE_CLASSES}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <TrainerLiveClassesPage />
-    </ProtectedRoute>
-  }
-/>
-
-      <Route
-  path={ROUTES.NOTIFICATIONS}
-  element={
-    <ProtectedRoute requiredRole="learner">
-      <NotificationsPage />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path={ROUTES.TRAINER_NOTIFICATIONS}
-  element={
-    <ProtectedRoute requiredRole="trainer">
-      <NotificationsPage />
-    </ProtectedRoute>
-  }
-/>
+          path={ROUTES.TRAINER_COURSES}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_PROFILE}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_COURSE_ADD}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <AddCoursePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_COURSE_MANAGE}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerCourseManagePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_REVIEWS}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerReviewsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_COURSE_EDIT}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <AddCoursePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path={ROUTES.TRAINER_BOOKINGS} element={<TrainerBookingsPage />} />
+        <Route path={ROUTES.TRAINER_COMMUNITY} element={<TrainerCommunityPage />} />
+        <Route
+          path={ROUTES.TRAINER_LIVE_CLASSES}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerLiveClassesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.NOTIFICATIONS}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_NOTIFICATIONS}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.COURSES}
           element={
@@ -342,14 +336,14 @@ element={
             </ProtectedRoute>
           }
         />
-<Route
-  path={ROUTES.LIVE_SESSIONS}
-  element={
-    <ProtectedRoute requiredRole="learner">
-      <LiveSessionsPage />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path={ROUTES.LIVE_SESSIONS}
+          element={
+            <ProtectedRoute requiredRole="learner">
+              <LiveSessionsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.TUTOR_BOOKING}
           element={
@@ -399,19 +393,14 @@ element={
             </ProtectedRoute>
           }
         />
+        <Route path={ROUTES.ADMIN_LOGIN} element={<AdminLoginPage />} />
         <Route
-          path={ROUTES.ADMIN_LOGIN}
+          path={ROUTES.ADMIN_SETTINGS}
           element={
-            <AdminLoginPage />
+            <ProtectedRoute requiredRole="admin" requiredPermission="system_settings">
+              <AdminSettingsPage />
+            </ProtectedRoute>
           }
-        />
-        <Route
-        path={ROUTES.ADMIN_SETTINGS}
-        element={
-          <ProtectedRoute requiredRole="admin" requiredPermission="system_settings">
-            <AdminSettingsPage />
-          </ProtectedRoute>
-        }
         />
         <Route
           path={ROUTES.ADMIN_ACTIVITY}
@@ -449,6 +438,7 @@ element={
         <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
         </Routes>
+        </MaintenanceGate>
       </Suspense>
     </Router>
   )

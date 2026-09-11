@@ -325,7 +325,7 @@ const PAGE_CSS = `
   .modal-break-link { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8438rem; color: #6B7280; text-decoration: underline; cursor: pointer; background: none; border: none; }
 
   /* ── Booking calendar modal ── */
-  .booking-modal-card { max-width: 400px; align-items: stretch; }
+  .booking-modal-card { max-width: 400px; max-height: calc(100vh - 3rem); box-sizing: border-box; overflow-y: auto; align-items: stretch; }
   .booking-title { font-size: 1.25rem; font-weight: 700; color: #2492EB; text-align: center; }
   .booking-sub { font-size: 0.875rem; color: #6B7280; text-align: center; margin-top: -0.75rem; }
   .booking-cal-box { width: 100%; border: 1px solid #E5E7EB; border-radius: 1rem; padding: 1.25rem; }
@@ -379,6 +379,7 @@ const PAGE_CSS = `
     .popover { min-width: 120px; }
     /* Ask-for-help popover: clamp width on small screens */
     .ask-help-popover { width: min(320px, calc(100vw - 2rem)); right: 0; left: auto; }
+    .booking-modal-card { max-height: calc(100dvh - 1.5rem); }
   }
 `
 
@@ -1295,7 +1296,13 @@ async function downloadResource(r: LessonResource) {
                       <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); openBookingModal() }}>
                         Book a session
                       </button>
-                      <button className="ask-help-item secondary" onClick={() => setAskHelpOpen(false)}>
+                      <button
+                        className="ask-help-item secondary"
+                        onClick={() => {
+                          setAskHelpOpen(false)
+                          navigate(ROUTES.COMMUNITY)
+                        }}
+                      >
                         Ask in community forum
                       </button>
                     </div>
