@@ -57,8 +57,7 @@ const REASON_OPTIONS: { value: ArchiveReason; label: string }[] = [
 interface ArchiveCourseModalProps {
   course: AdminCourseRow
   onClose: () => void
-  // The endpoint requires {reason, note?} — recorded server-side with who
-  // archived it and why, so this can no longer be a bare confirm().
+  
   onConfirm: (payload: ArchiveCoursePayload) => void
 }
 

@@ -249,8 +249,6 @@ export default function AdminCoursesPage() {
     }
   }, [openMenuId])
 
-  // Flip the row menu above its button (or clamp to viewport) if it doesn't
-  // fit below — fixes menus near the bottom of the page getting clipped.
   useLayoutEffect(() => {
     if (!openMenuId || !menuPos) return
     const btn = menuBtnRefs.current[openMenuId]
@@ -322,8 +320,9 @@ export default function AdminCoursesPage() {
     setArchivingCourse(course)
   }
 
-  function handleDelete(course: AdminCourseRow) {
+   function handleDelete(course: AdminCourseRow) {
     closeRowMenu()
+    setActionError(null)
     setDeletingCourse(course)
   }
 
@@ -358,7 +357,7 @@ export default function AdminCoursesPage() {
     }
   }
 
-  async function confirmDelete(course: AdminCourseRow) {
+    async function confirmDelete(course: AdminCourseRow) {
     setActioningSlug(course.slug)
     setActionError(null)
     const res = await adminCoursesAPI.deleteCourse(course.slug)
@@ -368,8 +367,10 @@ export default function AdminCoursesPage() {
       setCount((prev) => Math.max(0, prev - 1))
       setDeletingCourse(null)
       fetchStats()
+    } else if (res.statusCode === 409) {
+      setActionError('This course has enrollment, payment, or certificate history, so it can\u2019t be permanently deleted. Archive it instead, ' +
+        'that removes it from active listings while keeping those records intact.')
     } else {
-     
       setActionError(apiErrorMessage(res.error))
     }
   }
@@ -413,15 +414,15 @@ function handleCreateCourse() {
           </button>
         </div>
 
-        {actionError && (
-          <div className="cc-error-banner">
-            <AlertCircle size={16} />
-            <span>{actionError}</span>
-            <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss">
-              <XIcon size={14} />
-            </button>
-          </div>
-        )}
+          {actionError && !deletingCourse && (
+    <div className="cc-error-banner">
+      <AlertCircle size={16} />
+      <span>{actionError}</span>
+      <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss">
+        <XIcon size={14} />
+      </button>
+    </div>
+  )}
 
         <div className="cc-stats-grid">
           <div className="cc-stat-card">
@@ -666,11 +667,13 @@ function handleCreateCourse() {
         />
       )}
 
-      {deletingCourse && (
+            {deletingCourse && (
         <DeleteCourseModal
           course={deletingCourse}
-          onClose={() => setDeletingCourse(null)}
+          onClose={() => { setDeletingCourse(null); setActionError(null) }}
           onConfirm={() => confirmDelete(deletingCourse)}
+          error={actionError}
+          submitting={actioningSlug === deletingCourse.slug}
         />
       )}
     </AdminShell>

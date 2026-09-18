@@ -405,6 +405,7 @@ export default function CourseLearnPage() {
   const [lesson, setLesson]   = useState<LessonDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+const [paywalled, setPaywalled] = useState(false)
   const [activeNav, setActiveNav] = useState('courses')
   const [moduleAssignments, setModuleAssignments] = useState<LearnModuleAssignmentSummary[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
@@ -469,39 +470,36 @@ export default function CourseLearnPage() {
     const persistedNote = localStorage.getItem(noteStorageKey)
 
     coursesAPI.getLesson(slug, lessonId).then((res) => {
-      if (cancelled) return
-      if (res.success) {
-        console.debug('coursesAPI.getLesson response', res.data)
-        // Backend currently returns `downloadable_resources` in some cases
-        // while frontend expects `resources`. Normalize here so the UI
-        // reliably reads `lesson.resources`.
-        // Also normalize the lesson's description/overview text: the trainer
-        // wizard saves it as `body` (see coursesManageAPI.updateLesson), but
-        // some lesson-detail responses may surface it as `description`
-        // instead — check both so the learner-side Overview tab always
-        // has content when the trainer has set one.
-        const normalized = {
-          ...res.data,
-          resources: (res.data as any).resources ?? (res.data as any).downloadable_resources ?? [],
-          notes: (res.data as any).notes ?? (res.data as any).note ?? null,
-          description: (res.data as any).description ?? (res.data as any).body ?? null,
-        }
-        setLesson(normalized as LessonDetailResponse)
-        const serverNotes = (normalized as any).notes ?? ''
-        const noteValue = persistedNote !== null && persistedNote !== ''
-          ? persistedNote
-          : serverNotes
-        setNotes(noteValue)
-        if (noteValue) {
-          localStorage.setItem(noteStorageKey, noteValue)
-        } else {
-          localStorage.removeItem(noteStorageKey)
-        }
-        notesLoadedRef.current = true
-      } else {
-        setError(res.statusCode === 404 ? 'Lesson not found.' : res.error)
-      }
-      setLoading(false)
+  if (cancelled) return
+  if (res.success) {
+    console.debug('coursesAPI.getLesson response', res.data)
+    const normalized = {
+      ...res.data,
+      resources: (res.data as any).resources ?? (res.data as any).downloadable_resources ?? [],
+      notes: (res.data as any).notes ?? (res.data as any).note ?? null,
+      description: (res.data as any).description ?? (res.data as any).body ?? null,
+    }
+    setLesson(normalized as LessonDetailResponse)
+    setPaywalled(false)
+    const serverNotes = (normalized as any).notes ?? ''
+    const noteValue = persistedNote !== null && persistedNote !== ''
+      ? persistedNote
+      : serverNotes
+    setNotes(noteValue)
+    if (noteValue) {
+      localStorage.setItem(noteStorageKey, noteValue)
+    } else {
+      localStorage.removeItem(noteStorageKey)
+    }
+    notesLoadedRef.current = true
+  } else if (res.statusCode === 403) {
+    setLesson(null)
+    setPaywalled(true)
+  } else {
+    setError(res.statusCode === 404 ? 'Lesson not found.' : res.error)
+  }
+  setLoading(false)
+
     })
     return () => { cancelled = true }
   }, [slug, lessonId])
@@ -558,17 +556,17 @@ export default function CourseLearnPage() {
     setModuleAssignments(match?.assignments ?? [])
   }, [lessonId, allModules])
 
-  // ── Reset on lesson change ──
-  useEffect(() => {
-    setIsPlaying(false)
-    setCurrentTime(0)
-    setDuration(0)
-    setBuffering(false)
-    setActiveTab('overview')
-    setSelectedResources(new Set())
-    setAskHelpOpen(false)
-    setCompleteInfo(null)
-  }, [lessonId])
+ useEffect(() => {
+  setIsPlaying(false)
+  setCurrentTime(0)
+  setDuration(0)
+  setBuffering(false)
+  setActiveTab('overview')
+  setSelectedResources(new Set())
+  setAskHelpOpen(false)
+  setCompleteInfo(null)
+  setPaywalled(false)
+}, [lessonId])
 
   // ── Wire video events ──
   useEffect(() => {
@@ -924,11 +922,30 @@ async function downloadResource(r: LessonResource) {
     <>
       <style>{SHELL_CSS + PAGE_CSS}</style>
       <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
-        <div className="content">
-          {loading && <div className="state-screen">Loading lesson…</div>}
-          {error && !loading && <div className="state-screen error">{error}</div>}
+        <div className="content">{loading && <div className="state-screen">Loading lesson…</div>}
+{error && !loading && <div className="state-screen error">{error}</div>}
 
-          {!loading && !error && lesson && (
+{!loading && !error && paywalled && (
+  <div className="player-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', color: '#fff' }}>
+    <Lock size={28} color="#9CA3AF" />
+    <h3 style={{ marginTop: '1rem', fontSize: '1.125rem', fontWeight: 700 }}>
+      This lesson is locked
+    </h3>
+    <p style={{ marginTop: '0.5rem', color: '#9CA3AF', fontSize: '0.875rem' }}>
+      Enrol in this course to keep watching.
+    </p>
+    <button
+      className="mark-done-btn"
+      style={{ marginTop: '1.25rem', background: '#2492EB', color: '#fff', borderColor: '#2492EB' }}
+      onClick={() => navigate(RouteBuilder.course(slug as string))}
+    >
+      View enrolment options
+    </button>
+  </div>
+)}
+
+{!loading && !error && !paywalled && lesson && (
+  
             <>
               {/* ── Video player ── */}
               <div className="player-card">

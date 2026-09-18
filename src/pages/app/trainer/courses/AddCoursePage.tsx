@@ -45,6 +45,7 @@ type Lesson = {
   materialsUploaded: boolean
   assignment: AssignmentDraft | null
   assignmentRemoteId: string | null
+  isPreview: boolean   // ← NEW: whether this lesson is free to watch before enrolling
 }
 
 type CourseForm = {
@@ -94,6 +95,7 @@ function emptyLesson(): Lesson {
     materialsUploaded: false,
     assignment: null,
     assignmentRemoteId: null,
+    isPreview: false,   // ← NEW
   }
 }
 
@@ -252,6 +254,11 @@ const PAGE_CSS = `
   .ac-assignment-added svg { color: #616873; }
   .ac-assignment-preview-link { border: none; background: none; color: #2492EB; font-family: 'Sora', inherit; font-weight: 500; font-size: 12px; line-height: 18px; text-decoration: underline; cursor: pointer; padding: 0; }
 
+  .ac-preview-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border: 1px solid #E5E7EB; border-radius: 0.85rem; padding: 0.75rem 1rem; }
+  .ac-preview-toggle-text { display: flex; flex-direction: column; gap: 0.1rem; }
+  .ac-preview-toggle-title { font-weight: 700; color: #111827; font-size: 0.85rem; }
+  .ac-preview-toggle-sub { color: #6B7280; font-size: 0.75rem; }
+
   .ac-add-lesson-btn { width: 100%; border: 2px dashed #D1D5DB; border-radius: 1rem; padding: 1rem; background: none; color: #6B7280; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 
   .ac-settings-card { border: 1px solid #E5E7EB; border-radius: 1rem; margin-bottom: 1.1rem; overflow: hidden; }
@@ -390,8 +397,7 @@ export default function AddCoursePage() {
     }
     setPreviewVideoSrc(null)
     return
-    // Only re-run when the actual video source changes, not on every keystroke elsewhere in the form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [previewLesson?.videoFile, previewLesson?.existingVideoUrl])
 
   useEffect(() => {
@@ -464,6 +470,8 @@ export default function AddCoursePage() {
         const moduleAssignments = assignmentsByModule.get(lesson.moduleId) ?? []
         const loadedAssignment = findSavedAssignment(moduleAssignments, undefined, lesson.title) ? normalizeAssignmentDraft(findSavedAssignment(moduleAssignments, undefined, lesson.title)) : null
         const rawVideoUrl = (lesson as any).video_url ?? (lesson as any).videoUrl ?? (detail as any)?.video_url ?? (detail as any)?.videoUrl ?? null
+        // ← NEW: read is_preview off either the curriculum-list lesson or the lesson-detail response, whichever has it
+        const rawIsPreview = (lesson as any).is_preview ?? (detail as any)?.is_preview ?? false
 
         return {
           id: makeId(),
@@ -478,6 +486,7 @@ export default function AddCoursePage() {
           materialsUploaded: true,
           assignment: loadedAssignment,
           assignmentRemoteId: loadedAssignment ? (moduleAssignments[0]?.id ?? null) : null,
+          isPreview: Boolean(rawIsPreview),   // ← NEW
         }
       })
 
@@ -562,8 +571,28 @@ export default function AddCoursePage() {
       }
       if (result.data.slug) setCourseSlug(result.data.slug)
     }
-
+    if (form.coverImage) {
+  const coverResult = await coursesManageAPI.uploadCourseImage(activeCourseId, form.coverImage, 'cover')
+  if (!coverResult.success) {
+    setSaveError(coverResult.error || 'Failed to upload cover image.')
     setSaving(false)
+    return
+  }
+
+  const thumbResult = await coursesManageAPI.uploadCourseImage(activeCourseId, form.coverImage, 'thumbnail')
+  if (!thumbResult.success) {
+    setSaveError(thumbResult.error || 'Failed to upload thumbnail image.')
+    setSaving(false)
+    return
+  }
+
+  setForm((f) => ({
+    ...f,
+    coverImage: null,
+    existingCoverImageUrl: coverResult.data.cover_image_url ?? f.existingCoverImageUrl,
+  }))
+}
+   setSaving(false)
     setStep(2)
   }
 
@@ -619,8 +648,7 @@ export default function AddCoursePage() {
       let remoteId = lesson.remoteId
 
       if (!remoteId) {
-        // createLesson only accepts a title — body has to be set in a
-        // follow-up patch, since there's no create-with-body endpoint.
+        
         const lessonResult = await coursesManageAPI.createLesson(activeModuleId, lesson.title)
         if (!lessonResult.success) {
           setSaveError(lessonResult.error || `Failed to create lesson "${lesson.title}".`)
@@ -629,9 +657,11 @@ export default function AddCoursePage() {
         }
         remoteId = lessonResult.data.id
 
-        if (lesson.description.trim()) {
+       
+        if (lesson.description.trim() || lesson.isPreview) {
           const bodyResult = await coursesManageAPI.updateLesson(remoteId, {
             body: lesson.description,
+            is_preview: lesson.isPreview,
           })
           if (!bodyResult.success) {
             setSaveError(bodyResult.error || `Failed to save description for "${lesson.title}".`)
@@ -641,9 +671,10 @@ export default function AddCoursePage() {
         }
       } else {
         const updateResult = await coursesManageAPI.updateLesson(remoteId, {
-          title: lesson.title,
-          body: lesson.description,
-        })
+  title: lesson.title,
+  body: lesson.description,
+  is_preview: lesson.isPreview,
+})
         if (!updateResult.success) {
           setSaveError(updateResult.error || `Failed to update lesson "${lesson.title}".`)
           setSaving(false)
@@ -847,13 +878,6 @@ export default function AddCoursePage() {
       }
     }
 
-    // Note: this only removes the lesson locally/server-side — it does NOT
-    // delete the underlying assignment via trainerAssignmentsAPI.remove().
-    // Assignments are module-scoped, so the assignment may still be
-    // relevant to other lessons/the module as a whole; deleting it here
-    // could surprise the trainer. If a "delete lesson also deletes its
-    // assignment" behavior is wanted, call trainerAssignmentsAPI.remove()
-    // with lesson.assignmentRemoteId here (courseSlug must be set).
   }
 
   function openAssignmentModal(lessonId: string) {
@@ -1024,7 +1048,7 @@ export default function AddCoursePage() {
                         </>
                       )}
                     </label>
-                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB · cover images are shown in this preview but are not saved until the backend adds course-cover uploads.</p>
+                    <p className="ac-hint">Recommended: 1280×720 px · JPG or PNG · max 5 MB.</p>
                   </div>
                 </div>
               </>
@@ -1148,6 +1172,24 @@ export default function AddCoursePage() {
                     </div>
 
                     <div className="ac-lesson-uploads">
+                      {/* ← NEW: free-preview toggle */}
+                      <div className="ac-preview-toggle-row">
+                        <div className="ac-preview-toggle-text">
+                          <span className="ac-preview-toggle-title">Free preview</span>
+                          <span className="ac-preview-toggle-sub">
+                            Anyone can watch this lesson without enrolling
+                          </span>
+                        </div>
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={lesson.isPreview}
+                            onChange={(e) => updateLesson(lesson.id, { isPreview: e.target.checked })}
+                          />
+                          <span className="track" />
+                        </label>
+                      </div>
+
                       <label className="ac-upload-chip">
                         <input
                           type="file"

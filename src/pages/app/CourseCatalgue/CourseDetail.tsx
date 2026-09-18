@@ -24,6 +24,7 @@ interface Lesson {
   order: number
   duration_seconds: number
   duration_display: string
+  is_preview: boolean   
 }
 
 interface Module {
@@ -42,8 +43,6 @@ interface CourseDetail {
   level: 'beginner' | 'intermediate' | 'advanced' | 'expert'
   price_kobo: number
   price_naira: string
-  // Drives the enroll-vs-checkout branch below. Present on the list endpoint
-  // (CourseListItem) already — this was just missing from the detail type.
   is_free: boolean
   description: string
   duration_weeks: number
@@ -434,7 +433,6 @@ export default function CourseDetailPage() {
 
   return <PublicCourseOverview course={course} isAuthenticated={isAuthenticated} />
 }
-
 // ─── Public sales page ────────────────────────────────────────────────────────
 function PublicCourseOverview({
   course,
@@ -446,6 +444,38 @@ function PublicCourseOverview({
   const navigate = useNavigate()
   const [enrolling, setEnrolling] = useState(false)
   const [enrollError, setEnrollError] = useState<string | null>(null)
+
+  // ── Free-preview lesson playback ──
+  const [activePreviewLessonId, setActivePreviewLessonId] = useState<string | null>(null)
+  const [previewLessonDetail, setPreviewLessonDetail] = useState<{ video_url: string | null; title: string } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  const allLessons = course.modules.flatMap((m) => m.lessons)
+
+  useEffect(() => {
+    if (!activePreviewLessonId) {
+      setPreviewLessonDetail(null)
+      return
+    }
+    let cancelled = false
+    setPreviewLoading(true)
+    apiClient
+  .get<{ video_url: string | null; title: string }>(
+    `/v1/courses/${course.slug}/lessons/${activePreviewLessonId}/`
+  )
+  .then((res) => {
+    if (!cancelled) setPreviewLessonDetail(res.data)
+  })
+      .catch(() => {
+        if (!cancelled) setPreviewLessonDetail(null)
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activePreviewLessonId, course.slug])
 
   const stats = [
     { icon: Clock,     value: course.total_duration_display || `${course.duration_weeks}w`, label: 'Duration' },
@@ -483,8 +513,6 @@ function PublicCourseOverview({
     setEnrolling(false)
 
     if (res.success) {
-      // Enrolled — CourseDetailPage will re-fetch enrollment status and
-      // render EnrolledCourseOverview on next mount/navigation.
       navigate(RouteBuilder.course(course.slug), { replace: true })
       window.location.reload()
       return
@@ -541,6 +569,68 @@ function PublicCourseOverview({
                   </div>
                 ))}
               </div>
+
+              {allLessons.length > 0 && (
+                <div className="section">
+                  <h2>Course content</h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {allLessons.map((lesson) => {
+                      const locked = !lesson.is_preview
+                      const isActive = activePreviewLessonId === lesson.id
+                      return (
+                        <div
+                          key={lesson.id}
+                          onClick={() => !locked && setActivePreviewLessonId(lesson.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.75rem 0.875rem',
+                            border: isActive ? '1px solid #2492EB' : '1px solid #E5E7EB',
+                            borderRadius: '0.625rem',
+                            cursor: locked ? 'default' : 'pointer',
+                            opacity: locked ? 0.6 : 1,
+                            background: isActive ? '#EFF6FF' : '#fff',
+                          }}
+                        >
+                          {locked
+                            ? <Lock size={15} color="#9CA3AF" />
+                            : <Play size={15} color="#2492EB" />
+                          }
+                          <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: '#111' }}>
+                            {lesson.title}
+                          </span>
+                          {!locked && (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2492EB' }}>
+                              FREE PREVIEW
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.8125rem', color: '#9CA3AF' }}>
+                            {lesson.duration_display}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {activePreviewLessonId && (
+                    <div style={{ marginTop: '0.75rem', borderRadius: '0.875rem', overflow: 'hidden', background: '#111' }}>
+                      {previewLoading ? (
+                        <div className="state-screen">Loading preview…</div>
+                      ) : previewLessonDetail?.video_url ? (
+                        <video
+                          key={previewLessonDetail.video_url}
+                          src={previewLessonDetail.video_url}
+                          controls
+                          style={{ width: '100%', display: 'block' }}
+                        />
+                      ) : (
+                        <div className="state-screen">Preview video not available yet.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {course.expected_outcomes.length > 0 && (
                 <div className="section">

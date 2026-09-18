@@ -1,7 +1,7 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
-import { ROUTES } from './constants/routes'
+import { ROUTES, RouteBuilder } from './constants/routes'
 import MaintenanceGate from './components/MaintenanceGate'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
@@ -24,7 +24,6 @@ const DashboardPage = lazy(() => import('./pages/app/DashboardPage'))
 const CertificatesPage = lazy(() => import('./pages/app/CertificatesPage'))
 const CourseCatalogPage = lazy(() => import('./pages/app/CourseCatalgue'))
 const CourseDetailPage = lazy(() => import('./pages/app/CourseCatalgue/CourseDetail'))
-const CoursePlayerPage = lazy(() => import('./pages/app/CourseCatalgue/CoursePlayer'))
 const CourseLearnPage = lazy(() => import('./pages/app/CourseCatalgue/CourseLearnPage'))
 const CommunityPage = lazy(() => import('./pages/app/CommunityPage'))
 const AssignmentDetailPage = lazy(() => import('./pages/app/CourseCatalgue/AssignmentDetailPage'))
@@ -88,8 +87,21 @@ function DashboardPageWrapper() {
   return <DashboardPage key={location.key} />
 }
 
+// Handles old bookmarked/shared links to the retired standalone preview route.
+// The preview lesson experience now lives inside CourseDetailPage's
+// PublicCourseOverview, so this just forwards straight to the course detail page.
+function CoursePreviewRedirect() {
+  const { slug } = useParams<{ slug: string }>()
+  const navigate = useNavigate()
 
+  useEffect(() => {
+    if (slug) {
+      navigate(RouteBuilder.course(slug), { replace: true })
+    }
+  }, [slug, navigate])
 
+  return null
+}
 
 function App() {
   const { isAuthenticated, user } = useAuthStore()
@@ -316,7 +328,7 @@ function App() {
           path="/courses/:slug/preview"
           element={
             <ProtectedRoute requiredRole="learner">
-              <CoursePlayerPage />
+              <CoursePreviewRedirect />
             </ProtectedRoute>
           }
         />

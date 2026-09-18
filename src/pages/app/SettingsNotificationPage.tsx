@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
-import { useAuth } from '../../hooks/useAuth' 
+import { useAuth } from '../../hooks/useAuth'
+import { usePushNotifications } from '../../hooks/usePushNotification'
+import { AlertCircle, Bell, Smartphone } from 'lucide-react'
 
 type Channel = 'inApp' | 'email' | 'push'
 
@@ -30,6 +32,13 @@ const NOTIFICATION_SETTINGS_KEY = 'tgpl.notification-settings'
 
 const PAGE_CSS = `
   .notif-card { max-width: 720px; margin: 1.5rem auto 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; overflow: hidden; }
+  .notif-push-banner { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1.1rem 1.5rem; border-bottom: 1px solid #E5E7EB; }
+  .notif-push-banner-icon { width: 36px; height: 36px; border-radius: 0.65rem; background: #EFF6FF; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .notif-push-banner-title { font-weight: 700; font-size: 0.9rem; color: #111; margin: 0; }
+  .notif-push-banner-sub { font-size: 0.8125rem; color: #6B7280; margin: 0.2rem 0 0; line-height: 1.5; }
+  .notif-push-banner-note { font-size: 0.78rem; margin-top: 0.5rem; display: flex; align-items: flex-start; gap: 0.4rem; }
+  .notif-push-banner-note.error { color: #B91C1C; }
+  .notif-push-banner-note.info { color: #6B7280; }
   .notif-pause-row { display:flex; align-items:center; justify-content:space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #E5E7EB; }
   .notif-pause-title { font-weight: 700; font-size: 1rem; color: #111; margin: 0; }
   .notif-pause-sub { font-size: 0.875rem; color: #6B7280; margin: 0.25rem 0 0; }
@@ -67,8 +76,11 @@ function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disa
 }
 
 export default function SettingsNotificationPage() {
- const { user } = useAuth()
-const isTrainer = user?.role === 'trainer' 
+  const { user } = useAuth()
+  const isTrainer = user?.role === 'trainer'
+
+  const { isSupported, permission, subscribing, error: pushError, subscribe, unsubscribe } = usePushNotifications()
+  const pushEnabled = isSupported && permission === 'granted'
 
   const DEFAULT_CATEGORIES = isTrainer ? TRAINER_CATEGORIES : LEARNER_CATEGORIES
 
@@ -97,10 +109,26 @@ const isTrainer = user?.role === 'trainer'
     } catch {
       // Ignore malformed local settings and keep the defaults.
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role])
 
   const toggleChannel = (id: string, channel: Channel) => {
     setSaved(false)
+
+    if (channel === 'push') {
+      const turningOn = !categories.find((c) => c.id === id)?.push
+      if (turningOn && !pushEnabled) {
+        // Route through the real browser permission flow first — only flip
+        // the local toggle if the subscription actually succeeds.
+        subscribe().then((ok) => {
+          if (ok) {
+            setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, push: true } : c)))
+          }
+        })
+        return
+      }
+    }
+
     setCategories((prev) =>
       prev.map((c) => (c.id === id ? { ...c, [channel]: !c[channel] } : c))
     )
@@ -112,6 +140,12 @@ const isTrainer = user?.role === 'trainer'
     setSavedSettings(nextSettings)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+
+   
+    const anyPushOn = categories.some((c) => c.push)
+    if (pushEnabled && (pauseAll || !anyPushOn)) {
+      unsubscribe()
+    }
   }
 
   const handleCancel = () => {
@@ -125,6 +159,35 @@ const isTrainer = user?.role === 'trainer'
       <style>{PAGE_CSS}</style>
       <SettingsLayout title="Notification" subtitle="Choose what you're notified about and how">
         <div className="notif-card">
+          <div className="notif-push-banner">
+            <div className="notif-push-banner-icon">
+              <Bell size={17} />
+            </div>
+            <div>
+              <p className="notif-push-banner-title">Push notifications on this device</p>
+              <p className="notif-push-banner-sub">
+                {pushEnabled
+                  ? 'Push is enabled — the Push toggles below will actually reach this device.'
+                  : 'Turning on any Push toggle below will ask your browser for notification permission.'}
+              </p>
+              {!isSupported && (
+                <div className="notif-push-banner-note info">
+                  <Smartphone size={13} /> Not supported in this browser.
+                </div>
+              )}
+              {isSupported && permission === 'denied' && (
+                <div className="notif-push-banner-note error">
+                  <AlertCircle size={13} /> Blocked in your browser settings — enable it there first.
+                </div>
+              )}
+              {pushError && (
+                <div className="notif-push-banner-note error">
+                  <AlertCircle size={13} /> {pushError}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="notif-pause-row">
             <div>
               <p className="notif-pause-title">Pause all notifications</p>
@@ -169,7 +232,7 @@ const isTrainer = user?.role === 'trainer'
                   <td className="col-toggle">
                     <Toggle
                       checked={cat.push}
-                      disabled={pauseAll}
+                      disabled={pauseAll || subscribing || (isSupported && permission === 'denied')}
                       onChange={() => toggleChannel(cat.id, 'push')}
                       label={`${cat.label} push`}
                     />

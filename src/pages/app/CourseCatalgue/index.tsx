@@ -27,9 +27,6 @@ interface PaginatedCourses {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function shouldUsePreviewRoute(course: CourseListItem) {
-  return course.is_free || course.title.toLowerCase().startsWith('introductory')
-}
 
 type CatalogueFilters = {
   search: string
@@ -211,25 +208,19 @@ export default function CourseCatalogPage() {
           {!loading && !error && courses.length > 0 && (
             <>
               <div className="catalog-grid">
-                {courses.map((course) => {
-                  const freePreview = shouldUsePreviewRoute(course)
-                  const to = freePreview
-                    ? `/courses/${course.slug}/preview`
-                    : RouteBuilder.course(course.slug)
+                {courses.map((course) => (
+  <Link key={course.id} className="course-card" to={RouteBuilder.course(course.slug)}>
+    <CourseThumb course={course} video={false} />
+    <div className="course-body">
+      <p className="course-tag">{course.category}</p>
+      <p className="course-title">{course.title}</p>
+      {course.trainer_name && (
+        <p className="course-instructor">{course.trainer_name}</p>
+      )}
+    </div>
+  </Link>
 
-                  return (
-                    <Link key={course.id} className="course-card" to={to}>
-                      <CourseThumb course={course} video={freePreview} />
-                      <div className="course-body">
-                        <p className="course-tag">{course.category}</p>
-                        <p className="course-title">{course.title}</p>
-                        {course.trainer_name && (
-                          <p className="course-instructor">{course.trainer_name}</p>
-                        )}
-                      </div>
-                    </Link>
-                  )
-                })}
+                ))}
               </div>
 
               {(hasNext || hasPrevious) && (

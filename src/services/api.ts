@@ -721,6 +721,7 @@ export interface LessonDetailResponse {
   duration_seconds: number
   duration_display: string
   status: LessonStatus
+  is_preview: boolean
   notes?: string | null
   resources?: LessonResource[]
   downloadable_resources?: LessonResource[]
@@ -1395,6 +1396,7 @@ export interface CourseDraft {
   language?: string
   level?: CourseLevel
   cover_image_url?: string | null
+  thumbnail_url?: string | null
   description?: string
   expected_outcomes?: string[]
   target_audience?: string[]
@@ -1727,22 +1729,23 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
-   uploadCoverImage: async (courseId: string, file: File) => {
-    const formData = new FormData()
-    formData.append('cover_image_url', file)
+  uploadCourseImage: async (courseId: string, file: File, kind: 'cover' | 'thumbnail') => {
+  const formData = new FormData()
+  formData.append('kind', kind)
+  formData.append('file', file)
 
-    try {
-      const response = await apiClient.patch<CourseDraft>(
-        API_ENDPOINTS.COURSES_MANAGE_DETAIL(courseId),
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
-      )
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseApiError(error, 'Failed to upload cover image')
-      return { success: false as const, error: message, statusCode }
-    }
-  },
+  try {
+    const response = await apiClient.post<CourseDraft>(
+      `/v1/courses/manage/${courseId}/image/`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return { success: true as const, data: response.data }
+  } catch (error) {
+      const { message, statusCode } = parseApiError(error, `Failed to upload ${kind} image`)
+    return { success: false as const, error: message, statusCode }
+  }
+},
 
 
 }

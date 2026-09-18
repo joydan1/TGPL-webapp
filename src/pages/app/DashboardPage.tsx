@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
-import { apiClient, coursesAPI } from '../../services/api'
+import { apiClient, coursesAPI, liveSessionsAPI, type LiveSlotBooking } from '../../services/api'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
-
+import {
+  InactivityNudge, DeadlineUrgencyNudge, LiveSessionNudge, BookingReminderNudge, CertificateNudge,
+  NUDGE_CSS,
+} from '../../components/nudges/NudgeComponents'
 // ── Types ──────────────────────────────────────────────────────────────────
 interface EnrolledCourse {
   course_id: string
@@ -402,7 +405,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+ const [dismissedNudges, setDismissedNudges] = useState<Set<string>>(new Set())
+  const [myBookings, setMyBookings] = useState<LiveSlotBooking[]>([])
+  const [nowTick, setNowTick] = useState(() => Date.now())
 
+  function dismissNudge(id: string) {
+    setDismissedNudges((prev) => new Set(prev).add(id))
+ }
   useEffect(() => {
     if (!isAuthenticated) navigate(ROUTES.LOGIN)
   }, [isAuthenticated, navigate])
@@ -534,6 +543,20 @@ const upcoming = all
     if (user) fetchLiveSessions()
   }, [user])
 
+  useEffect(() => {
+    const fetchBookings = async () => {
+      const result = await liveSessionsAPI.getMyBookings()
+     if (result.success) setMyBookings(result.data)
+    }
+    if (user) fetchBookings()
+  }, [user])
+
+  // Ticks every 30s so the "starts in 15 min" nudge window is live, not a one-time check.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   if (!user) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Loading…</p></div>
 
   const firstName = (user.name || user.email || '').split(' ')[0]
@@ -580,6 +603,50 @@ const upcoming = all
     : null
 
   const configMissingNote = activeCert?.checklist.find((c) => c.reason === 'config_missing')
+  // ── InactivityNudge — most recent activity across all enrolled courses ──
+  const mostRecentAccess = enrolledCourses.reduce<Date | null>((latest, c) => {
+    if (!c.last_accessed_at) return latest
+    const d = new Date(c.last_accessed_at)
+    if (isNaN(d.getTime())) return latest
+    return !latest || d > latest ? d : latest
+  }, null)
+  const daysInactive = mostRecentAccess
+    ? Math.floor((nowTick - mostRecentAccess.getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+  const showInactivityNudge =
+    showCourseDependentSections && daysInactive >= 3 && !dismissedNudges.has('inactivity') && resumeCourse
+
+  // ── DeadlineUrgencyNudge — an in-progress assignment already past due ──
+  const overdueAssignment = assignmentsActive.find((a) => {
+    if (!a.due_at) return false
+    const due = new Date(a.due_at)
+    return !isNaN(due.getTime()) && due.getTime() < nowTick
+  })
+  const showDeadlineNudge = !!overdueAssignment && !dismissedNudges.has(`deadline-${overdueAssignment.id}`)
+
+  // ── LiveSessionNudge — a session starting within the next 15 minutes ──
+  const startingSoonSession = upcomingSessions.find((s) => {
+    const starts = new Date(s.starts_at).getTime()
+    const minutesUntil = (starts - nowTick) / 60_000
+    return minutesUntil > 0 && minutesUntil <= 15
+  })
+  const showLiveSessionNudge = !!startingSoonSession && !dismissedNudges.has(`live-${startingSoonSession.id}`)
+
+  // ── BookingReminderNudge — a confirmed 1:1 booking starting within 24h ──
+  const upcomingBooking = myBookings
+    .filter((b) => b.status === 'confirmed')
+    .find((b) => {
+      const starts = new Date(b.slot_starts_at).getTime()
+      const hoursUntil = (starts - nowTick) / (1000 * 60 * 60)
+      return hoursUntil > 0 && hoursUntil <= 24
+    })
+  const showBookingNudge = !!upcomingBooking && !dismissedNudges.has(`booking-${upcomingBooking.id}`)
+
+  // ── CertificateNudge — 80%+ but not yet eligible ──
+  const showCertNudge =
+    showCourseDependentSections && certProgressLoaded && activeCert
+    && !activeCert.eligible && activeCert.completion_percentage >= 80
+    && !dismissedNudges.has(`cert-${activeCert.course_slug}`)
 
   function goToCourse(slug: string) {
     if (!slug) return
@@ -596,8 +663,25 @@ function goToCertification() {
 }
   return (
     <>
-      <style>{SHELL_CSS + PAGE_CSS}</style>
+      <style>{SHELL_CSS + PAGE_CSS + NUDGE_CSS}</style>
       <AppShell activeNav={activeNav} onNavChange={setActiveNav}>
+                {showLiveSessionNudge && startingSoonSession && (
+          <LiveSessionNudge
+            sessionTitle={startingSoonSession.title}
+            trainerName={startingSoonSession.trainer_name}
+            onJoin={() => window.open(startingSoonSession.join_url, '_blank')}
+            onDismiss={() => dismissNudge(`live-${startingSoonSession.id}`)}
+          />
+        )}
+        {!showLiveSessionNudge && showBookingNudge && upcomingBooking && (
+          <BookingReminderNudge
+            trainerName={upcomingBooking.trainer_name || 'your tutor'}
+            startsAtDisplay={fmtSessionTime(upcomingBooking.slot_starts_at)}
+            onAddToCalendar={() => {/* wire to your calendar export, if any */}}
+            onReschedule={() => navigate(ROUTES.TRAINER_BOOKINGS)}
+            onDismiss={() => dismissNudge(`booking-${upcomingBooking.id}`)}
+          />
+        )}
         <div className="content">
 
           {/* Greeting */}
@@ -605,7 +689,17 @@ function goToCertification() {
             <div className="greeting-line">{greeting},</div>
             <div className="greeting-name">{firstName} 👋</div>
           </div>
-
+{showInactivityNudge && resumeCourse && (
+            <InactivityNudge
+             daysInactive={daysInactive}
+              firstName={firstName}
+              onResume={() => {
+                if (resumeCourse.resume_url) navigate(resumeCourse.resume_url)
+                else goToCourse(resumeCourse.course_slug)
+              }}
+              onDismiss={() => dismissNudge('inactivity')}
+            />
+          )}
           {/* Resume banner (has progress) */}
           {showCourseDependentSections && resumeCourse && resumeCourse.completion_percentage > 0 && (
             <div className="resume-banner">
@@ -660,6 +754,16 @@ function goToCertification() {
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
             </div>
+            {showDeadlineNudge && overdueAssignment && (
+              <div style={{ marginBottom: '0.875rem' }}>
+                <DeadlineUrgencyNudge
+                  assignmentTitle={overdueAssignment.title}
+                  courseTitle={overdueAssignment.course_title}
+                  onSubmitNow={() => goToAssignment(overdueAssignment)}
+                  onDismiss={() => dismissNudge(`deadline-${overdueAssignment.id}`)}
+                />
+              </div>
+            )}
             {assignmentsLoaded && !hasAssignments && (
               <div className="empty-inline">
                 <div className="empty-inline-icon" style={{ background: '#EFF6FF' }}>
@@ -862,6 +966,16 @@ function goToCertification() {
                     <span>{labelForRequirement(item.requirement)}</span>
                   </div>
                 ))}
+                 {showCertNudge && (
+                 <div style={{ marginTop: '0.875rem' }}>
+                   <CertificateNudge
+                     courseTitle={activeCert.course_title}
+                      lessonsRemaining={Math.max(1, Math.round((100 - activeCert.completion_percentage) / 10))}
+                     percentComplete={activeCert.completion_percentage}
+                     onFinishNow={() => goToCourse(activeCert.course_slug)}
+                     onDismiss={() => dismissNudge(`cert-${activeCert.course_slug}`)}                    />
+                  </div>
+                )}
                 <button className="cert-view" onClick={goToCertification}>
   View all requirements <ChevronRight size={14} />
 </button>
