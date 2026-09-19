@@ -10,6 +10,8 @@ import { adminUsersAPI, type ApiRole, type AdminUserListItem } from '../../servi
 import UserProfileModal, { USER_PROFILE_MODAL_ALL_CSS } from '../../components/admin/UserProfileModal'
 import DeleteAccountModal from '../../components/admin/DeleteAccountModal'
 import InviteUserModal, { type InviteUserPayload } from '../../components/admin/InviteUserModal'
+import TrainerRequestModal, { TRAINER_REQUEST_MODAL_CSS } from '../../components/admin/TrainerRequestModal'
+import RowActionMenu, { type RowActionMenuItem } from '../../components/admin/RowActionMenu'
 
 export interface AdminUser {
   id: string
@@ -33,6 +35,19 @@ interface AdminInviteListItem {
   expires_at: string
 }
 
+// ─── Trainer requests (new) ─────────────────────────────────────────────────
+type TrainerRequestStatus = 'pending' | 'approved' | 'rejected' | 'used' | 'expired'
+
+interface AdminTrainerRequestListItem {
+  id: string
+  full_name: string
+  email: string
+  subject: string
+  message: string
+  status: TrainerRequestStatus
+  created_at: string
+}
+
 interface PaginatedResponse<T> {
   count: number
   next: string | null
@@ -40,7 +55,7 @@ interface PaginatedResponse<T> {
   results: T[]
 }
 
-type AdminView = 'members' | 'invites'
+type AdminView = 'members' | 'invites' | 'trainer-requests'
 
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 400
@@ -79,6 +94,17 @@ const ROLE_TABS: { key: RoleFilterKey; label: string }[] = [
   { key: 'admin', label: 'Admin' },
 ]
 
+type TrainerRequestFilterKey = 'all' | TrainerRequestStatus
+
+const TRAINER_REQUEST_STATUS_TABS: { key: TrainerRequestFilterKey; label: string }[] = [
+  { key: 'pending', label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'used', label: 'Used' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'all', label: 'All' },
+]
+
 // ─── Styles ────────────────────────────────────────────────────────────────
 const PAGE_CSS = `
   .au-page { padding: 1.5rem 2rem 2rem; background: #F7F7F7; font-family: 'Sora', sans-serif; }
@@ -88,7 +114,7 @@ const PAGE_CSS = `
   .au-subtitle { margin: 0.25rem 0 0; color: #99A1AF; font-size: 0.85rem; }
   .au-create-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none; border-radius: 14px; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; box-shadow: 0px 1px 3px rgba(36,146,235,0.2), 0px 1px 2px -1px rgba(36,146,235,0.2); white-space: nowrap; }
 
-  .au-view-tabs { display: flex; gap: 0.25rem; background: #fff; border: 1px solid #EBEBEB; border-radius: 14px; padding: 0.25rem; width: fit-content; margin-bottom: 1rem; }
+  .au-view-tabs { display: flex; gap: 0.25rem; background: #fff; border: 1px solid #EBEBEB; border-radius: 14px; padding: 0.25rem; width: fit-content; margin-bottom: 1rem; flex-wrap: wrap; }
   .au-view-tab { display: flex; align-items: center; gap: 0.4rem; border: none; background: none; color: #99A1AF; font-weight: 600; font-size: 0.82rem; padding: 0.55rem 1rem; border-radius: 10px; cursor: pointer; white-space: nowrap; }
   .au-view-tab.active { background: #E9F5FF; color: #2492EB; }
   .au-view-tab-count { font-size: 0.68rem; font-weight: 700; background: rgba(0,0,0,0.06); color: inherit; border-radius: 999px; padding: 0.05rem 0.4rem; }
@@ -136,6 +162,15 @@ const PAGE_CSS = `
   .au-invite-badge.accepted { background: #F0FDF4; color: #10B981; }
   .au-invite-badge.revoked { background: #FEF2F2; color: #DC2626; }
   .au-invite-badge.expired { background: #F3F4F6; color: #99A1AF; }
+
+  .au-trainer-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 999px; white-space: nowrap; text-transform: capitalize; }
+  .au-trainer-badge.pending { background: #FFF7EB; color: #FE9A00; }
+  .au-trainer-badge.approved { background: #F0FDF4; color: #10B981; }
+  .au-trainer-badge.rejected { background: #FEF2F2; color: #DC2626; }
+  .au-trainer-badge.used { background: #E9F5FF; color: #2492EB; }
+  .au-trainer-badge.expired { background: #F3F4F6; color: #99A1AF; }
+
+  .au-subject-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .au-row-menu-wrap { position: relative; text-align: right; }
   .au-row-menu-btn { border: none; background: none; cursor: pointer; color: #99A1AF; padding: 0.4rem; border-radius: 10px; display: inline-flex; }
@@ -252,6 +287,21 @@ function invitesBadgeIcon(status: string) {
   }
 }
 
+function trainerRequestBadgeClass(status: string) {
+  const key = status.toLowerCase()
+  return ['pending', 'approved', 'rejected', 'used', 'expired'].includes(key) ? key : 'pending'
+}
+
+function trainerRequestBadgeIcon(status: string) {
+  switch (status.toLowerCase()) {
+    case 'approved': return CheckCircle2
+    case 'rejected': return Ban
+    case 'used': return CheckCircle2
+    case 'expired': return XCircle
+    default: return Clock
+  }
+}
+
 function downloadCsv(rows: AdminUser[]) {
   const header = ['Name', 'Email', 'Role', 'Joined', 'Status']
   const lines = rows.map((u) => [u.name, u.email, roleLabel(u.role), formatJoinedDate(u.joined_at), u.status])
@@ -300,6 +350,18 @@ export default function AdminUsersPage() {
   const [openInviteMenuId, setOpenInviteMenuId] = useState<string | null>(null)
   const [invitesActingId, setInvitesActingId] = useState<string | null>(null)
   const [inviteActionError, setInviteActionError] = useState<string | null>(null)
+
+  // ── Trainer requests ──
+  // (Menu open/closed state now lives inside <RowActionMenu />.)
+  const [trainerRequests, setTrainerRequests] = useState<AdminTrainerRequestListItem[]>([])
+  const [trainerRequestsLoading, setTrainerRequestsLoading] = useState(false)
+  const [trainerRequestsLoadError, setTrainerRequestsLoadError] = useState<string | null>(null)
+  const [trainerRequestsLoaded, setTrainerRequestsLoaded] = useState(false)
+  const [trainerRequestsReloadKey, setTrainerRequestsReloadKey] = useState(0)
+  const [trainerRequestsStatusFilter, setTrainerRequestsStatusFilter] = useState<TrainerRequestFilterKey>('pending')
+  const [trainerRequestActingId, setTrainerRequestActingId] = useState<string | null>(null)
+  const [trainerRequestActionError, setTrainerRequestActionError] = useState<string | null>(null)
+  const [viewingTrainerRequest, setViewingTrainerRequest] = useState<AdminTrainerRequestListItem | null>(null)
 
   // Debounce the search box — resets to page 1 once the debounced value changes.
   useEffect(() => {
@@ -366,6 +428,34 @@ export default function AdminUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, invitesReloadKey])
 
+  // Trainer requests — refetches when the status filter changes since the
+  // backend filters server-side; the pending queue is the default view.
+  useEffect(() => {
+    if (view !== 'trainer-requests') return
+    let cancelled = false
+    setTrainerRequestsLoading(true)
+    setTrainerRequestsLoadError(null)
+
+    const query = new URLSearchParams()
+    if (trainerRequestsStatusFilter !== 'all') query.set('status', trainerRequestsStatusFilter)
+    const qs = query.toString()
+
+    apiClient
+      .get<PaginatedResponse<AdminTrainerRequestListItem>>(`/v1/admin/trainer-requests/${qs ? `?${qs}` : ''}`)
+      .then((res) => {
+        if (cancelled) return
+        setTrainerRequests(res.data.results)
+        setTrainerRequestsLoaded(true)
+      })
+      .catch(() => {
+        if (!cancelled) setTrainerRequestsLoadError("Couldn't load trainer requests. Please try again.")
+      })
+      .finally(() => {
+        if (!cancelled) setTrainerRequestsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [view, trainerRequestsStatusFilter, trainerRequestsReloadKey])
+
   const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
 
   const filteredInvites = useMemo(() => {
@@ -376,6 +466,14 @@ export default function AdminUsersPage() {
       return matchesRole && matchesSearch
     })
   }, [invites, roleFilter, searchQuery])
+
+  const filteredTrainerRequests = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return trainerRequests
+    return trainerRequests.filter(
+      (req) => req.full_name.toLowerCase().includes(q) || req.email.toLowerCase().includes(q),
+    )
+  }, [trainerRequests, searchQuery])
 
   const allSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id))
 
@@ -427,6 +525,53 @@ export default function AdminUsersPage() {
     } finally {
       setInvitesActingId(null)
     }
+  }
+
+  async function handleTrainerRequestAction(request: AdminTrainerRequestListItem, action: 'approve' | 'reject') {
+    setTrainerRequestActionError(null)
+    setTrainerRequestActingId(request.id)
+    try {
+      const res = await apiClient.post<AdminTrainerRequestListItem>(
+        `/v1/admin/trainer-requests/${request.id}/${action}/`,
+      )
+      // The approved/rejected request usually drops out of the current
+      // (default "pending") filter — refetch to keep the list honest.
+      setTrainerRequests((prev) => prev.map((r) => (r.id === request.id ? res.data : r)))
+      setTrainerRequestsReloadKey((k) => k + 1)
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message
+      if (apiMessage) {
+        setTrainerRequestActionError(apiMessage)
+      } else if (err?.response?.status === 404) {
+        setTrainerRequestActionError('This request no longer exists.')
+      } else if (err?.response?.status === 400) {
+        setTrainerRequestActionError(
+          action === 'approve'
+            ? "This request can no longer be approved."
+            : "This request can no longer be rejected.",
+        )
+      } else {
+        setTrainerRequestActionError(`Couldn't ${action} this request. Please try again.`)
+      }
+      // Rethrown on purpose: the detail modal uses this to know the action failed.
+      throw err
+    } finally {
+      setTrainerRequestActingId(null)
+    }
+  }
+
+  // Items for the three-dot menu on each pending request. Must live inside the
+  // component because it calls handleTrainerRequestAction.
+  function trainerRequestMenuItems(req: AdminTrainerRequestListItem): RowActionMenuItem[] {
+    const run = (action: 'approve' | 'reject') => {
+      // The error banner is already set by handleTrainerRequestAction; swallow
+      // the rethrow here so it doesn't become an unhandled promise rejection.
+      handleTrainerRequestAction(req, action).catch(() => {})
+    }
+    return [
+      { label: 'Approve', icon: <CheckCircle2 size={15} />, onClick: () => run('approve') },
+      { label: 'Reject', icon: <Ban size={15} />, danger: true, onClick: () => run('reject') },
+    ]
   }
 
   function handleViewProfile(user: AdminUser) {
@@ -496,6 +641,8 @@ export default function AdminUsersPage() {
     setOpenMenuId(null)
     setOpenInviteMenuId(null)
     setInviteActionError(null)
+    setTrainerRequestActionError(null)
+    if (next === 'trainer-requests') setTrainerRequestsStatusFilter('pending')
   }
 
   async function handleInviteUser(payload: InviteUserPayload) {
@@ -506,14 +653,18 @@ export default function AdminUsersPage() {
 
   return (
     <AdminShell>
-      <style>{PAGE_CSS + USER_PROFILE_MODAL_ALL_CSS}</style>
+      <style>{PAGE_CSS + USER_PROFILE_MODAL_ALL_CSS + TRAINER_REQUEST_MODAL_CSS}</style>
       <div className="au-page">
 
         <div className="au-header">
           <div>
             <h1 className="au-title">Users &amp; Roles</h1>
             <p className="au-subtitle">
-              {view === 'members' ? `${totalUsers} total members` : `${invites.length} invites sent`}
+              {view === 'members'
+                ? `${totalUsers} total members`
+                : view === 'invites'
+                ? `${invites.length} invites sent`
+                : `${trainerRequests.length} trainer requests`}
             </p>
           </div>
           <button className="au-create-btn" type="button" onClick={() => setInviting(true)}>
@@ -538,28 +689,53 @@ export default function AdminUsersPage() {
             Invites
             {invitesLoaded && <span className="au-view-tab-count">{invites.length}</span>}
           </button>
+          <button
+            className={`au-view-tab${view === 'trainer-requests' ? ' active' : ''}`}
+            type="button"
+            onClick={() => handleSwitchView('trainer-requests')}
+          >
+            Trainer requests
+            {trainerRequestsLoaded && <span className="au-view-tab-count">{trainerRequests.length}</span>}
+          </button>
         </div>
 
         <div className="au-panel">
           <div className="au-toolbar">
             <div className="au-role-tabs">
-              {ROLE_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  className={`au-role-tab${roleFilter === tab.key ? ' active' : ''}`}
-                  onClick={() => setRoleFilter(tab.key)}
-                  type="button"
-                >
-                  {tab.label}
-                </button>
-              ))}
+              {view === 'trainer-requests'
+                ? TRAINER_REQUEST_STATUS_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      className={`au-role-tab${trainerRequestsStatusFilter === tab.key ? ' active' : ''}`}
+                      onClick={() => setTrainerRequestsStatusFilter(tab.key)}
+                      type="button"
+                    >
+                      {tab.label}
+                    </button>
+                  ))
+                : ROLE_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      className={`au-role-tab${roleFilter === tab.key ? ' active' : ''}`}
+                      onClick={() => setRoleFilter(tab.key)}
+                      type="button"
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
             </div>
 
             <div className="au-search-wrap">
               <Search size={16} color="#99A1AF" />
               <input
                 type="text"
-                placeholder={view === 'members' ? 'Search by name or email...' : 'Search by email...'}
+                placeholder={
+                  view === 'members'
+                    ? 'Search by name or email...'
+                    : view === 'invites'
+                    ? 'Search by email...'
+                    : 'Search by name or email...'
+                }
                 value={view === 'members' ? searchInput : searchQuery}
                 onChange={(e) => (view === 'members' ? setSearchInput(e.target.value) : setSearchQuery(e.target.value))}
               />
@@ -976,8 +1152,155 @@ export default function AdminUsersPage() {
               )}
             </>
           )}
+
+          {view === 'trainer-requests' && (
+            <>
+              {trainerRequestsLoading && (
+                <div className="au-loading">
+                  <Loader2 size={20} className="animate-spin" /> Loading trainer requests…
+                </div>
+              )}
+
+              {!trainerRequestsLoading && trainerRequestsLoadError && (
+                <div className="au-load-error">
+                  <AlertCircle size={20} />
+                  {trainerRequestsLoadError}
+                  <button className="au-retry-btn" type="button" onClick={() => setTrainerRequestsReloadKey((k) => k + 1)}>
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!trainerRequestsLoading && !trainerRequestsLoadError && (
+                <>
+                  {trainerRequestActionError && (
+                    <div className="au-inline-error" role="alert">
+                      <AlertCircle size={15} />
+                      {trainerRequestActionError}
+                    </div>
+                  )}
+
+                  <div className="au-table-wrap">
+                    <table className="au-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Subject</th>
+                          <th>Requested</th>
+                          <th>Status</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTrainerRequests.map((req) => {
+                          const StatusIcon = trainerRequestBadgeIcon(req.status)
+                          const isPending = req.status.toLowerCase() === 'pending'
+                          const isActing = trainerRequestActingId === req.id
+                          return (
+                            <tr
+                              key={req.id}
+                              onClick={() => setViewingTrainerRequest(req)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <td>{req.full_name}</td>
+                              <td>{req.email}</td>
+                              <td className="au-subject-cell" title={req.subject}>{req.subject}</td>
+                              <td>{formatJoinedDate(req.created_at)}</td>
+                              <td>
+                                <span className={`au-trainer-badge ${trainerRequestBadgeClass(req.status)}`}>
+                                  <StatusIcon size={12} />
+                                  {req.status}
+                                </span>
+                              </td>
+                              <td>
+                                {isPending && (
+                                  <RowActionMenu
+                                    label="Request actions"
+                                    loading={isActing}
+                                    items={trainerRequestMenuItems(req)}
+                                  />
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+
+                    {filteredTrainerRequests.length === 0 && (
+                      <div className="au-empty">No trainer requests match your filters.</div>
+                    )}
+                  </div>
+
+                  <div className="au-card-list">
+                    {filteredTrainerRequests.map((req) => {
+                      const StatusIcon = trainerRequestBadgeIcon(req.status)
+                      const isPending = req.status.toLowerCase() === 'pending'
+                      const isActing = trainerRequestActingId === req.id
+                      return (
+                        <div
+                          className="au-user-card"
+                          key={req.id}
+                          onClick={() => setViewingTrainerRequest(req)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="au-invite-card-main">
+                            <div className="au-invite-card-top">
+                              <div style={{ minWidth: 0 }}>
+                                <div className="au-invite-card-email">{req.full_name}</div>
+                                <div className="au-user-card-email">{req.email}</div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span className={`au-trainer-badge ${trainerRequestBadgeClass(req.status)}`}>
+                                  <StatusIcon size={12} />
+                                  {req.status}
+                                </span>
+                                {isPending && (
+                                  <RowActionMenu
+                                    label="Request actions"
+                                    loading={isActing}
+                                    items={trainerRequestMenuItems(req)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="au-user-card-meta">
+                              <span>Subject <strong>{req.subject}</strong></span>
+                              <span>Requested <strong>{formatJoinedDate(req.created_at)}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {filteredTrainerRequests.length === 0 && (
+                      <div className="au-empty">No trainer requests match your filters.</div>
+                    )}
+                  </div>
+
+                  <div className="au-footer">
+                    <span className="au-footer-text">
+                      Showing {filteredTrainerRequests.length} of {trainerRequests.length} requests
+                    </span>
+                    <span className="au-page-pill">1</span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
+
+      {viewingTrainerRequest && (
+        <TrainerRequestModal
+          request={viewingTrainerRequest}
+          onClose={() => setViewingTrainerRequest(null)}
+          onApprove={(req) => handleTrainerRequestAction(req, 'approve')}
+          onReject={(req) => handleTrainerRequestAction(req, 'reject')}
+        />
+      )}
 
       {viewingUser && (
         <UserProfileModal

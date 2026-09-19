@@ -12,8 +12,14 @@ import type {
 import type { User } from '../types/index'
 
 export type AuthResult =
-  | { success: true; user?: User; token?: string }
-  | { success: false; error?: string; statusCode?: number; code?: string }
+  | { success: true; user?: User; token?: string; is_email_verified?: boolean }
+  | {
+      success: false
+      error?: string
+      statusCode?: number
+      code?: string
+      fieldErrors?: Record<string, string | string[]>
+    }
 
 export const useAuth = () => {
   const user = useAuthStore((s) => s.user)
@@ -43,15 +49,15 @@ export const useAuth = () => {
         return { success: false, error: 'Failed to fetch user info' }
       }
       const user: User = {
-        id: userData.id,
-        email: userData.email,
-        name: `${userData.first_name} ${userData.last_name}`.trim(),
-        role: userData.role,
-        createdAt: userData.created_at,
-        learner_profile: userData.learner_profile || null,
-        avatar_url: userData.avatar_url || null,
-        permissions: userData.permissions || null,
-      }
+  id: userData.id,
+  email: userData.email,
+  name: `${userData.first_name} ${userData.last_name}`.trim(),
+  role: userData.role,
+  createdAt: userData.created_at,
+  learner_profile: userData.learner_profile || null,
+  avatar_url: userData.avatar_url || null,
+  permissions: userData.permissions || null,   
+}
       store.login(user, result.access, result.refresh)
       return { success: true, user, token: result.access }
     } catch (error) {
@@ -64,24 +70,32 @@ export const useAuth = () => {
   }, [])
 
   const signup = useCallback(async (formData: SignupPayload): Promise<AuthResult> => {
-    const store = useAuthStore.getState()
-    try {
-      store.setLoading(true)
-      store.clearError()
-      const result = await authAPI.signup(formData)
-      if (!result.success) {
-        store.setError(result.error || 'Signup failed')
-        return { success: false, error: result.error }
-      }
-      return { success: true }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Signup failed'
-      store.setError(message)
-      return { success: false, error: message }
-    } finally {
-      store.setLoading(false)
-    }
-  }, [])
+  const store = useAuthStore.getState()
+  try {
+    store.setLoading(true)
+    store.clearError()
+    const result = await authAPI.signup(formData)
+   if (!result.success) {
+  const hasTrainerCodeError = Boolean(
+    result.fieldErrors?.trainer_code ?? result.fieldErrors?.trainerCode,
+  )
+  if (!hasTrainerCodeError) store.setError(result.error || 'Signup failed')
+  return {
+    success: false,
+    error: result.error,
+    statusCode: result.statusCode,
+    fieldErrors: result.fieldErrors,
+  }
+}
+    return { success: true, is_email_verified: result.data.is_email_verified }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Signup failed'
+    store.setError(message)
+    return { success: false, error: message }
+  } finally {
+    store.setLoading(false)
+  }
+}, [])
 
   const verifyEmail = useCallback(async (payload: EmailVerificationPayload): Promise<AuthResult> => {
     const store = useAuthStore.getState()
@@ -201,6 +215,7 @@ export const useAuth = () => {
           createdAt: userData.created_at,
           learner_profile: userData.learner_profile || null,
           avatar_url: userData.avatar_url || null,
+          permissions: userData.permissions || null,
         }
         store.setUser(user)
         return { success: true, user }

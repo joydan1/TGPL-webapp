@@ -61,6 +61,7 @@ export interface SignupPayload {
   firstName: string
   lastName: string
   role: 'learner' | 'trainer' | 'admin'
+  trainerCode?: string
 }
 
 export interface LoginPayload {
@@ -166,20 +167,39 @@ export type LoginResult =
 export type CheckoutResult =
   | { success: true; data: CheckoutResponse | FreeCourseCheckoutResponse }
   | { success: false; error: string; statusCode?: number }
+export interface TrainerRequestPayload {
+  fullName: string
+  email: string
+  subject: string
+  message: string
+}
+
+export type SignupResult =
+  | { success: true; data: UserResponse }
+  | { success: false; error: string; fieldErrors?: Record<string, string | string[]>; statusCode?: number }
+
+export interface TrainerRequestResponse {
+  id: string
+  status: string
+  created_at: string
+}
+
+export type TrainerRequestResult =
+  | { success: true; data: TrainerRequestResponse }
+  | { success: false; error: string; fieldErrors?: Record<string, string | string[]>; statusCode?: number }
 
 
-  
 // ─── Routes that should NOT trigger a token refresh on 401 ───────────────────
 
 const SKIP_REFRESH_ROUTES = [
   API_ENDPOINTS.LOGIN,
   API_ENDPOINTS.SIGNUP,
+  API_ENDPOINTS.REFRESH_TOKEN,   
   API_ENDPOINTS.EMAIL_VERIFICATION_SEND,
   API_ENDPOINTS.EMAIL_VERIFICATION_CONFIRM,
   API_ENDPOINTS.PASSWORD_RESET,
   API_ENDPOINTS.PASSWORD_RESET_CONFIRM,
 ]
-
 const SKIP_FORBIDDEN_REDIRECT_PATTERNS = [
   /\/v1\/courses\//,
 ]
@@ -212,12 +232,14 @@ class ApiClient {
         const status = error.response?.status
 
         if (status === 401) {
-          if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
-            return Promise.reject(error)
-          }
-          return this.handleTokenExpiry(error)
-        }
-
+  if (SKIP_REFRESH_ROUTES.some((route) => url.includes(route))) {
+    return Promise.reject(error)
+  }
+  if ((error.config as { _retried?: boolean } | undefined)?._retried) {
+    return Promise.reject(error)
+  }
+  return this.handleTokenExpiry(error)
+}
         if (status === 403) {
           if (error.response?.data?.code === 'missing_permission') {
             return Promise.reject(error)
@@ -256,10 +278,11 @@ class ApiClient {
 
     try {
       const newToken = await this.refreshTokenPromise
-      if (newToken && config) {
-        config.headers.Authorization = `Bearer ${newToken}`
-        return this.axiosInstance(config)
-      }
+     if (newToken && config) {
+  ;(config as typeof config & { _retried?: boolean })._retried = true
+  config.headers.Authorization = `Bearer ${newToken}`
+  return this.axiosInstance(config)
+}
     } catch {
       useAuthStore.getState().logout()
       window.location.href = '/login'
@@ -345,6 +368,18 @@ export function parseApiError(error: unknown, fallback: string): { message: stri
 
   return { message, statusCode, code }
 }
+function extractFieldErrors(error: unknown): Record<string, string | string[]> | undefined {
+  const err = error as AxiosError<ApiErrorResponse>
+  const data = err.response?.data
+  if (!data || typeof data !== 'object') return undefined
+  const { code, detail, ...rest } = data as Record<string, unknown>
+  const fieldErrors: Record<string, string | string[]> = {}
+  for (const [key, value] of Object.entries(rest)) {
+    if (Array.isArray(value)) fieldErrors[key] = value.map(String)
+    else if (typeof value === 'string') fieldErrors[key] = value
+  }
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined
+}
 
 function simplifyFileError(message: string, statusCode?: number): string {
   const lower = message.toLowerCase()
@@ -381,7 +416,7 @@ function humanizeStorageUploadError(status: number): string {
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const authAPI = {
- signup: async (payload: SignupPayload) => {
+signup: async (payload: SignupPayload): Promise<SignupResult> => {
   try {
     const response = await apiClient.post<UserResponse>(API_ENDPOINTS.SIGNUP, {
       email: payload.email,
@@ -389,11 +424,12 @@ export const authAPI = {
       first_name: payload.firstName,
       last_name: payload.lastName,
       role: payload.role,
+      ...(payload.trainerCode ? { trainer_code: payload.trainerCode } : {}),
     })
     return { success: true as const, data: response.data }
   } catch (error) {
-    const { message } = parseApiError(error, 'Signup failed')
-    return { success: false as const, error: message }
+    const { message, statusCode } = parseApiError(error, 'Signup failed')
+    return { success: false as const, error: message, fieldErrors: extractFieldErrors(error), statusCode }
   }
 },
 
@@ -511,7 +547,20 @@ export const authAPI = {
       return { success: false as const, error: message }
     }
   },
-
+submitTrainerRequest: async (payload: TrainerRequestPayload): Promise<TrainerRequestResult> => {
+  try {
+    const response = await apiClient.post<TrainerRequestResponse>('/v1/trainer-requests/', {
+      full_name: payload.fullName,
+      email: payload.email,
+      subject: payload.subject,
+      message: payload.message,
+    })
+    return { success: true as const, data: response.data }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Failed to send your request')
+    return { success: false as const, error: message, fieldErrors: extractFieldErrors(error), statusCode }
+  }
+},
  changePassword: async (current_password: string, new_password: string) => {
   try {
     await apiClient.post('/v1/auth/password-change/', {

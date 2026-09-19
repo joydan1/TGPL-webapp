@@ -9,6 +9,31 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
 
+// iOS Safari (and any other browser on iOS, since they're all WebKit under the
+// hood) only supports Web Push when the site has been added to the Home
+
+function detectIOSHomeScreenState() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return { isIOS: false, isStandalone: false, needsHomeScreenInstall: false }
+  }
+
+  const ua = navigator.userAgent
+  // Covers iPhone/iPod, iPad on iOS <13, and iPad on iOS 13+ which reports as
+  // "MacIntel" but exposes touch points a real Mac never has.
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+  // Standalone = launched from a Home Screen icon. iOS exposes this as
+  // navigator.standalone (non-standard, Safari-only); other browsers use the
+  // display-mode media query.
+  const isStandalone =
+    (window.navigator as any).standalone === true ||
+    window.matchMedia?.('(display-mode: standalone)').matches === true
+
+  return { isIOS, isStandalone, needsHomeScreenInstall: isIOS && !isStandalone }
+}
+
 export function usePushNotifications() {
   const isSupported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
   const [permission, setPermission] = useState<NotificationPermission | null>(
@@ -17,15 +42,18 @@ export function usePushNotifications() {
   const [subscribing, setSubscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [{ isIOS, isStandalone, needsHomeScreenInstall }] = useState(detectIOSHomeScreenState)
+
   // If the browser already granted permission in a previous session, silently
   // re-register the subscription (idempotent server-side) — no prompt shown.
   useEffect(() => {
     if (!isSupported || Notification.permission !== 'granted') return
+    if (needsHomeScreenInstall) return // iOS Safari not installed — nothing to re-subscribe
     registerAndSubscribe().catch(() => {
       // silent — this is a background sync, not a user-initiated action
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSupported])
+  }, [isSupported, needsHomeScreenInstall])
 
    async function registerAndSubscribe() {
     const registration = await navigator.serviceWorker.register('/sw.js')
@@ -54,9 +82,14 @@ export function usePushNotifications() {
     if (!result.success) throw new Error(result.error)
     return subscription
   }
+
    const subscribe = useCallback(async () => {
     if (!isSupported) {
       setError('Push notifications are not supported in this browser.')
+      return false
+    }
+    if (needsHomeScreenInstall) {
+      setError('Add this app to your Home Screen first, then enable notifications from there.')
       return false
     }
     setSubscribing(true)
@@ -81,7 +114,7 @@ export function usePushNotifications() {
       setSubscribing(false)
       return false
     }
-  }, [isSupported])
+  }, [isSupported, needsHomeScreenInstall])
 
   const unsubscribe = useCallback(async () => {
     if (!isSupported) return
@@ -94,5 +127,15 @@ export function usePushNotifications() {
     await pushAPI.unsubscribe(endpoint)
   }, [isSupported])
 
-  return { isSupported, permission, subscribing, error, subscribe, unsubscribe }
+  return {
+    isSupported,
+    permission,
+    subscribing,
+    error,
+    subscribe,
+    unsubscribe,
+    isIOS,
+    isStandalone,
+    needsHomeScreenInstall,
+  }
 }

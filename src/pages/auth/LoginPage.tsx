@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+﻿import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useAuthStore } from '../../store/auth'
 import { authAPI } from '../../services/api'
@@ -10,10 +10,55 @@ import Alert from '../../components/Alert'
 import Spinner from '../../components/Spinner'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
 
+type LoginRole = 'learner' | 'trainer'
+
+// All role-specific wording lives here so the JSX stays clean.
+const CONTENT: Record<
+  LoginRole,
+  {
+    toggleLabel: string
+    heroLines: string[]
+    heroText: string
+    title: string
+    subtitle: string
+    footerPrompt: string
+    footerLinkText: string
+    footerLinkTo: string
+  }
+> = {
+  learner: {
+    toggleLabel: "I'm a learner",
+    heroLines: ['Master', 'Project Management,', 'Boost Your Career'],
+    heroText: 'Learn the skills to plan, execute, and deliver successful projects.',
+    title: 'Welcome back',
+    subtitle: 'Log in to continue learning.',
+    footerPrompt: 'New here?',
+    footerLinkText: 'Create an account',
+    footerLinkTo: ROUTES.SIGNUP,
+  },
+  trainer: {
+    toggleLabel: "I'm a trainer",
+    heroLines: ['Share Your Expertise,', 'Shape the Next', 'Project Leaders'],
+    heroText: 'Manage your courses, review submissions, and support your learners.',
+    title: 'Trainer login',
+    subtitle: 'Log in to manage your courses and learners.',
+    footerPrompt: 'Want to teach?',
+    footerLinkText: 'Create a trainer account',
+    // The signup page already reads ?role=trainer and preselects the trainer tab.
+    footerLinkTo: `${ROUTES.SIGNUP}?role=trainer`,
+  },
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { login, isLoading, error, clearError } = useAuth()
 
+  // Copy only: this does not restrict who can log in. After login, the redirect
+  // is still decided by the account's real role.
+  const [role, setRole] = useState<LoginRole>(
+    searchParams.get('role') === 'trainer' ? 'trainer' : 'learner',
+  )
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -21,6 +66,8 @@ export default function LoginPage() {
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
+
+  const content = CONTENT[role]
 
   const isFormFilled =
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) &&
@@ -75,10 +122,8 @@ export default function LoginPage() {
           ? RouteBuilder.dashboard()
           : RouteBuilder.onboarding()
       navigate(destination)
-    } else {
-     if (!result.success && (result as {success:false;statusCode?:number;code?:string}).statusCode === 403 && (result as {success:false;statusCode?:number;code?:string}).code === 'email_not_verified') {
-        setUnverifiedEmail(formData.email)
-      }
+    } else if (result.statusCode === 403 && result.code === 'email_not_verified') {
+      setUnverifiedEmail(formData.email)
     }
   }
 
@@ -132,6 +177,12 @@ export default function LoginPage() {
         .login-logo img { height: 2.75rem; width: auto; }
 
         .login-card { width: 100%; max-width: 440px; background: var(--white); border: 1px solid #E8E8E8; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm); }
+
+        .login-role-toggle { display: flex; gap: 6px; padding: 4px; background: var(--grey); border-radius: var(--radius-lg); margin-bottom: 1.5rem; }
+        .login-role-btn { flex: 1; padding: 8px 12px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 500; cursor: pointer; font-family: inherit; border: 2px solid transparent; background: var(--grey); color: var(--black); transition: all 200ms ease; }
+        .login-role-btn.active { background: var(--white); border-color: var(--primary-500); color: var(--primary-500); box-shadow: 0 1px 6px rgba(36,146,235,0.18); }
+        .login-role-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+
         .login-title { text-align: center; margin-bottom: 1.75rem; }
         .login-title h2 { color: var(--black); font-size: 1.75rem; line-height: 1.1; margin: 0 0 0.75rem; font-weight: 700; }
         .login-title p { color: var(--black); opacity: 0.85; font-size: 1rem; line-height: 1.6; margin: 0; }
@@ -155,14 +206,28 @@ export default function LoginPage() {
         .login-trust-badge { font-size: 0.875rem; color: #999; margin-top: 1.25rem; margin-bottom: 0; text-align: center; }
 
         @media (max-width: 1024px) { .login-hero { display: none; } .login-form-panel { width: 100%; } }
-        @media (max-width: 640px) { .login-form-panel { padding: 1.5rem 1rem; } .login-card { max-width: 100%; } .login-logo img { height: 1.5rem; width: auto; } .login-hero-content h1 { font-size: 1.5rem; } .login-hero-content p { font-size: 1rem; } }
+        @media (max-width: 640px) {
+          .login-form-panel { padding: 1.5rem 1rem; }
+          .login-card { max-width: 100%; padding: 1.5rem 1.25rem; }
+          .login-logo img { height: 1.5rem; width: auto; }
+          .login-hero-content h1 { font-size: 1.5rem; }
+          .login-hero-content p { font-size: 1rem; }
+          .login-title h2 { font-size: 1.5rem; }
+        }
       `}</style>
 
       <div className="login-page">
         <div className="login-hero">
           <div className="login-hero-content">
-            <h1>Master<br />Project Management,<br />Boost Your Career</h1>
-            <p>Learn the skills to plan, execute, and deliver<br /> successful projects.</p>
+            <h1>
+              {content.heroLines.map((line, i) => (
+                <React.Fragment key={line}>
+                  {i > 0 && <br />}
+                  {line}
+                </React.Fragment>
+              ))}
+            </h1>
+            <p>{content.heroText}</p>
             <div className="login-hero-dots">
               <button className="dot-button" aria-label="Slide 1"><span className="dot-active" /></button>
               <button className="dot-button" aria-label="Slide 2"><span className="dot-inactive" /></button>
@@ -181,9 +246,23 @@ export default function LoginPage() {
           </div>
 
           <div className="login-card">
+            <div className="login-role-toggle">
+              {(['learner', 'trainer'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`login-role-btn ${role === r ? 'active' : ''}`}
+                  aria-pressed={role === r}
+                  onClick={() => setRole(r)}
+                >
+                  {CONTENT[r].toggleLabel}
+                </button>
+              ))}
+            </div>
+
             <div className="login-title">
-              <h2>Welcome back</h2>
-              <p>Log in to continue learning.</p>
+              <h2>{content.title}</h2>
+              <p>{content.subtitle}</p>
             </div>
 
             {unverifiedEmail && (
@@ -250,7 +329,7 @@ export default function LoginPage() {
             </form>
 
             <div className="login-footer">
-              <p>New here? <Link to={ROUTES.SIGNUP}>Create an account</Link></p>
+              <p>{content.footerPrompt} <Link to={content.footerLinkTo}>{content.footerLinkText}</Link></p>
             </div>
           </div>
 

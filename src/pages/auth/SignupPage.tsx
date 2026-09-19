@@ -1,56 +1,5 @@
-/**
- * SignupPage
- *
- * FLOW:
- * 1. On mount: clearError() runs once to wipe any stale store error.
- *    (clearError is stable — empty deps [] is safe, no re-fire loop)
- *
- * 2. Role toggle: "I'm a learner" / "I'm a trainer"
- *    - Learner: normal signup flow.
- *    - Trainer: same form, plus a 6-digit "Unique Code" field (issued by an
- *      admin). No alert, no disabled button anymore — trainers can self-serve
- *      as long as they have a valid code.
- *    - "Contact admin to get a code" swaps the card into a short contact
- *      form (name/email/subject/message) for trainers who don't have a code
- *      yet. "Go back" returns to the signup form without losing what was
- *      already typed there.
- *
- * 3. isFormFilled: gates the button before any submission attempt.
- *    Checks: firstName, lastName, valid email format, password >= 8 chars,
- *    confirmPassword non-empty, terms accepted, and — for trainers — a
- *    complete 6-digit unique code.
- *
- * 4. Submit:
- *    a. clearError() + setFormErrors({}) — wipes stale errors
- *    b. validateForm() — sets per-field error messages if invalid
- *    c. Trainer only: validates the unique code (currently MOCKED — see
- *       mockValidateUniqueCode below — until the backend endpoint exists)
- *    d. Calls useAuth.signup() → authAPI.signup() → POST /api/v1/auth/signup/
- *       Payload is camelCase here; authAPI maps to snake_case before sending.
- *       Trainer signups also include `trainerCode`.
- *    e. SUCCESS: switches to the email verification screen (emailSent = true)
- *       No tokens issued at this stage — user must verify email first.
- *    f. FAILURE: error stored in Zustand, displayed via {error} Alert above the form.
- *
- * 5. Email verification screen (after successful signup):
- *    - Shows the email address submitted
- *    - Resend button calls authAPI.sendVerificationEmail() — uses axios + correct path
- *    - "Back to login" link
- *
- * 6. Password strength indicator: shown live as user types, hidden if error is showing
- * 7. Live password mismatch: shown as user types in confirm field, before submit
- *
- * MOCKED — BACKEND NOT READY YET:
- * - mockValidateUniqueCode(): stands in for POST /api/v1/auth/validate-trainer-code/
- * - mockSubmitContactForm(): stands in for POST /api/v1/support/contact/
- * Both are called with a fake network delay and simple pass/fail logic so the
- * UI/UX can be built and demoed now. Swap the bodies for real authAPI calls
- * (and thread trainerCode into useAuth's signup() payload type) once the
- * backend ships these endpoints — search "TODO" below.
- */
-
 import React, { useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Eye, EyeOff, ChevronLeft, Send } from 'lucide-react'
 import { authAPI } from '../../services/api'
@@ -62,7 +11,8 @@ import { ROUTES } from '../../constants/routes'
 type StrengthLevel = { score: number; label: string; color: string }
 type ContactFormData = { name: string; email: string; subject: string; message: string }
 
-const TRAINER_CODE_LENGTH = 6
+const CODE_LENGTH = 6
+const emptyCode = (): string[] => Array(CODE_LENGTH).fill('')
 
 function getPasswordStrength(password: string): StrengthLevel {
   if (!password) return { score: 0, label: '', color: '' }
@@ -77,7 +27,9 @@ function getPasswordStrength(password: string): StrengthLevel {
     { score: 3, label: 'Good', color: 'var(--primary-500)' },
     { score: 4, label: 'Strong', color: 'var(--success)' },
   ]
-  return { ...levels[score - 1] }
+  // A non-empty password can still score 0 (e.g. "abc"); treat that as Weak
+  // instead of indexing levels[-1].
+  return { ...levels[Math.max(score, 1) - 1] }
 }
 
 function PasswordStrengthIndicator({ password }: { password: string }) {
@@ -108,41 +60,37 @@ function Spinner() {
   )
 }
 
-// TODO: replace with a real call once the backend ships
-// POST /api/v1/auth/validate-trainer-code/
-async function mockValidateUniqueCode(code: string): Promise<{ valid: boolean }> {
-  await new Promise((resolve) => setTimeout(resolve, 600))
-  // Temporary mock: any complete 6-digit code is accepted except all zeros,
-  // which simulates an invalid/expired code so the error state is testable.
-  return { valid: code.length === TRAINER_CODE_LENGTH && code !== '000000' }
-}
-
-// TODO: replace with a real call once the backend ships
-// POST /api/v1/support/contact/
-async function mockSubmitContactForm(_data: ContactFormData): Promise<{ success: boolean }> {
-  await new Promise((resolve) => setTimeout(resolve, 700))
-  return { success: true }
-}
-
 export default function SignupPage() {
   const { signup, isLoading, error, clearError } = useAuth()
+  const [searchParams] = useSearchParams()
 
-  const [role, setRole] = useState<'learner' | 'trainer'>('learner')
+  const [role, setRole] = useState<'learner' | 'trainer'>(
+    searchParams.get('role') === 'trainer' ? 'trainer' : 'learner',
+  )
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  // Trainer accounts created via a valid code come back already verified —
+  // there's no email to check, so this gets its own success screen.
+  const [trainerActivated, setTrainerActivated] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' })
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    trainerCode: '',
+  })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [termsAccepted, setTermsAccepted] = useState(false)
 
-  // Trainer unique-code field
-  const [uniqueCode, setUniqueCode] = useState<string[]>(Array(TRAINER_CODE_LENGTH).fill(''))
-  const [codeValidating, setCodeValidating] = useState(false)
-  const codeInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  // Trainer access code: one box per character, mirrored into formData.trainerCode
+  const [uniqueCode, setUniqueCode] = useState<string[]>(emptyCode)
+  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // "Contact admin to get a code" panel (swaps in place of the signup form)
+  // "Don't have a code? Request one" panel (swaps in place of the signup form)
   const [showContactForm, setShowContactForm] = useState(false)
   const [contactFormData, setContactFormData] = useState<ContactFormData>({ name: '', email: '', subject: '', message: '' })
   const [contactErrors, setContactErrors] = useState<Record<string, string>>({})
@@ -162,7 +110,7 @@ export default function SignupPage() {
     formData.password.length >= 8 &&
     formData.confirmPassword.length > 0 &&
     termsAccepted &&
-    (role === 'learner' || uniqueCode.every((digit) => digit.length === 1))
+    (role === 'learner' || formData.trainerCode.length === CODE_LENGTH)
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
@@ -184,8 +132,12 @@ export default function SignupPage() {
       errors.confirmPassword = 'Passwords do not match'
     }
     if (!termsAccepted) errors.terms = 'You must agree to the Terms of Service and Privacy Policy'
-    if (role === 'trainer' && uniqueCode.join('').length < TRAINER_CODE_LENGTH) {
-      errors.uniqueCode = 'Enter your 6-digit trainer code'
+    if (role === 'trainer') {
+      if (formData.trainerCode.length === 0) {
+        errors.trainerCode = 'A trainer access code is required'
+      } else if (formData.trainerCode.length !== CODE_LENGTH) {
+        errors.trainerCode = `Enter the full ${CODE_LENGTH}-character code`
+      }
     }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -198,34 +150,90 @@ export default function SignupPage() {
 
     if (!validateForm()) return
 
-    if (role === 'trainer') {
-      setCodeValidating(true)
-      const codeResult = await mockValidateUniqueCode(uniqueCode.join(''))
-      setCodeValidating(false)
-      if (!codeResult.valid) {
-        setFormErrors((prev) => ({ ...prev, uniqueCode: 'That code is invalid or has expired. Contact admin for a new one.' }))
-        return
-      }
-    }
-
     const result = await signup({
       email: formData.email,
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
       role,
-      // TODO: add `trainerCode?: string` to useAuth's signup() payload type
-      // once the backend accepts it — this cast can come out at that point.
-      ...(role === 'trainer' ? { trainerCode: uniqueCode.join('') } : {}),
-    } as Parameters<typeof signup>[0])
+      // Sent as-is; backend normalises case and the cosmetic hyphen
+      // ("ABC-123" and "abc123" are both accepted).
+      ...(role === 'trainer' ? { trainerCode: formData.trainerCode.trim() } : {}),
+    })
 
-    if (result.success) setEmailSent(true)
+    if (result.success) {
+      if (role === 'trainer' && result.is_email_verified) {
+        setTrainerActivated(true)
+      } else {
+        setEmailSent(true)
+      }
+      return
+    }
+
+    const trainerCodeError = result.fieldErrors?.trainer_code ?? result.fieldErrors?.trainerCode
+    if (trainerCodeError) {
+      const message = Array.isArray(trainerCodeError) ? trainerCodeError[0] : trainerCodeError
+      setFormErrors((prev) => ({ ...prev, trainerCode: message }))
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: '' }))
+  }
+
+  // ── Trainer code helpers ───────────────────────────────────────────────────
+  // Single place that keeps the boxes, formData.trainerCode and the error in sync.
+  const applyCode = (updated: string[]) => {
+    setUniqueCode(updated)
+    setFormData((prev) => ({ ...prev, trainerCode: updated.join('') }))
+    setFormErrors((prev) => (prev.trainerCode ? { ...prev, trainerCode: '' } : prev))
+  }
+
+  const handleCodeChange = (index: number, value: string) => {
+    if (!/^[0-9A-Za-z]?$/.test(value)) return
+
+    const updated = [...uniqueCode]
+    updated[index] = value.toUpperCase()
+    applyCode(updated)
+
+    if (value && index < CODE_LENGTH - 1) {
+      codeInputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !uniqueCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault()
+      codeInputRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < CODE_LENGTH - 1) {
+      e.preventDefault()
+      codeInputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleCodePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    // Strip hyphens/spaces first so a pasted "ABC-123" isn't cut off at 6 raw characters.
+    const chars = e.clipboardData
+      .getData('text')
+      .replace(/[^0-9A-Za-z]/g, '')
+      .toUpperCase()
+      .slice(0, CODE_LENGTH)
+      .split('')
+    if (chars.length === 0) return
+
+    const updated = emptyCode()
+    chars.forEach((char, i) => {
+      updated[i] = char
+    })
+    applyCode(updated)
+
+    // Land on the next empty box, or the last box if the code is complete
+    codeInputRefs.current[Math.min(chars.length, CODE_LENGTH - 1)]?.focus()
   }
 
   const handleResendEmail = async () => {
@@ -239,47 +247,18 @@ export default function SignupPage() {
   const handleRoleChange = (r: 'learner' | 'trainer') => {
     setRole(r)
     if (formErrors.submit) setFormErrors((prev) => ({ ...prev, submit: '' }))
-    if (r === 'learner' && formErrors.uniqueCode) {
-      setFormErrors((prev) => {
-        const next = { ...prev }
-        delete next.uniqueCode
-        return next
-      })
+    if (r === 'learner') {
+      // Don't carry a half-typed code back when the person returns to "trainer"
+      setUniqueCode(emptyCode())
+      setFormData((prev) => ({ ...prev, trainerCode: '' }))
+      if (formErrors.trainerCode) {
+        setFormErrors((prev) => {
+          const next = { ...prev }
+          delete next.trainerCode
+          return next
+        })
+      }
     }
-  }
-
-  const handleCodeChange = (index: number, rawValue: string) => {
-    const value = rawValue.replace(/[^0-9]/g, '').slice(-1)
-    setUniqueCode((prev) => {
-      const next = [...prev]
-      next[index] = value
-      return next
-    })
-    if (formErrors.uniqueCode) setFormErrors((prev) => ({ ...prev, uniqueCode: '' }))
-    if (value && index < TRAINER_CODE_LENGTH - 1) {
-      codeInputRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !uniqueCode[index] && index > 0) {
-      codeInputRefs.current[index - 1]?.focus()
-    }
-  }
-
-  const handleCodePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, TRAINER_CODE_LENGTH)
-    if (!pasted) return
-    setUniqueCode((prev) => {
-      const next = [...prev]
-      pasted.split('').forEach((digit, i) => {
-        next[i] = digit
-      })
-      return next
-    })
-    if (formErrors.uniqueCode) setFormErrors((prev) => ({ ...prev, uniqueCode: '' }))
-    codeInputRefs.current[Math.min(pasted.length, TRAINER_CODE_LENGTH - 1)]?.focus()
   }
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -306,15 +285,71 @@ export default function SignupPage() {
     e.preventDefault()
     if (!validateContactForm()) return
     setContactSubmitting(true)
-    const result = await mockSubmitContactForm(contactFormData)
-    setContactSubmitting(false)
-    if (result.success) setContactSubmitted(true)
+    setContactErrors((prev) => ({ ...prev, form: '' }))
+    try {
+      const result = await authAPI.submitTrainerRequest({
+        fullName: contactFormData.name,
+        email: contactFormData.email,
+        subject: contactFormData.subject,
+        message: contactFormData.message,
+      })
+      if (result.success) {
+        setContactSubmitted(true)
+      } else {
+        // "You already have a request awaiting review" comes back as a 400
+        // on `email` — show it directly, per the backend note.
+        const emailError = result.fieldErrors?.email
+        if (emailError) {
+          setContactErrors((prev) => ({ ...prev, email: Array.isArray(emailError) ? emailError[0] : emailError }))
+        } else {
+          setContactErrors((prev) => ({
+            ...prev,
+            form: result.error || 'Something went wrong. Please try again.',
+          }))
+        }
+      }
+    } catch {
+      setContactErrors((prev) => ({ ...prev, form: 'Something went wrong. Please try again.' }))
+    } finally {
+      setContactSubmitting(false)
+    }
   }
 
   const handleBackFromContact = () => {
     setShowContactForm(false)
     setContactSubmitted(false)
     setContactErrors({})
+  }
+
+  // ── Trainer-account-ready screen (code-based signup, already verified) ──────
+  if (trainerActivated) {
+    return (
+      <>
+        <style>{`* { box-sizing: border-box; }`}</style>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--grey)', padding: '1rem' }}>
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', padding: '3rem 2.5rem', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <img src="/Logo.png" alt="The Global Project Leaders" style={{ height: '2.75rem' }} />
+            </div>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#EBF5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--black)', margin: '0 0 0.75rem', lineHeight: 1.2 }}>You're all set</h2>
+            <p style={{ color: '#4a4a4a', lineHeight: 1.7, margin: '0 0 2rem', fontSize: '0.95rem', overflowWrap: 'anywhere' }}>
+              Your trainer account is ready. You can log in now with <strong>{formData.email}</strong>.
+            </p>
+            <Link
+              to={ROUTES.LOGIN}
+              style={{ display: 'inline-block', width: '100%', padding: '0.8125rem 1rem', background: 'var(--primary-500)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, textDecoration: 'none', fontSize: '0.9rem' }}
+            >
+              Go to login
+            </Link>
+          </div>
+        </div>
+      </>
+    )
   }
 
   // ── Email verification screen ──────────────────────────────────────────────
@@ -334,7 +369,7 @@ export default function SignupPage() {
               </svg>
             </div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--black)', margin: '0 0 0.75rem', lineHeight: 1.2 }}>Check your email</h2>
-            <p style={{ color: '#4a4a4a', lineHeight: 1.7, margin: '0 0 2rem', fontSize: '0.95rem' }}>
+            <p style={{ color: '#4a4a4a', lineHeight: 1.7, margin: '0 0 2rem', fontSize: '0.95rem', overflowWrap: 'anywhere' }}>
               We sent a verification link to <strong>{formData.email}</strong>. Click the link to verify your account and get started.
             </p>
             <div style={{ padding: '1rem', background: '#F9F9F9', borderRadius: 'var(--radius-md)', marginBottom: '2rem' }}>
@@ -441,12 +476,30 @@ export default function SignupPage() {
         .password-match-error { font-size: 0.75rem; color: var(--danger); margin-top: 4px; }
 
         .field-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.375rem; color: var(--black); }
+        .field-error { font-size: 0.75rem; color: var(--danger); margin: 6px 0 0; }
 
-        .code-input-row { display: flex; align-items: center; gap: 6px; }
-        .code-input-box { width: 100%; text-align: center; padding: 0.625rem 0; border-radius: var(--radius-md); font-size: 1rem; font-family: inherit; border: 1px solid #D1D5DB; }
+        /* Trainer access code (6 boxes with a dash after the 3rd) */
+        .code-input-row { display: flex; align-items: center; justify-content: flex-start; gap: 0.5rem; width: 100%; }
+        .code-input-box {
+          flex: 1 1 0;
+          min-width: 0;
+          max-width: 3.25rem;
+          aspect-ratio: 1 / 1;
+          padding: 0;
+          text-align: center;
+          font-size: 1.125rem;
+          font-weight: 600;
+          font-family: inherit;
+          text-transform: uppercase;
+          color: var(--black);
+          background: var(--white);
+          border: 1px solid #D1D5DB;
+          border-radius: var(--radius-md);
+          transition: border-color 150ms ease, box-shadow 150ms ease;
+        }
         .code-input-box:focus { outline: none; border-color: var(--primary-500); box-shadow: 0 0 0 3px rgba(36,146,235,0.12); }
         .code-input-box.has-error { border-color: var(--danger); }
-        .code-dash { color: #999999; font-size: 1rem; }
+        .code-dash { flex: 0 0 auto; color: #999999; font-weight: 600; }
 
         .contact-admin-link { display: inline-block; background: none; border: none; padding: 0; margin-top: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--primary-500); cursor: pointer; font-family: inherit; }
         .contact-admin-link:hover { text-decoration: underline; }
@@ -470,7 +523,9 @@ export default function SignupPage() {
           .signup-hero-content p { font-size: 1rem; }
           .signup-form-panel { padding: 1.5rem 1rem; }
           .name-row { grid-template-columns: 1fr; }
-          .signup-card { max-width: 100%; }
+          .signup-card { max-width: 100%; padding: 1.5rem 1.25rem; }
+          .code-input-row { gap: 0.375rem; }
+          .code-input-box { font-size: 1rem; }
         }
       `}</style>
 
@@ -503,7 +558,7 @@ export default function SignupPage() {
           <div className="signup-card">
             {showContactForm ? (
               contactSubmitted ? (
-                // ── Contact form: success state ────────────────────────────
+                // ── Trainer request: success state ─────────────────────────
                 <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                   <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#EBF5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2">
@@ -511,22 +566,27 @@ export default function SignupPage() {
                       <polyline points="22,6 12,13 2,6" />
                     </svg>
                   </div>
-                  <h2 className="signup-title" style={{ marginBottom: '0.5rem' }}>Message sent</h2>
+                  <h2 className="signup-title" style={{ marginBottom: '0.5rem' }}>Request received</h2>
                   <p style={{ color: '#4a4a4a', lineHeight: 1.6, fontSize: '0.9rem', margin: '0 0 1.5rem' }}>
-                    Our team will review your request and follow up by email with a trainer code.
+                    Our team will review your request. If approved, we'll email you a trainer access code — it's valid for 7 days.
                   </p>
                   <button type="button" className="go-back-link" style={{ marginBottom: 0, justifyContent: 'center', width: '100%' }} onClick={handleBackFromContact}>
                     <ChevronLeft size={16} /> Back to signup
                   </button>
                 </div>
               ) : (
-                // ── Contact form ────────────────────────────────────────────
+                // ── Trainer request form ─────────────────────────────────────
                 <>
                   <button type="button" className="go-back-link" onClick={handleBackFromContact}>
                     <ChevronLeft size={16} /> Go back
                   </button>
-                  <h2 className="signup-title" style={{ textAlign: 'left', marginBottom: '0.375rem' }}>Send us a message</h2>
-                  <p style={{ color: '#666666', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>Fill in the form and we'll be in touch shortly.</p>
+                  <h2 className="signup-title" style={{ textAlign: 'left', marginBottom: '0.375rem' }}>Request trainer access</h2>
+                  <p style={{ color: '#666666', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>Tell us a bit about yourself and we'll review your request.</p>
+                  {contactErrors.form && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <Alert type="error" title="Couldn't send your request">{contactErrors.form}</Alert>
+                    </div>
+                  )}
                   <form className="signup-form" onSubmit={handleContactSubmit}>
                     <Input label="Name" name="name" type="text" placeholder="Your full name" value={contactFormData.name} onChange={handleContactChange} error={contactErrors.name} />
                     <Input label="Email" name="email" type="email" placeholder="your@email.com" value={contactFormData.email} onChange={handleContactChange} error={contactErrors.email} />
@@ -551,7 +611,7 @@ export default function SignupPage() {
                       iconPosition="left"
                       style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
                     >
-                      {contactSubmitting ? 'Sending...' : 'Send Message'}
+                      {contactSubmitting ? 'Sending...' : 'Send Request'}
                     </Button>
                   </form>
                 </>
@@ -584,29 +644,44 @@ export default function SignupPage() {
 
                   {role === 'trainer' && (
                     <div>
-                      <label className="field-label">Unique Code</label>
-                      <div className="code-input-row">
-                        {uniqueCode.map((digit, i) => (
+                      <label className="field-label" id="trainer-code-label">Trainer access code</label>
+
+                      <div className="code-input-row" role="group" aria-labelledby="trainer-code-label">
+                        {uniqueCode.map((char, i) => (
                           <React.Fragment key={i}>
                             <input
-                              ref={(el) => (codeInputRefs.current[i] = el)}
+                              ref={(el) => {
+                                codeInputRefs.current[i] = el
+                              }}
                               type="text"
-                              inputMode="numeric"
+                              inputMode="text"
+                              autoComplete="off"
+                              autoCapitalize="characters"
+                              spellCheck={false}
                               maxLength={1}
-                              value={digit}
+                              value={char}
+                              aria-label={`Trainer code character ${i + 1} of ${CODE_LENGTH}`}
                               onChange={(e) => handleCodeChange(i, e.target.value)}
                               onKeyDown={(e) => handleCodeKeyDown(i, e)}
                               onPaste={handleCodePaste}
-                              className={`code-input-box ${formErrors.uniqueCode ? 'has-error' : ''}`}
-                              aria-label={`Trainer code digit ${i + 1}`}
+                              onFocus={(e) => e.target.select()}
+                              className={`code-input-box ${formErrors.trainerCode ? 'has-error' : ''}`}
                             />
-                            {i === 2 && <span className="code-dash">–</span>}
+                            {i === 2 && <span className="code-dash" aria-hidden="true">-</span>}
                           </React.Fragment>
                         ))}
                       </div>
-                      {formErrors.uniqueCode && <p className="terms-error">{formErrors.uniqueCode}</p>}
-                      <button type="button" className="contact-admin-link" onClick={() => setShowContactForm(true)}>
-                        Contact admin to get a code
+
+                      {formErrors.trainerCode && (
+                        <p className="field-error">{formErrors.trainerCode}</p>
+                      )}
+
+                      <button
+                        type="button"
+                        className="contact-admin-link"
+                        onClick={() => setShowContactForm(true)}
+                      >
+                        Don't have a code? Request one
                       </button>
                     </div>
                   )}
@@ -659,13 +734,13 @@ export default function SignupPage() {
 
                   <Button
                     type="submit"
-                    disabled={!isFormFilled || isLoading || codeValidating}
+                    disabled={!isFormFilled || isLoading}
                     className="submit-button"
-                    icon={isLoading || codeValidating ? <Spinner /> : undefined}
+                    icon={isLoading ? <Spinner /> : undefined}
                     iconPosition="left"
                     style={{ width: '100%', padding: '0.8125rem 1rem', gap: '0.5rem' }}
                   >
-                    {codeValidating ? 'Checking code...' : isLoading ? 'Creating account...' : 'Create account'}
+                    {isLoading ? 'Creating account...' : 'Create account'}
                   </Button>
                 </form>
 
