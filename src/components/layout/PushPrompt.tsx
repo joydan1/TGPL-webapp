@@ -30,9 +30,9 @@ export const PUSH_PROMPT_CSS = `
   .push-prompt-close { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0.125rem; display: flex; flex-shrink: 0; }
   .push-prompt-close:hover { color: #374151; }
 
-  /* Phones: full-width card that sits above the bottom tab bar */
+  /* Phones: full-width card that sits above the top tab bar */
   @media (max-width: 640px) {
-    .push-prompt { left: 0.75rem; right: 0.75rem; width: auto; max-width: none; bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 0.75rem); }
+    .push-prompt { left: 0.75rem; right: 0.75rem; width: auto; max-width: none; top: calc(60px + env(safe-area-inset-bottom, 0px) + 0.75rem); }
   }
 `
 
