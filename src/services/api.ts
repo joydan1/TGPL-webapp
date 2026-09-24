@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosError } from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api'
 import { useAuthStore } from '../store/auth'
-
+import type { UserMode } from '../types/index'
 // ─── Response Types ───────────────────────────────────────────────────────────
 
 export interface ApiErrorResponse {
@@ -26,6 +26,7 @@ export interface UserResponse {
   country: string | null
   bio: string | null
   avatar_url: string | null
+  available_modes?: UserMode[]
   permissions?: {
     manage_users?: boolean
     moderate_content?: boolean

@@ -71,7 +71,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
     return <Navigate to={ROUTES.LOGIN} replace />
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  // requiredRole means "the user can act in this mode". Only admins can act in more than one
+  // mode (trainer and learner screens too), so available_modes is only honoured for admins.
+  // Trainers and learners are always limited to their own role.
+  const modes: string[] =
+    user?.role === 'admin'
+      ? (user.available_modes ?? ['admin'])
+      : user?.role ? [user.role] : []
+  if (requiredRole && !modes.includes(requiredRole)) {
     return <Navigate to={ROUTES.FORBIDDEN} replace />
   }
 
@@ -105,8 +112,11 @@ function CoursePreviewRedirect() {
 
 function App() {
   const { isAuthenticated, user } = useAuthStore()
-  const getAuthenticatedHome = () =>
-    user?.role === 'trainer' ? ROUTES.TRAINER_DASHBOARD : ROUTES.DASHBOARD
+  const getAuthenticatedHome = () => {
+    if (user?.role === 'admin') return ROUTES.ADMIN_DASHBOARD
+    if (user?.role === 'trainer') return ROUTES.TRAINER_DASHBOARD
+    return ROUTES.DASHBOARD
+  }
 
   return (
     <Router>
@@ -281,8 +291,22 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path={ROUTES.TRAINER_BOOKINGS} element={<TrainerBookingsPage />} />
-        <Route path={ROUTES.TRAINER_COMMUNITY} element={<TrainerCommunityPage />} />
+        <Route
+          path={ROUTES.TRAINER_BOOKINGS}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerBookingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_COMMUNITY}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <TrainerCommunityPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path={ROUTES.TRAINER_LIVE_CLASSES}
           element={

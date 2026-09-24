@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Radio, Settings,
-  Search, Bell, ChevronDown,Calendar, ChevronLeft,
+  Search, Bell, ChevronDown, Calendar, ChevronLeft,
   PanelLeftClose, PanelLeftOpen, MessageCircle,
   LogOut, User as UserIcon, Shield, HelpCircle,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
 import { useAuth } from '../../hooks/useAuth'
+import { useModeSwitch } from '../../hooks/useModeSwitch'
 import NotificationPanel, { NOTIF_CSS } from './NotificationPanel'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from './LogoutConfirmModal'
+import ModeSwitch, { MobileModeSwitchItems, MODE_SWITCH_CSS } from './ModeSwitch'
 
 export const NAV_ITEMS = [
   { key: 'home',      label: 'Home',         Icon: Home          },
@@ -23,9 +25,9 @@ export const NAV_ITEMS = [
 
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,    route: ROUTES.PROFILE },
-  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS_SECURITY }, 
+  { key: 'security',      label: 'Security',        Icon: Shield,      route: ROUTES.SETTINGS_SECURITY },
   { key: 'notifications', label: 'Notifications',   Icon: Bell,        route: ROUTES.SETTINGS_NOTIFICATIONS },
-  { key: 'help', label: 'Help & Support', Icon: HelpCircle, route: ROUTES.HELP_SUPPORT }, 
+  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle,  route: ROUTES.HELP_SUPPORT },
   { key: 'logout',        label: 'Log out',         Icon: LogOut,      route: null, danger: true },
 ]
 
@@ -123,6 +125,7 @@ export const SHELL_CSS = `
     .navbar-logo img { height: 1.35rem; width: auto; }
     .navbar-page-subtitle { display: none; }
     .mobile-tabbar { display: block; }
+    .profile-dropdown { width: min(220px, calc(100vw - 2rem)); }
   }
   @media (max-width: 900px) {
     .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
@@ -160,6 +163,7 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { options: switchOptions, canSwitch } = useModeSwitch('learner')
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   const [collapsed,    setCollapsed]    = useState(false)
@@ -180,12 +184,12 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
       return
     }
     onNavChange?.(key)
-    if (key === 'home')     navigate(ROUTES.DASHBOARD)
-    if (key === 'bookings') navigate(RouteBuilder.tutorBooking())
-    if (key === 'myCourse') navigate(ROUTES.COURSES)
-    if (key === 'courses')  navigate(ROUTES.COURSES)
-    if (key === 'live')     navigate(ROUTES.LIVE_SESSIONS)
-      if (key === 'community') navigate(ROUTES.COMMUNITY)
+    if (key === 'home')      navigate(ROUTES.DASHBOARD)
+    if (key === 'bookings')  navigate(RouteBuilder.tutorBooking())
+    if (key === 'myCourse')  navigate(ROUTES.COURSES)
+    if (key === 'courses')   navigate(ROUTES.COURSES)
+    if (key === 'live')      navigate(ROUTES.LIVE_SESSIONS)
+    if (key === 'community') navigate(ROUTES.COMMUNITY)
   }
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -196,24 +200,24 @@ export default function AppShell({ children, activeNav = 'home', onNavChange, pa
   }
 
   function handleSubitemClick(sub: typeof SETTINGS_SUBITEMS[number]) {
-  if (sub.key === 'logout') {
-    setLogoutConfirmOpen(true)
-    return
+    if (sub.key === 'logout') {
+      setLogoutConfirmOpen(true)
+      return
+    }
+    if (sub.route) navigate(sub.route)
   }
-  if (sub.route) navigate(sub.route)
-}
 
-async function handleLogout() {
-  setProfileOpen(false)
-  setLogoutConfirmOpen(false)
-  await logout()
-  navigate(ROUTES.LOGIN)
-}
+  async function handleLogout() {
+    setProfileOpen(false)
+    setLogoutConfirmOpen(false)
+    await logout()
+    navigate(ROUTES.LOGIN)
+  }
 
-function requestLogout() {
-  setProfileOpen(false)
-  setLogoutConfirmOpen(true)
-}
+  function requestLogout() {
+    setProfileOpen(false)
+    setLogoutConfirmOpen(true)
+  }
 
   function toggleNotif() {
     setNotifOpen(o => !o)
@@ -227,7 +231,7 @@ function requestLogout() {
 
   return (
     <>
-      <style>{SHELL_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
+      <style>{SHELL_CSS + MODE_SWITCH_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
       <div className="db-root">
 
         {/* ── Navbar ── */}
@@ -302,6 +306,15 @@ function requestLogout() {
                           <div className="profile-dropdown-email">{user.email}</div>
                         </div>
                       </div>
+
+                      {/* Mobile only: the sidebar (and its switch) is hidden ≤640px */}
+                      {canSwitch && (
+                        <MobileModeSwitchItems
+                          options={switchOptions}
+                          onDone={() => setProfileOpen(false)}
+                        />
+                      )}
+
                       <button
                         className="profile-dropdown-item"
                         onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
@@ -309,8 +322,8 @@ function requestLogout() {
                         <UserIcon size={16} /> Profile
                       </button>
                       <button className="profile-dropdown-item danger" onClick={requestLogout}>
-  <LogOut size={16} /> Log out
-</button>
+                        <LogOut size={16} /> Log out
+                      </button>
                     </div>
                   )}
                 </div>
@@ -358,6 +371,10 @@ function requestLogout() {
                 </div>
               ))}
             </nav>
+
+            {/* ── Switch role (admins only: available_modes has more than one entry) ── */}
+            {canSwitch && <ModeSwitch options={switchOptions} />}
+
             <div className="sidebar-user">
               <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
               <div className="user-text">

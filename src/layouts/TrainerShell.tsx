@@ -7,9 +7,11 @@ import {
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
+import { useModeSwitch } from '../hooks/useModeSwitch'
 import { trainerReviewsAPI } from '../services/api'
 import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationPanel'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
+import ModeSwitch, { MobileModeSwitchItems, MODE_SWITCH_CSS } from '../components/layout/ModeSwitch'
 import { useState, useEffect } from 'react'
 
 
@@ -113,18 +115,19 @@ export const SHELL_CSS = `
   .tab-item .tab-badge { position: absolute; top: 2px; right: calc(50% - 18px); background: #F59E0B; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 999px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
 
   @media (max-width: 640px) {
-  .sidebar { display: none; }
-  .search-wrap { display: none; }
-  .navbar { padding: 0 1rem; }
-  .navbar-logo img { height: 1.35rem; width: auto; }
-  .navbar-page-subtitle { display: none; }
-  .mobile-tabbar { display: block; }
-  .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }  
-}
-@media (max-width: 900px) {
-  .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
-  .navbar-right { gap: 0.625rem; }
-}
+    .sidebar { display: none; }
+    .search-wrap { display: none; }
+    .navbar { padding: 0 1rem; }
+    .navbar-logo img { height: 1.35rem; width: auto; }
+    .navbar-page-subtitle { display: none; }
+    .mobile-tabbar { display: block; }
+    .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+    .profile-dropdown { width: min(220px, calc(100vw - 2rem)); }
+  }
+  @media (max-width: 900px) {
+    .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .navbar-right { gap: 0.625rem; }
+  }
 `
 
 interface TrainerShellProps {
@@ -156,6 +159,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { options: switchOptions, canSwitch } = useModeSwitch('trainer')
 
   const [collapsed,           setCollapsed]           = useState(false)
   const [profileOpen,         setProfileOpen]         = useState(false)
@@ -177,13 +181,13 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   }, [])
 
   const navItems = [
-    { key: 'home',     label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home    },
-    { key: 'courses',  label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
-    {key: 'community',  label: 'Community', route: ROUTES.TRAINER_COMMUNITY, Icon: MessageCircle },
-    { key: 'reviews',  label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star,   badge: pendingReviewsCount || undefined },
-    { key: 'live',     label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
-     { key: 'bookings', label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,    Icon: Calendar },
-    { key: 'settings', label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
+    { key: 'home',      label: 'Home',         route: ROUTES.TRAINER_DASHBOARD,    Icon: Home },
+    { key: 'courses',   label: 'My Courses',   route: ROUTES.TRAINER_COURSES,      Icon: BookOpen },
+    { key: 'community', label: 'Community',    route: ROUTES.TRAINER_COMMUNITY,    Icon: MessageCircle },
+    { key: 'reviews',   label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star, badge: pendingReviewsCount || undefined },
+    { key: 'live',      label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
+    { key: 'bookings',  label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,     Icon: Calendar },
+    { key: 'settings',  label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
   ]
 
   if (!user) return null
@@ -231,7 +235,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
 
   return (
     <>
-      <style>{SHELL_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
+      <style>{SHELL_CSS + MODE_SWITCH_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
       <div className="db-root">
 
         {/* ── Navbar ── */}
@@ -300,6 +304,15 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
                           <div className="profile-dropdown-email">{user.email}</div>
                         </div>
                       </div>
+
+                      {/* Mobile only: the sidebar (and its switch) is hidden ≤640px */}
+                      {canSwitch && (
+                        <MobileModeSwitchItems
+                          options={switchOptions}
+                          onDone={() => setProfileOpen(false)}
+                        />
+                      )}
+
                       <button
                         className="profile-dropdown-item"
                         onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
@@ -326,40 +339,45 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
                 {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
               </button>
             </div>
+
             <nav className="sidebar-nav">
-             {navItems.map(({ key, label, route, Icon, badge }) => {
-  const active = activeRoute === route
-  return (
-    <div key={key}>
-      <div
-        className={`nav-item${active ? ' active' : ''}`}
-        onClick={() => handleNav(key, route)}
-      >
-        <Icon size={18} />
-        <span className="nav-label">{label}</span>
-        {!!badge && <span className="nav-badge">{badge}</span>}
-        {key === 'settings' && (
-          <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
-        )}
-      </div>
-      {key === 'settings' && settingsOpen && (
-        <div className="nav-subitems">
-          {SETTINGS_SUBITEMS.map((sub) => (
-            <button
-              key={sub.key}
-              className={`nav-subitem${sub.danger ? ' danger' : ''}`}
-              onClick={() => handleSubitemClick(sub)}
-            >
-              <sub.Icon size={15} />
-              {sub.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-})}
+              {navItems.map(({ key, label, route, Icon, badge }) => {
+                const active = activeRoute === route
+                return (
+                  <div key={key}>
+                    <div
+                      className={`nav-item${active ? ' active' : ''}`}
+                      onClick={() => handleNav(key, route)}
+                    >
+                      <Icon size={18} />
+                      <span className="nav-label">{label}</span>
+                      {!!badge && <span className="nav-badge">{badge}</span>}
+                      {key === 'settings' && (
+                        <ChevronDown size={16} className={`nav-chevron${settingsOpen ? ' open' : ''}`} />
+                      )}
+                    </div>
+                    {key === 'settings' && settingsOpen && (
+                      <div className="nav-subitems">
+                        {SETTINGS_SUBITEMS.map((sub) => (
+                          <button
+                            key={sub.key}
+                            className={`nav-subitem${sub.danger ? ' danger' : ''}`}
+                            onClick={() => handleSubitemClick(sub)}
+                          >
+                            <sub.Icon size={15} />
+                            {sub.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </nav>
+
+            {/* ── Switch role (admins only: available_modes has more than one entry) ── */}
+            {canSwitch && <ModeSwitch options={switchOptions} />}
+
             <div className="sidebar-user">
               <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
               <div className="user-text">
@@ -385,7 +403,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
         {/* ── Mobile tab bar ── */}
         <div className="mobile-tabbar">
           <div className="mobile-tabbar-inner">
-          {navItems.map(({ key, label, route, Icon, badge }) => (
+            {navItems.map(({ key, label, route, Icon, badge }) => (
               <button
                 key={key}
                 className={`tab-item${activeRoute === route ? ' active' : ''}`}

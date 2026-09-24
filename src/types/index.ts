@@ -5,6 +5,7 @@ export type Goal = 'land_pm_role' | 'switch_careers' | 'upskill_current_role' | 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type CurrentStatus = 'student' | 'working' | 'between_roles' | 'freelancer' | 'career_break'
 export type PreferredLearningHours = '1-3' | '4-6' | '7-10' | '10+'
+export type UserMode = 'admin' | 'trainer' | 'learner'
 
 export interface User {
   id: string
@@ -15,6 +16,7 @@ export interface User {
   learner_profile?: LearnerProfile | null
   avatar_url: string | null
   permissions?: AdminPermissions | null
+   available_modes?: UserMode[]
 }
 
 export interface AdminPermissions {

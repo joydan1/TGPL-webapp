@@ -7,8 +7,10 @@ import {
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
+import { useModeSwitch } from '../hooks/useModeSwitch'
 import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationPanel'
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
+import ModeSwitch, { MobileModeSwitchItems, MODE_SWITCH_CSS } from '../components/layout/ModeSwitch'
 import { useState } from 'react'
 
 export const ADMIN_SHELL_CSS = `
@@ -59,16 +61,6 @@ export const ADMIN_SHELL_CSS = `
   .sidebar.collapsed .nav-label { display: none; }
   .sidebar.collapsed .nav-item { justify-content: center; padding: 0.625rem; }
 
-  /* ── Switch role ── */
-  .switch-role-wrap { position: relative; padding: 0.75rem 0.875rem; border-top: 1px solid #F3F4F6; }
-  .switch-role-btn { width: 100%; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.6rem; padding: 0.55rem 0.75rem; cursor: pointer; color: #374151; font-size: 0.8125rem; font-weight: 600; transition: background 0.15s; }
-  .switch-role-btn:hover { background: #F3F4F6; }
-  .sidebar.collapsed .switch-role-btn .switch-role-label { display: none; }
-  .sidebar.collapsed .switch-role-btn { justify-content: center; }
-  .switch-role-menu { position: absolute; bottom: calc(100% + 0.4rem); left: 0.875rem; right: 0.875rem; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.1); padding: 0.4rem; z-index: 300; }
-  .switch-role-option { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.6rem 0.7rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; color: #374151; cursor: pointer; }
-  .switch-role-option:hover { background: #F9FAFB; }
-
   .sidebar-user { padding: 1rem 0.875rem; border-top: 1px solid #F3F4F6; display: flex; align-items: center; gap: 0.625rem; overflow: hidden; }
   .user-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #2492EB; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; }
   .user-text { overflow: hidden; }
@@ -81,24 +73,26 @@ export const ADMIN_SHELL_CSS = `
   .page-dashboard-back { padding: 0.75rem 1.5rem 0; }
   .page-dashboard-back button { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #E5E7EB; border-radius: 50%; background: #fff; color: #6B7280; cursor: pointer; }
   .page-dashboard-back button:hover { color: #2492EB; border-color: #BFDBFE; background: #EFF6FF; }
-/* ── Mobile tab bar ── */
+
+  /* ── Mobile tab bar ── */
   .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
   .tab-item.active { color: #2492EB; }
 
- @media (max-width: 640px) {
-  .sidebar { display: none; }
-  .search-wrap { display: none; }
-  .navbar { padding: 0 1rem; }
-  .navbar-logo img { height: 1.35rem; width: auto; }
-  .mobile-tabbar { display: block; }
-  .main { padding-bottom: 60px; }
-}
-@media (max-width: 900px) {
-  .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
-  .navbar-right { gap: 0.625rem; }
-}
+  @media (max-width: 640px) {
+    .sidebar { display: none; }
+    .search-wrap { display: none; }
+    .navbar { padding: 0 1rem; }
+    .navbar-logo img { height: 1.35rem; width: auto; }
+    .mobile-tabbar { display: block; }
+    .main { padding-bottom: 60px; }
+    .profile-dropdown { width: min(220px, calc(100vw - 2rem)); }
+  }
+  @media (max-width: 900px) {
+    .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .navbar-right { gap: 0.625rem; }
+  }
 `
 
 interface AdminShellProps {
@@ -133,20 +127,15 @@ const navItems = [
   { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon, permission: 'system_settings' as const },
 ]
 
-const ROLE_SWITCH_OPTIONS = [
-  { key: 'learner', label: 'Continue as Learner', route: ROUTES.DASHBOARD },
-  { key: 'trainer', label: 'Continue as Trainer',  route: ROUTES.TRAINER_DASHBOARD },
-]
-
 export default function AdminShell({ children }: AdminShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { options: switchOptions, canSwitch } = useModeSwitch('admin')
 
   const [collapsed,         setCollapsed]         = useState(false)
   const [profileOpen,       setProfileOpen]       = useState(false)
   const [notifOpen,         setNotifOpen]         = useState(false)
-  const [roleMenuOpen,      setRoleMenuOpen]      = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   if (!user) return null
@@ -177,22 +166,17 @@ export default function AdminShell({ children }: AdminShellProps) {
     setNotifOpen(false)
   }
 
-  function handleRoleSwitch(route: string) {
-    setRoleMenuOpen(false)
-    navigate(route)
-  }
-
   return (
     <>
-      <style>{ADMIN_SHELL_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
+      <style>{ADMIN_SHELL_CSS + MODE_SWITCH_CSS + NOTIF_CSS + LOGOUT_MODAL_CSS}</style>
       <div className="db-root">
 
         {/* ── Navbar ── */}
         <nav className="navbar">
-              <div className="navbar-brand">
-                <div className="navbar-logo">
-                  <img src="/Logo.png" alt="The Global Project Leaders" />
-                </div>
+          <div className="navbar-brand">
+            <div className="navbar-logo">
+              <img src="/Logo.png" alt="The Global Project Leaders" />
+            </div>
           </div>
 
           <div className="navbar-right">
@@ -235,6 +219,15 @@ export default function AdminShell({ children }: AdminShellProps) {
                       <div className="profile-dropdown-email">{user.email}</div>
                     </div>
                   </div>
+
+                  {/* Mobile only: the sidebar (and its switch) is hidden ≤640px */}
+                  {canSwitch && (
+                    <MobileModeSwitchItems
+                      options={switchOptions}
+                      onDone={() => setProfileOpen(false)}
+                    />
+                  )}
+
                   <button
                     className="profile-dropdown-item"
                     onClick={() => { setProfileOpen(false); navigate(ROUTES.PROFILE) }}
@@ -276,26 +269,8 @@ export default function AdminShell({ children }: AdminShellProps) {
               })}
             </nav>
 
-            {/* ── Switch role ── */}
-            <div className="switch-role-wrap">
-              {roleMenuOpen && (
-                <div className="switch-role-menu">
-                  {ROLE_SWITCH_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.key}
-                      className="switch-role-option"
-                      onClick={() => handleRoleSwitch(opt.route)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button className="switch-role-btn" onClick={() => setRoleMenuOpen((o) => !o)}>
-                <ChevronLeft size={15} />
-                <span className="switch-role-label">Switch role</span>
-              </button>
-            </div>
+            {/* ── Switch role (only when the user has more than one mode) ── */}
+            {canSwitch && <ModeSwitch options={switchOptions} />}
 
             <div className="sidebar-user">
               <Avatar avatarUrl={avatarUrl} initials={initials} className="user-avatar" />
@@ -318,21 +293,23 @@ export default function AdminShell({ children }: AdminShellProps) {
             {children}
           </main>
         </div>
-              {/* ── Mobile tab bar ── */}
-<div className="mobile-tabbar">
-  <div className="mobile-tabbar-inner">
-    {visibleNavItems.map(({ key, label, route, Icon }) => (
-      <button
-        key={key}
-        className={`tab-item${activeRoute === route ? ' active' : ''}`}
-        onClick={() => navigate(route)}
-      >
-        <Icon size={20} />
-        <span>{label}</span>
-      </button>
-    ))}
-  </div>
-</div>
+
+        {/* ── Mobile tab bar ── */}
+        <div className="mobile-tabbar">
+          <div className="mobile-tabbar-inner">
+            {visibleNavItems.map(({ key, label, route, Icon }) => (
+              <button
+                key={key}
+                className={`tab-item${activeRoute === route ? ' active' : ''}`}
+                onClick={() => navigate(route)}
+              >
+                <Icon size={20} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {logoutConfirmOpen && (
           <LogoutConfirmModal
             onCancel={() => setLogoutConfirmOpen(false)}
