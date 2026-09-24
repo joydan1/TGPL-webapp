@@ -10,6 +10,7 @@ import type {
   LearnerProfilePayload,
 } from '../services/api'
 import type { User } from '../types/index'
+import { unsubscribeFromPush } from './usePushNotification'
 
 export type AuthResult =
   | { success: true; user?: User; token?: string; is_email_verified?: boolean }
@@ -159,6 +160,13 @@ export const useAuth = () => {
   }, [])
 
   const logout = useCallback(async () => {
+    // Stop this device receiving the user's pushes. Must run before the session is
+    // cleared so the request can still authenticate. Never let it block logout.
+    try {
+      await unsubscribeFromPush()
+    } catch (error) {
+      console.error('Push unsubscribe error:', error)
+    }
     try {
       await authAPI.logout()
     } catch (error) {

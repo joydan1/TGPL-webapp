@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavig
 import { useAuthStore } from './store/auth'
 import { ROUTES, RouteBuilder } from './constants/routes'
 import MaintenanceGate from './components/MaintenanceGate'
+import PushPrompt from './components/layout/PushPrompt'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
 
@@ -475,6 +476,8 @@ function App() {
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
         </Routes>
         </MaintenanceGate>
+        {/* Asks logged-in users to allow notifications, and keeps their push subscription fresh */}
+        {isAuthenticated && <PushPrompt />}
       </Suspense>
     </Router>
   )

@@ -22,7 +22,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || '',
     icon: '/Logo.png',
-    badge: '/badge-72.png',
+    badge: '/footerlogo.png',
     data: {
       url: payload.url || '/',
       notification_id: payload.notification_id,
