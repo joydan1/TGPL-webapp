@@ -359,7 +359,7 @@ export default function BookSessionModal({ onClose, onBooked }: BookSessionModal
               loading ? (
                 <div className="bm-skeleton" style={{ height: 320 }} />
               ) : slots.length === 0 ? (
-                <div className="bm-empty">No open slots right now — check back soon.</div>
+                <div className="bm-empty">No open slots right now, check back soon.</div>
               ) : (
                 <>
                   <div className="bm-cal">

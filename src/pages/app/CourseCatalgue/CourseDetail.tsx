@@ -803,7 +803,7 @@ function EnrolledCourseOverview({
               <div className="modules-empty">
                 <BookOpen size={28} color="#D1D5DB" />
                 <span className="modules-empty-title">No modules added yet</span>
-                <span className="modules-empty-sub">This course doesn't have any modules or lessons yet — check back soon.</span>
+                <span className="modules-empty-sub">This course doesn't have any modules or lessons yet, check back soon.</span>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
