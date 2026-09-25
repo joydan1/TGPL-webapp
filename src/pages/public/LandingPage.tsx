@@ -348,6 +348,7 @@ const navigate = useNavigate()
                     alt="TGPL Team"
                     width={327}
                     height={384}
+                    style={{ aspectRatio: '327 / 384' }}
                     loading="lazy"
                     decoding="async"
                   />
@@ -466,7 +467,7 @@ const navigate = useNavigate()
         <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#1a2e3d', margin: '0 0 0.4rem 0' }}>Enobong Okposin</h2>
         <p style={{ fontSize: '1rem', color: '#2890E4', fontWeight: 600, margin: '0 0 1rem 0' }}>Founder & Chief Executive Officer</p>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.75rem' }}>
-          <a href="https://linkedin.com/in/enobong-okposin" target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <a aria-label="Enobong Okposin on LinkedIn" href="https://linkedin.com/in/enobong-okposin" target="_blank" rel="noopener noreferrer" style={{ width: 32, height: 32, backgroundColor: '#1a2e3d', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z" /><circle cx="4" cy="4" r="2" fill="white" /></svg>
           </a>
           <a href="https://enobong.theglobalprojectleaders.com/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', fontWeight: 600, color: '#1a2e3d', textDecoration: 'none', borderBottom: '1.5px solid #1a2e3d', paddingBottom: '1px' }}>
