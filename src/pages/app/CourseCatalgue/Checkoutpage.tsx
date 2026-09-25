@@ -84,6 +84,36 @@ declare global {
   }
 }
 
+// Lazily injects the Paystack inline script + button CSS. Resolves
+// immediately if already loaded (e.g. a second checkout attempt in the
+// same session), so it's safe to call on every initiatePayment.
+let paystackPromise: Promise<void> | null = null
+
+function loadPaystackScript(): Promise<void> {
+  if (window.PaystackPop) return Promise.resolve()
+  if (paystackPromise) return paystackPromise
+
+  paystackPromise = new Promise((resolve, reject) => {
+    if (!document.querySelector('link[href="/paystack-button.min.css"]')) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = '/paystack-button.min.css'
+      document.head.appendChild(link)
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://js.paystack.co/v1/inline.js'
+    script.onload = () => resolve()
+    script.onerror = () => {
+      paystackPromise = null // allow a retry on the next attempt
+      reject(new Error('Failed to load Paystack script'))
+    }
+    document.body.appendChild(script)
+  })
+
+  return paystackPromise
+}
+
 function fmtNaira(raw: string): string {
   const num = Number(raw)
   if (isNaN(num)) return `\u20a6${raw}`
@@ -274,8 +304,10 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
         throw new Error('Invalid course price. Please go back and try again.')
       }
 
-      // Guard — script must already be loaded via index.html
-      if (!window.PaystackPop) {
+      // Lazily load the Paystack SDK — no longer loaded eagerly via index.html
+      try {
+        await loadPaystackScript()
+      } catch {
         throw new Error('Payment SDK failed to load. Please refresh and try again.')
       }
 
