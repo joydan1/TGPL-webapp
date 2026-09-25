@@ -167,7 +167,7 @@ export default function SettingsNotificationPage() {
               <p className="notif-push-banner-title">Push notifications on this device</p>
               <p className="notif-push-banner-sub">
                 {pushEnabled
-                  ? 'Push is enabled — the Push toggles below will actually reach this device.'
+                  ? 'Push is enabled.'
                   : 'Turning on any Push toggle below will ask your browser for notification permission.'}
               </p>
               {!isSupported && (
@@ -177,7 +177,7 @@ export default function SettingsNotificationPage() {
               )}
               {isSupported && permission === 'denied' && (
                 <div className="notif-push-banner-note error">
-                  <AlertCircle size={13} /> Blocked in your browser settings — enable it there first.
+                  <AlertCircle size={13} /> Blocked in your browser settings, enable it there first.
                 </div>
               )}
               {pushError && (

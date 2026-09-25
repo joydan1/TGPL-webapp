@@ -1398,7 +1398,7 @@ async function downloadResource(r: LessonResource) {
                 {slotsLoading && <div className="state-screen">Loading available times…</div>}
                 {slotsError && <div className="error-banner">{slotsError}</div>}
                 {!slotsLoading && !slotsError && slots.length === 0 && (
-                  <div className="resources-empty">No open slots right now — check back soon.</div>
+                  <div className="resources-empty">No open slots right now,check back soon.</div>
                 )}
 
                 {!slotsLoading && !slotsError && slots.length > 0 && currentMonthKey && (

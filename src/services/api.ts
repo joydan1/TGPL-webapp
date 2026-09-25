@@ -1336,19 +1336,19 @@ export const liveSessionsAPI = {
       return { success: false as const, error: message, statusCode }
     }
   },
-  
-  /** GET /v1/live/courses/{slug}/slots/ — OPEN slots for an enrolled course */
-  getCourseSlots: async (courseSlug: string) => {
-    try {
-      const response = await apiClient.get<LiveSlot[]>(
-        API_ENDPOINTS.LIVE_COURSE_SLOTS(courseSlug),
-      )
-      return { success: true as const, data: response.data }
-    } catch (error) {
-      const { message, statusCode } = parseApiError(error, 'Failed to load available times')
-      return { success: false as const, error: message, statusCode }
-    }
-  },
+ /** GET /v1/live/courses/{course_slug}/slots/ — backend returns a paginated envelope */
+getCourseSlots: async (courseSlug: string) => {
+  try {
+    const response = await apiClient.get<{ results: LiveSlot[] } | LiveSlot[]>(
+      API_ENDPOINTS.LIVE_COURSE_SLOTS(courseSlug),
+    )
+    const data = Array.isArray(response.data) ? response.data : response.data.results
+    return { success: true as const, data }
+  } catch (error) {
+    const { message, statusCode } = parseApiError(error, 'Failed to load available times')
+    return { success: false as const, error: message, statusCode }
+  }
+},
 
   /** POST /v1/live/slots/{slot_id}/book/ — request an open slot */
   bookSlot: async (slotId: string) => {
