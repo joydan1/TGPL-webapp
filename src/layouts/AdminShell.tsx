@@ -12,7 +12,7 @@ import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationP
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
 import ModeSwitch, { MobileModeSwitchItems, MODE_SWITCH_CSS } from '../components/layout/ModeSwitch'
 import { useState } from 'react'
-
+import UploadTray from '../components/UploadTray'
 export const ADMIN_SHELL_CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -318,6 +318,7 @@ export default function AdminShell({ children }: AdminShellProps) {
         )}
 
       </div>
+      <UploadTray />
     </>
   )
 }

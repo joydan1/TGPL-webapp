@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
 import MaintenanceScreen from '../../components/MaintenanceScreen'
+import { useAuthStore } from '../../store/auth'
 import { adminSettingsAPI, adminProfileAPI, NO_OP_ERROR_MESSAGE } from '../../services/adminSettingsApi'
 import {
   SETTINGS_SECTIONS, CERTIFICATE_TEMPLATES,
@@ -47,6 +48,7 @@ const PAGE_CSS = `
   .as-row-label { max-width: 260px; padding-top: 2px; }
   .as-row-label-title { margin: 0; font-size: 13px; font-weight: 600; color: #2B2B2C; }
   .as-row-label-help { margin: 4px 0 0; font-size: 11px; line-height: 1.6; color: #99A1AF; }
+  .as-unavailable { color: #99A1AF; background: #F3F4F6; border: 1px solid #EBEBEB; border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
   .as-row-input { flex-shrink: 0; }
   .as-row-input.wide { width: 240px; }
   .as-input { width: 100%; box-sizing: border-box; height: 36px; padding: 0 12px; border: 1px solid #EBEBEB; border-radius: 14px; font-family: inherit; font-size: 13px; color: #2B2B2C; background: #fff; }
@@ -409,6 +411,18 @@ function PaymentGatewayGroup({ currentValue }: { currentValue: <K extends keyof 
 }
 
 function FieldRow({ field, value, onChange }: { field: FieldConfig; value: unknown; onChange: (v: unknown) => void }) {
+  if (!field.available) {
+    return (
+      <div className="as-row">
+        <div className="as-row-label">
+          <p className="as-row-label-title">{field.label || 'Configuration'}</p>
+          {field.help && <p className="as-row-label-help">{field.help}</p>}
+        </div>
+        <span className="as-unavailable">Not available yet</span>
+      </div>
+    )
+  }
+
   if (field.type === 'certificate_grid') {
     return (
       <div className="as-cert-grid">
@@ -418,6 +432,7 @@ function FieldRow({ field, value, onChange }: { field: FieldConfig; value: unkno
             type="button"
             className={`as-cert-card${value === tpl.value ? ' selected' : ''}`}
             onClick={() => onChange(tpl.value)}
+            disabled={!field.available || field.disabled}
           >
             <div className={`as-cert-swatch ${tpl.value}`}>
               <div className="as-cert-swatch-icon" style={{ background: 'rgba(255,255,255,0.5)' }}>
@@ -439,7 +454,20 @@ function FieldRow({ field, value, onChange }: { field: FieldConfig; value: unkno
           <p className="as-row-label-title">{field.label}</p>
           {field.help && <p className="as-row-label-help">{field.help}</p>}
         </div>
-        <FileUploadField currentUrl={(value as string) || ''} onChange={onChange} />
+        {field.available ? (
+          <div className="as-row-input wide">
+            <input
+              className="as-input"
+              type="url"
+              placeholder="https://..."
+              value={(value as string) || ''}
+              disabled={field.disabled}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          </div>
+        ) : (
+          <FileUploadField currentUrl={(value as string) || ''} onChange={onChange} disabled />
+        )}
       </div>
     )
   }
@@ -457,37 +485,37 @@ function FieldRow({ field, value, onChange }: { field: FieldConfig; value: unkno
             <span className={`as-toggle-label ${value ? 'on' : 'off'}`}>{value ? 'On' : 'Off'}</span>
           )}
           <label className="as-toggle">
-            <input type="checkbox" checked={Boolean(value)} disabled={field.disabled} onChange={(e) => onChange(e.target.checked)} />
+            <input type="checkbox" checked={Boolean(value)} disabled={!field.available || field.disabled} onChange={(e) => onChange(e.target.checked)} />
             <span className="as-toggle-track" />
             <span className="as-toggle-thumb" />
           </label>
         </div>
       ) : field.type === 'select' ? (
         <div className="as-row-input wide">
-          <select className="as-input" value={(value as string) || ''} onChange={(e) => onChange(e.target.value)}>
+          <select className="as-input" value={(value as string) || ''} disabled={!field.available || field.disabled} onChange={(e) => onChange(e.target.value)}>
             {field.options?.map((opt: SelectOption) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
         </div>
       ) : field.type === 'number' ? (
         <div className="as-row-input wide">
           <input className="as-input" type="number" min={field.min} max={field.max} step={field.step ?? 1}
-            value={value == null ? '' : Number(value)} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} />
+            value={value == null ? '' : Number(value)} disabled={!field.available || field.disabled} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} />
         </div>
       ) : field.type === 'time' ? (
         <div className="as-row-input wide">
-          <input className="as-input" type="time" value={timeToInputValue(value as string)} onChange={(e) => onChange(inputValueToTime(e.target.value))} />
+          <input className="as-input" type="time" value={timeToInputValue(value as string)} disabled={!field.available || field.disabled} onChange={(e) => onChange(inputValueToTime(e.target.value))} />
         </div>
       ) : (
         <div className="as-row-input wide">
           <input className="as-input" type={field.type === 'email' ? 'email' : field.type === 'url' ? 'url' : 'text'}
-            value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />
+            value={(value as string) ?? ''} disabled={!field.available || field.disabled} onChange={(e) => onChange(e.target.value)} />
         </div>
       )}
     </div>
   )
 }
 
-function FileUploadField({ currentUrl, onChange: _onChange }: { currentUrl: string; onChange: (url: string) => void }) {
+function FileUploadField({ currentUrl, onChange: _onChange, disabled }: { currentUrl: string; onChange: (url: string) => void; disabled?: boolean }) {
   const [localPreview, setLocalPreview] = useState<string | null>(null)
 
   async function handleFile(file: File) {
@@ -501,8 +529,8 @@ function FileUploadField({ currentUrl, onChange: _onChange }: { currentUrl: stri
   const filled = Boolean(localPreview || currentUrl)
 
   return (
-    <label className={`as-upload-box ${filled ? 'filled' : 'empty'}`}>
-      <input type="file" accept="image/png" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+    <label className={`as-upload-box ${filled ? 'filled' : 'empty'}`} style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+      <input type="file" accept="image/png" disabled={disabled} style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
       <Upload size={14} color={filled ? '#2492EB' : '#99A1AF'} />
       <span className="as-upload-text">{filled ? 'signature.png' : 'Upload signature'}</span>
     </label>
@@ -635,7 +663,18 @@ function ProfilePanel() {
     setInfoFeedback(null)
     const res = await adminProfileAPI.updateProfile({ full_name: nameDraft, email: emailDraft, phone: phoneDraft || null })
     setInfoSaving(false)
-    if (res.success) { setProfile(res.data); setInfoFeedback({ type: 'success', text: 'Profile updated.' }) }
+    if (res.success) {
+      setProfile(res.data)
+      const user = useAuthStore.getState().user
+      if (user) {
+        useAuthStore.getState().setUser({
+          ...user,
+          name: res.data.full_name,
+          email: res.data.email,
+        })
+      }
+      setInfoFeedback({ type: 'success', text: 'Profile updated.' })
+    }
     else setInfoFeedback({ type: 'error', text: apiErrorMessage(res.error) })
   }
 
@@ -643,7 +682,11 @@ function ProfilePanel() {
     setAvatarUploading(true)
     const res = await adminProfileAPI.uploadAvatar(file)
     setAvatarUploading(false)
-    if (res.success && profile) setProfile({ ...profile, avatar_url: res.data.avatar_url })
+    if (res.success && profile) {
+      setProfile({ ...profile, avatar_url: res.data.avatar_url })
+      const user = useAuthStore.getState().user
+      if (user) useAuthStore.getState().setUser({ ...user, avatar_url: res.data.avatar_url })
+    }
   }
 
   const pwValid = currentPw.length > 0 && newPw.length >= 8 && newPw === confirmPw

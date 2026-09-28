@@ -28,6 +28,7 @@ export interface SystemSettings {
   enable_certificates: boolean
   enable_notifications_email: boolean
   enable_notifications_inapp: boolean
+  enable_notifications_push: boolean
   enable_refunds: boolean
 
   inactivity_threshold_days: number
@@ -228,6 +229,7 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
           { key: 'enable_certificates', label: 'Enable certificates', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_email', label: 'Enable email notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_inapp', label: 'Enable in-app notifications', type: 'boolean', showOnOffLabel: true, available: true },
+          { key: 'enable_notifications_push', label: 'Enable push notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_refunds', label: 'Enable refunds', type: 'boolean', disabled: true, showOnOffLabel: true, available: true },
         ],
       },
@@ -245,8 +247,8 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         fields: [
           { key: 'primary_color', label: 'Primary color', type: 'color', available: true },
           { key: 'secondary_color', label: 'Secondary color', type: 'color', available: true },
-          { key: 'logo_url', label: 'Logo', type: 'file', available: true },
-          { key: 'favicon_url', label: 'Favicon', type: 'file', available: true },
+          { key: 'logo_url', label: 'Logo', type: 'file', available: false },
+          { key: 'favicon_url', label: 'Favicon', type: 'file', available: false },
         ],
       },
     ],
@@ -284,6 +286,7 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
           { key: 'enable_notifications_email', label: 'Email notifications', help: 'Transactional and marketing emails', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_sms', label: 'SMS notifications', help: 'OTPs and critical alerts via SMS', type: 'boolean', disabled: true, showOnOffLabel: true, available: false },
           { key: 'enable_notifications_inapp', label: 'In-app notifications', help: 'Bell icon alerts inside the learner and admin portals', type: 'boolean', showOnOffLabel: true, available: true },
+          { key: 'enable_notifications_push', label: 'Push notifications', help: 'Browser and device push alerts', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_slack', label: 'Slack integration', help: 'Post admin alerts to a configured Slack channel', type: 'boolean', showOnOffLabel: true, available: false },
           { key: 'slack_webhook_url', label: 'Slack webhook URL', type: 'text', showIf: 'enable_notifications_slack', available: false },
           { key: 'slack_channel', label: 'Slack channel', type: 'text', showIf: 'enable_notifications_slack', available: false },

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminPromoCodesAPI } from '../../services/adminPromoCodesApi'
 import apiClient from '../../services/api'
-import type { DiscountType } from '../../services/adminPromoCodesApi'
+import type { AdminPromoCode, DiscountType } from '../../services/adminPromoCodesApi'
 
 export const PROMO_MODAL_CSS = `
   .pc-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 100; }
@@ -11,6 +11,8 @@ export const PROMO_MODAL_CSS = `
   .pc-field label { font-size: 0.8rem; font-weight: 700; color: #374151; }
   .pc-field input { border: 1px solid #E5E7EB; border-radius: 0.6rem; padding: 0.6rem 0.8rem; font-size: 0.875rem; color: #111; outline: none; width: 100%; }
   .pc-field input:focus { border-color: #2492EB; }
+  .pc-active-toggle { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; font-weight: 600; color: #374151; }
+  .pc-active-toggle input { width: 16px; height: 16px; }
   .pc-field-hint { font-size: 0.75rem; color: #9CA3AF; }
   .pc-row { display: flex; gap: 0.75rem; }
   .pc-row .pc-field { flex: 1; min-width: 0; }
@@ -49,7 +51,9 @@ export const PROMO_MODAL_CSS = `
 
 interface CreatePromoCodeModalProps {
   onClose: () => void
-  onCreated: () => void
+  onCreated?: () => void
+  onUpdated?: () => void
+  promoCode?: AdminPromoCode
 }
 
 interface CourseOption {
@@ -65,23 +69,39 @@ interface PublishedCourseResponse {
   results: CourseOption[]
 }
 
-export default function CreatePromoCodeModal({ onClose, onCreated }: CreatePromoCodeModalProps) {
-  const [code, setCode] = useState('')
-  const [discountValue, setDiscountValue] = useState('')
-  const [maxRedemptions, setMaxRedemptions] = useState('')
-  const [maxPerUser, setMaxPerUser] = useState('')
+function toLocalDateTime(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
+function toIsoOrNull(value: string): string | null {
+  return value ? new Date(value).toISOString() : null
+}
+
+export default function CreatePromoCodeModal({ onClose, onCreated, onUpdated, promoCode }: CreatePromoCodeModalProps) {
+  const isEditing = Boolean(promoCode)
+  const [code, setCode] = useState(promoCode?.code ?? '')
+  const [discountValue, setDiscountValue] = useState(promoCode?.discount_value ?? '')
+  const [maxRedemptions, setMaxRedemptions] = useState(promoCode?.max_redemptions?.toString() ?? '')
+  const [maxPerUser, setMaxPerUser] = useState(promoCode?.max_redemptions_per_user?.toString() ?? '')
+  const [startsAt, setStartsAt] = useState(toLocalDateTime(promoCode?.starts_at))
+  const [expiresAt, setExpiresAt] = useState(toLocalDateTime(promoCode?.expires_at))
+  const [isActive, setIsActive] = useState(promoCode?.is_active ?? true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   
-  const discountType: DiscountType = 'percentage'
+  const [discountType] = useState<DiscountType>(promoCode?.discount_type ?? 'percentage')
 
   // ─── Course scoping ───
   const [courses, setCourses] = useState<CourseOption[]>([])
   const [coursesLoading, setCoursesLoading] = useState(true)
   const [coursesError, setCoursesError] = useState<string | null>(null)
   const [courseCount, setCourseCount] = useState(0)
-  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([])
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>(promoCode?.applicable_course_ids ?? [])
 
   useEffect(() => {
     let cancelled = false
@@ -114,34 +134,48 @@ export default function CreatePromoCodeModal({ onClose, onCreated }: CreatePromo
     )
   }
 
-  const canSubmit = code.trim().length > 0 && discountValue.trim().length > 0 && !isSubmitting
+  const canSubmit = (isEditing || code.trim().length > 0) && discountValue.trim().length > 0 && !isSubmitting
 
   async function handleSubmit() {
     setIsSubmitting(true)
     setError(null)
 
-    const res = await adminPromoCodesAPI.createCode({
-      code: code.trim().toUpperCase(),
-      discount_type: discountType,
-      discount_value: discountValue.trim(),
-      ...(maxRedemptions.trim() ? { max_redemptions: Number(maxRedemptions) } : {}),
-      ...(maxPerUser.trim() ? { max_redemptions_per_user: Number(maxPerUser) } : {}),
-      applicable_course_ids: selectedCourseIds,
-    })
+    const res = promoCode
+      ? await adminPromoCodesAPI.updateCode(promoCode.id, {
+          discount_type: discountType,
+          discount_value: discountValue.trim(),
+          starts_at: toIsoOrNull(startsAt),
+          expires_at: toIsoOrNull(expiresAt),
+          max_redemptions: maxRedemptions.trim() ? Number(maxRedemptions) : null,
+          max_redemptions_per_user: maxPerUser.trim() ? Number(maxPerUser) : null,
+          applicable_courses: selectedCourseIds,
+          is_active: isActive,
+        })
+      : await adminPromoCodesAPI.createCode({
+          code: code.trim().toUpperCase(),
+          discount_type: discountType,
+          discount_value: discountValue.trim(),
+          ...(maxRedemptions.trim() ? { max_redemptions: Number(maxRedemptions) } : {}),
+          ...(maxPerUser.trim() ? { max_redemptions_per_user: Number(maxPerUser) } : {}),
+          ...(startsAt ? { starts_at: toIsoOrNull(startsAt)! } : {}),
+          ...(expiresAt ? { expires_at: toIsoOrNull(expiresAt)! } : {}),
+          applicable_courses: selectedCourseIds,
+        })
 
     setIsSubmitting(false)
     if (!res.success) {
       setError(res.error)
       return
     }
-    onCreated()
+    if (promoCode) onUpdated?.()
+    else onCreated?.()
     onClose()
   }
 
   return (
     <div className="pc-modal-overlay" onClick={onClose}>
       <div className="pc-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="pc-modal-title">Create promo code</h2>
+        <h2 className="pc-modal-title">{isEditing ? 'Edit promo code' : 'Create promo code'}</h2>
 
         <div className="pc-field">
           <label>Code</label>
@@ -149,9 +183,28 @@ export default function CreatePromoCodeModal({ onClose, onCreated }: CreatePromo
             placeholder="SAVE20"
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            disabled={isEditing}
           />
-          <span className="pc-field-hint"> SAVE20 and save20 are the same code.</span>
+          <span className="pc-field-hint">{isEditing ? 'Codes cannot be changed after creation.' : 'SAVE20 and save20 are the same code.'}</span>
         </div>
+
+        <div className="pc-row">
+          <div className="pc-field">
+            <label>Starts at</label>
+            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+          </div>
+          <div className="pc-field">
+            <label>Expires at</label>
+            <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          </div>
+        </div>
+
+        {isEditing && (
+          <label className="pc-active-toggle">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            Active
+          </label>
+        )}
 
         <div className="pc-field">
           <label>Discount (%)</label>
@@ -223,7 +276,7 @@ export default function CreatePromoCodeModal({ onClose, onCreated }: CreatePromo
         <div className="pc-actions">
           <button type="button" className="pc-btn pc-btn-outline" onClick={onClose}>Cancel</button>
           <button type="button" className="pc-btn pc-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>
-            {isSubmitting ? 'Creating\u2026' : 'Create code'}
+            {isSubmitting ? (isEditing ? 'Saving\u2026' : 'Creating\u2026') : isEditing ? 'Save changes' : 'Create code'}
           </button>
         </div>
       </div>

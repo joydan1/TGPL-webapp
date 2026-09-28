@@ -13,6 +13,8 @@ import NotificationPanel, { NOTIF_CSS } from '../components/layout/NotificationP
 import LogoutConfirmModal, { LOGOUT_MODAL_CSS } from '../components/layout/LogoutConfirmModal'
 import ModeSwitch, { MobileModeSwitchItems, MODE_SWITCH_CSS } from '../components/layout/ModeSwitch'
 import { useState, useEffect } from 'react'
+import UploadTray from '../components/UploadTray'
+
 
 
 export const SETTINGS_SUBITEMS = [
@@ -426,6 +428,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
         )}
 
       </div>
+      <UploadTray />
     </>
   )
 }

@@ -13,9 +13,20 @@ export interface CreatePromoCodePayload {
   max_redemptions?: number
   max_redemptions_per_user?: number
  
-  applicable_course_ids?: string[]
+  applicable_courses?: string[]
   starts_at?: string
   expires_at?: string
+}
+
+export interface UpdatePromoCodePayload {
+  discount_type?: DiscountType
+  discount_value?: string
+  starts_at?: string | null
+  expires_at?: string | null
+  max_redemptions?: number | null
+  max_redemptions_per_user?: number | null
+  applicable_courses?: string[]
+  is_active?: boolean
 }
 
 // Confirmed shape, from the actual POST /admin/promo-codes/ 201 response.
@@ -34,7 +45,7 @@ export interface AdminPromoCode {
   updated_at: string
   redemptions_used: number
   redemptions_remaining: number
-  applicable_course_ids: string[] 
+  applicable_course_ids?: string[]
 }
 
 type ApiResult<T> =
@@ -51,13 +62,15 @@ type ListResponseShape =
     }
 
 function normalizePromoCode(code: AdminPromoCode & { applicable_courses?: string[] }): AdminPromoCode {
+  const applicableCourseIds = Array.isArray(code.applicable_course_ids)
+    ? code.applicable_course_ids
+    : Array.isArray(code.applicable_courses)
+      ? code.applicable_courses
+      : undefined
+
   return {
     ...code,
-    applicable_course_ids: Array.isArray(code.applicable_course_ids)
-      ? code.applicable_course_ids
-      : Array.isArray(code.applicable_courses)
-        ? code.applicable_courses
-        : [],
+    ...(applicableCourseIds ? { applicable_course_ids: applicableCourseIds } : {}),
   }
 }
 
@@ -93,6 +106,29 @@ export const adminPromoCodesAPI = {
           statusCode,
         }
       }
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  getCode: async (id: string): Promise<ApiResult<AdminPromoCode>> => {
+    try {
+      const response = await apiClient.get<AdminPromoCode>(`/v1/admin/promo-codes/${id}/`)
+      return { success: true, data: normalizePromoCode(response.data) }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to load promo code')
+      return { success: false, error: message, statusCode }
+    }
+  },
+
+  updateCode: async (id: string, payload: UpdatePromoCodePayload): Promise<ApiResult<AdminPromoCode>> => {
+    try {
+      const response = await apiClient.patch<AdminPromoCode>(
+        `/v1/admin/promo-codes/${id}/`,
+        payload,
+      )
+      return { success: true, data: normalizePromoCode(response.data) }
+    } catch (error) {
+      const { message, statusCode } = parseApiError(error, 'Failed to update promo code')
       return { success: false, error: message, statusCode }
     }
   },

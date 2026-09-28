@@ -27,7 +27,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   try {
     await resend.emails.send({
-      from: 'TGPL Website <onboarding@resend.dev>',
+      from: 'TGPL Website <noreply@theglobalprojectleaders.com>',
       to: recipient,
       replyTo: email,
       subject: `New website message from ${name}`,

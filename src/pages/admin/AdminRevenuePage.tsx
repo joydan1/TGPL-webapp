@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Download, Search, TrendingUp, CheckCircle2, Clock3, ArrowUpRight, ChevronRight, Plus, Tag } from 'lucide-react'
+import { Download, Search, TrendingUp, CheckCircle2, Clock3, ArrowUpRight, ChevronRight, Plus, Tag, Pencil } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
 import { adminRevenueAPI } from '../../services/adminRevenueApi'
 import { adminPromoCodesAPI } from '../../services/adminPromoCodesApi'
@@ -21,10 +21,11 @@ const PAGE_CSS = `
   .rv-page-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
   .rv-page-tab.active { background: #fff; color: #111827; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); }
 
-  .rv-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+  .rv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
   .rv-stat-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); display: flex; align-items: flex-start; gap: 0.85rem; }
   .rv-stat-icon { width: 40px; height: 40px; border-radius: 0.7rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .rv-stat-value { margin: 0; font-size: 1.4rem; font-weight: 800; color: #111827; }
+  .rv-stat-card > div:last-child { min-width: 0; }
+  .rv-stat-value { margin: 0; font-size: 1.4rem; font-weight: 800; color: #111827; overflow-wrap: anywhere; }
   .rv-stat-title { margin: 0.15rem 0 0; font-size: 0.8rem; color: #6B7280; }
   .rv-stat-sub { color: #9CA3AF; }
 
@@ -69,6 +70,10 @@ const PAGE_CSS = `
   .rv-status-badge.inactive { background: #F3F4F6; color: #6B7280; }
 
   .rv-code-pill { font-family: monospace; font-weight: 700; background: #EFF6FF; color: #2492EB; padding: 0.25rem 0.6rem; border-radius: 0.5rem; letter-spacing: 0.02em; }
+  .rv-promo-actions { display: flex; align-items: center; gap: 0.5rem; }
+  .rv-edit-btn { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid #E5E7EB; background: #fff; color: #374151; border-radius: 0.5rem; padding: 0.4rem 0.65rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+  .rv-edit-btn:hover { background: #F9FAFB; }
+  .rv-edit-btn:disabled { opacity: 0.5; cursor: wait; }
   .rv-deactivate-btn { border: 1px solid #FEE2E2; background: #fff; color: #EF4444; border-radius: 0.5rem; padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
   .rv-deactivate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -81,9 +86,6 @@ const PAGE_CSS = `
   .rv-empty, .rv-loading, .rv-error { padding: 3rem 1.25rem; text-align: center; color: #9CA3AF; font-size: 0.9rem; }
   .rv-error { color: #EF4444; }
 
-  @media (max-width: 900px) {
-    .rv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
   @media (max-width: 640px) {
     .rv-page { padding: 1.25rem; }
     .rv-stats { grid-template-columns: 1fr; }
@@ -190,6 +192,8 @@ export default function AdminRevenuePage() {
   const [promoLoaded, setPromoLoaded] = useState(false)
   const [promoError, setPromoError] = useState<string | null>(null)
   const [showCreatePromoModal, setShowCreatePromoModal] = useState(false)
+  const [editingPromoCode, setEditingPromoCode] = useState<AdminPromoCode | null>(null)
+  const [loadingPromoCodeId, setLoadingPromoCodeId] = useState<string | null>(null)
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
@@ -221,7 +225,16 @@ export default function AdminRevenuePage() {
     setPromoError(null)
     const res = await adminPromoCodesAPI.listCodes()
     if (res.success) {
-      setPromoCodes(res.data)
+      const scopedPromoCodes = await Promise.all(
+        res.data.map(async (promoCode) => {
+          if (promoCode.applicable_course_ids !== undefined) return promoCode
+          const detail = await adminPromoCodesAPI.getCode(promoCode.id)
+          return detail.success && detail.data.applicable_course_ids !== undefined
+            ? { ...promoCode, applicable_course_ids: detail.data.applicable_course_ids }
+            : promoCode
+        }),
+      )
+      setPromoCodes(scopedPromoCodes)
     } else {
       setPromoError(res.error)
     }
@@ -258,6 +271,15 @@ export default function AdminRevenuePage() {
 
   function handleTxnChanged(paymentId: string, newStatus: PaymentStatus) {
     setTransactions((prev) => prev.map((t) => (t.id === paymentId ? { ...t, status: newStatus } : t)))
+  }
+
+  async function handleEditPromoCode(id: string) {
+    setLoadingPromoCodeId(id)
+    setPromoError(null)
+    const result = await adminPromoCodesAPI.getCode(id)
+    setLoadingPromoCodeId(null)
+    if (result.success) setEditingPromoCode(result.data)
+    else setPromoError(result.error)
   }
 
   async function handleDeactivate(id: string) {
@@ -488,7 +510,7 @@ export default function AdminRevenuePage() {
                         <td>{formatRedemptions(code)}</td>
                         <td>{code.max_redemptions_per_user ?? '\u2014'}</td>
                         
-<td>{(code.applicable_course_ids ?? []).length === 0 ? 'Platform-wide' : `${(code.applicable_course_ids ?? []).length} course(s)`}</td>
+<td>{code.applicable_course_ids === undefined ? 'Scope not provided' : code.applicable_course_ids.length === 0 ? 'Platform-wide' : `${code.applicable_course_ids.length} course(s)`}</td>
 <td>
                        
 <span className={`rv-status-badge ${code.is_active ? 'active' : 'inactive'}`}>
@@ -498,6 +520,15 @@ export default function AdminRevenuePage() {
                         </td>
                         <td>{formatDate(code.created_at)}</td>
                         <td>
+                          <div className="rv-promo-actions">
+                            <button
+                              type="button"
+                              className="rv-edit-btn"
+                              disabled={loadingPromoCodeId === code.id}
+                              onClick={() => handleEditPromoCode(code.id)}
+                            >
+                              <Pencil size={13} /> {loadingPromoCodeId === code.id ? 'Loading…' : 'Edit'}
+                            </button>
                           {code.is_active !== false && (
                             <button
                               type="button"
@@ -508,6 +539,7 @@ export default function AdminRevenuePage() {
                               {deactivatingId === code.id ? 'Deactivating\u2026' : 'Deactivate'}
                             </button>
                           )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -531,10 +563,12 @@ export default function AdminRevenuePage() {
         />
       )}
 
-      {showCreatePromoModal && (
+      {(showCreatePromoModal || editingPromoCode) && (
         <CreatePromoCodeModal
-          onClose={() => setShowCreatePromoModal(false)}
-          onCreated={loadPromoCodes}
+          onClose={() => { setShowCreatePromoModal(false); setEditingPromoCode(null) }}
+          onCreated={() => { void loadPromoCodes() }}
+          onUpdated={() => { setEditingPromoCode(null); void loadPromoCodes() }}
+          promoCode={editingPromoCode ?? undefined}
         />
       )}
     </AdminShell>

@@ -44,7 +44,8 @@ export const useAuth = () => {
         store.setError('Login failed')
         return { success: false, error: 'Login failed' }
       }
-      const userData = result.user
+      const currentUserResult = await authAPI.getCurrentUser()
+      const userData = currentUserResult.success ? currentUserResult.data : result.user
       if (!userData) {
         store.setError('Failed to fetch user info')
         return { success: false, error: 'Failed to fetch user info' }

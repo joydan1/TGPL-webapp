@@ -875,6 +875,56 @@ export interface CourseDetailResponse {
 
 
 // ─── Courses API ──────────────────────────────────────────────────────────────
+class StorageUploadError extends Error {
+  status?: number
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'StorageUploadError'
+    this.status = status
+  }
+}
+
+function putFileWithProgress(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  file: File,
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const abortError = () => new DOMException('Upload aborted', 'AbortError')
+    if (signal?.aborted) {
+      reject(abortError())
+      return
+    }
+
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, url)
+    Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value))
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)))
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new StorageUploadError(humanizeStorageUploadError(xhr.status), xhr.status))
+    }
+    xhr.onerror = () => reject(new StorageUploadError('Network error during upload.'))
+    xhr.ontimeout = () => reject(new StorageUploadError('Upload timed out.'))
+    xhr.onabort = () => reject(abortError())
+
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.send(file)
+  })
+}
+
+export interface UploadFileOptions {
+  onProgress?: (percent: number) => void
+  signal?: AbortSignal
+}
 
 export const coursesAPI = {
   getEnrollmentStatus: async (courseSlug: string) => {
@@ -1604,18 +1654,15 @@ getCurriculum: async (courseId: string) => {
   },
  
   /** POST /v1/courses/manage/{id}/modules/reorder/ */
-  reorderModules: async (courseId: string, moduleIdsInOrder: string[]) => {
+ reorderModules: async (courseId: string, order: string[]) => {
     try {
-      await apiClient.post(API_ENDPOINTS.COURSES_MANAGE_MODULES_REORDER(courseId), {
-        module_ids: moduleIdsInOrder,
-      })
+      await apiClient.post(`/v1/courses/manage/${courseId}/modules/reorder/`, { order })
       return { success: true as const }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to reorder modules')
       return { success: false as const, error: message, statusCode }
     }
   },
- 
  /** PATCH /v1/courses/manage/modules/{module_id}/ */
   updateModule: async (moduleId: string, payload: Partial<Pick<CourseModule, 'title' | 'description'>>) => {
     try {
@@ -1653,11 +1700,9 @@ getCurriculum: async (courseId: string) => {
   },
  
   /** POST /v1/courses/manage/modules/{module_id}/lessons/reorder/ */
-  reorderLessons: async (moduleId: string, lessonIdsInOrder: string[]) => {
+  reorderLessons: async (moduleId: string, order: string[]) => {
     try {
-      await apiClient.post(API_ENDPOINTS.COURSES_MANAGE_MODULE_LESSONS_REORDER(moduleId), {
-        lesson_ids: lessonIdsInOrder,
-      })
+      await apiClient.post(`/v1/courses/manage/modules/${moduleId}/lessons/reorder/`, { order })
       return { success: true as const }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to reorder lessons')
@@ -1729,54 +1774,79 @@ getCurriculum: async (courseId: string) => {
       return { success: false as const, error: message, statusCode }
     }
   },
- 
- uploadFile: async (
+  uploadFile: async (
     file: File,
     target: UploadTarget,
     ids: { course_id?: string; lesson_id?: string },
+    options?: UploadFileOptions,
   ): Promise<
     | { success: true; data: ConfirmUploadResponse }
-    | { success: false; error: string; statusCode?: number }
+    | { success: false; error: string; statusCode?: number; cancelled?: boolean; retryable?: boolean }
   > => {
     try {
-      const presignRes = await apiClient.post<PresignUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_PRESIGN, {
-        target,
-        ...ids,
-        filename: file.name,
-        content_type: file.type || 'application/octet-stream',
-        file_size: file.size,
-      } as PresignUploadPayload)
+      const presignRes = await apiClient.post<PresignUploadResponse>(
+        API_ENDPOINTS.COURSES_UPLOADS_PRESIGN,
+        {
+          target,
+          ...ids,
+          filename: file.name,
+          content_type: file.type || 'application/octet-stream',
+          file_size: file.size,
+        } as PresignUploadPayload,
+        { signal: options?.signal },
+      )
 
       const { upload_url, method, headers, object_key } = presignRes.data
 
-      const uploadRes = await fetch(upload_url, {
-        method: method || 'PUT',
-        body: file,
-        headers:
-          headers && Object.keys(headers).length > 0
-            ? headers
-            : { 'Content-Type': file.type || 'application/octet-stream' },
-      })
-      if (!uploadRes.ok) {
-        throw new Error(`Upload failed for "${file.name}" (HTTP ${uploadRes.status})`)
-      }
+      await putFileWithProgress(
+        upload_url,
+        method || 'PUT',
+        headers && Object.keys(headers).length > 0
+          ? headers
+          : { 'Content-Type': file.type || 'application/octet-stream' },
+        file,
+        options?.onProgress,
+        options?.signal,
+      )
 
-      const confirmRes = await apiClient.post<ConfirmUploadResponse>(API_ENDPOINTS.COURSES_UPLOADS_CONFIRM, {
-        target,
-        ...ids,
-        object_key,
-        file_name: file.name,
-        file_size: file.size,
-        content_type: file.type || 'application/octet-stream',
-      } as ConfirmUploadPayload)
+      const confirmRes = await apiClient.post<ConfirmUploadResponse>(
+        API_ENDPOINTS.COURSES_UPLOADS_CONFIRM,
+        {
+          target,
+          ...ids,
+          object_key,
+          file_name: file.name,
+          file_size: file.size,
+          content_type: file.type || 'application/octet-stream',
+        } as ConfirmUploadPayload,
+        { signal: options?.signal },
+      )
 
+      options?.onProgress?.(100)
       return { success: true as const, data: confirmRes.data }
     } catch (error) {
+      if ((error as { name?: string })?.name === 'AbortError' || axios.isCancel(error)) {
+        return { success: false as const, error: 'Upload cancelled.', cancelled: true }
+      }
+      if (error instanceof StorageUploadError) {
+        const status = error.status
+        return {
+          success: false as const,
+          error: error.message,
+          statusCode: status,
+          retryable: !status || status >= 500 || status === 403,
+        }
+      }
       if (error instanceof Error && !(error as { response?: unknown }).response) {
-        return { success: false as const, error: error.message }
+        return { success: false as const, error: error.message, retryable: true }
       }
       const { message, statusCode } = parseApiError(error, 'Upload failed')
-      return { success: false as const, error: message, statusCode }
+      return {
+        success: false as const,
+        error: message,
+        statusCode,
+        retryable: !statusCode || statusCode >= 500 || statusCode === 429,
+      }
     }
   },
   uploadCourseImage: async (courseId: string, file: File, kind: 'cover' | 'thumbnail') => {
@@ -1796,7 +1866,7 @@ getCurriculum: async (courseId: string) => {
     return { success: false as const, error: message, statusCode }
   }
 },
-
+ 
 
 }
 export interface TrainerDashboardSummary {

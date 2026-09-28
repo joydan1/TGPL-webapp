@@ -11,14 +11,9 @@ import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
 interface Certificate {
   id: string
   serial: string
-  course_id: string
   course_title: string
-  course_slug: string
   issued_at: string
-  status: string // "issued" observed; treat anything else as non-final
-  is_downloadable: boolean
-  final_score: number
-  completion_percentage: number
+  status: string
 }
 
 // Matches GET /v1/learner/certificates/{id}/download/
@@ -178,7 +173,7 @@ export default function CertificatesPage() {
             <div className="certs-grid">
               {certificates.map((cert) => {
                 const status = statusLabel(cert.status)
-                const canDownload = cert.is_downloadable && cert.status !== 'archived' && cert.status !== 'revoked'
+                const canDownload = cert.status === 'issued'
                 return (
                   <div key={cert.id} className="cert-card">
                     <div className="cert-card-top">
@@ -191,12 +186,6 @@ export default function CertificatesPage() {
                       <div className="cert-card-title">{cert.course_title}</div>
                       <div className="cert-card-meta">Issued {fmtIssuedDate(cert.issued_at)}</div>
                       {cert.serial && <div className="cert-card-serial">{cert.serial}</div>}
-                    </div>
-                    <div className="cert-card-stats">
-                      <div><strong>{cert.completion_percentage}%</strong>Complete</div>
-                      {cert.final_score != null && (
-                        <div><strong>{cert.final_score}</strong>Final score</div>
-                      )}
                     </div>
                     <button
                       className="cert-download-btn"

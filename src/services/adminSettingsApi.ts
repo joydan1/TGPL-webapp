@@ -10,6 +10,24 @@ export type ApiResult<T> =
 
 const NO_OP_MESSAGE = 'No settings were changed.'
 
+type AdminProfileResponse = Partial<AdminProfile> & {
+  first_name?: string
+  last_name?: string
+}
+
+function normalizeAdminProfile(profile: AdminProfileResponse): AdminProfile {
+  const fullName = profile.full_name ?? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim()
+  return {
+    full_name: fullName,
+    email: profile.email ?? '',
+    phone: profile.phone ?? null,
+    role: profile.role ?? 'admin',
+    avatar_url: profile.avatar_url ?? null,
+    two_factor_enabled: profile.two_factor_enabled ?? false,
+    session_timeout_minutes: profile.session_timeout_minutes ?? 0,
+  }
+}
+
 export const adminSettingsAPI = {
   async getSettings(): Promise<ApiResult<SystemSettings>> {
     try {
@@ -52,8 +70,8 @@ export const NO_OP_ERROR_MESSAGE = NO_OP_MESSAGE
 export const adminProfileAPI = {
   async getProfile(): Promise<ApiResult<AdminProfile>> {
     try {
-      const res = await apiClient.get<AdminProfile>('/v1/auth/me/')
-      return { success: true, data: res.data }
+      const res = await apiClient.get<AdminProfileResponse>('/v1/auth/me/')
+      return { success: true, data: normalizeAdminProfile(res.data) }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to load profile')
       return { success: false, error: message, statusCode }
@@ -62,8 +80,15 @@ export const adminProfileAPI = {
 
   async updateProfile(payload: Partial<Pick<AdminProfile, 'full_name' | 'email' | 'phone'>>): Promise<ApiResult<AdminProfile>> {
     try {
-      const res = await apiClient.patch<AdminProfile>('/v1/auth/me/', payload)
-      return { success: true, data: res.data }
+      const nameParts = payload.full_name?.trim().split(/\s+/) ?? []
+      const res = await apiClient.patch<AdminProfileResponse>('/v1/auth/me/', {
+        ...(payload.full_name !== undefined
+          ? { first_name: nameParts[0] ?? '', last_name: nameParts.slice(1).join(' ') }
+          : {}),
+        ...(payload.email !== undefined ? { email: payload.email } : {}),
+        ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
+      })
+      return { success: true, data: normalizeAdminProfile(res.data) }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to update profile')
       return { success: false, error: message, statusCode }
@@ -84,7 +109,10 @@ export const adminProfileAPI = {
   },
   async changePassword(payload: { current_password: string; new_password: string }): Promise<ApiResult<{ message: string }>> {
     try {
-      const res = await apiClient.post<{ message: string }>('/v1/auth/password-change/', payload)
+      const res = await apiClient.post<{ message: string }>('/v1/auth/password-change/', {
+        old_password: payload.current_password,
+        new_password: payload.new_password,
+      })
       return { success: true, data: res.data }
     } catch (err) {
       const { message, statusCode } = parseApiError(err, 'Failed to change password')

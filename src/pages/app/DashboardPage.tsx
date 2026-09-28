@@ -515,7 +515,7 @@ const upcoming = all
             completion_percentage: data.completion_percentage ?? 0,
             next_incomplete: data.next_incomplete ?? null,
             
-            checklist: (data.checklist || []).filter((item) => item.implemented !== false),
+            checklist: data.checklist || [],
           })
         })
 
@@ -960,10 +960,10 @@ function goToCertification() {
 
                 {activeCert.checklist.map((item, i) => (
                   <div key={i} className={`cert-item${item.satisfied ? ' done' : ''}`}>
-                    {item.satisfied
+                    {item.implemented === false ? <Circle size={16} color="#9CA3AF" /> : item.satisfied
                       ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
                       : <Circle size={16} color="#D1D5DB" />}
-                    <span>{labelForRequirement(item.requirement)}</span>
+                    <span>{labelForRequirement(item.requirement)}{item.implemented === false ? ' (Coming soon)' : ''}</span>
                   </div>
                 ))}
                  {showCertNudge && (

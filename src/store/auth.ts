@@ -32,7 +32,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearError: () => set({ error: null }),
   setError: (error) => set({ error }),
 
-  setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
+  setUser: (user) => {
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user))
+    } else {
+      localStorage.removeItem('user')
+    }
+    set({ user, isAuthenticated: Boolean(user) })
+  },
 
   
   setToken: (token) => {

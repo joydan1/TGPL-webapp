@@ -130,10 +130,11 @@ const PAGE_CSS = `
   .ad-export-btn { display: flex; align-items: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.6rem 1.1rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
   .ad-export-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-  .ad-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+  .ad-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
   .ad-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); }
   .ad-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
-  .ad-stat-value { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
+  .ad-stat-top > div:first-child { min-width: 0; }
+  .ad-stat-value { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; overflow-wrap: anywhere; }
   .ad-stat-title { margin: 0.3rem 0 0.4rem; color: #6B7280; font-size: 0.8rem; }
   .ad-stat-change { font-size: 0.78rem; font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 0.2rem; }
   .ad-stat-change.negative { color: #DC2626; }
@@ -179,9 +180,6 @@ const PAGE_CSS = `
 
   @media (max-width: 1200px) {
     .ad-charts { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 900px) {
-    .ad-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 640px) {
     .ad-page { padding: 1.25rem; }
