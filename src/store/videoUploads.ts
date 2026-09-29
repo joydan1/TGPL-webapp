@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { useEffect } from 'react'
-import { coursesManageAPI } from '../services/api'
+import { coursesManageAPI, type MultipartUploadSession } from '../services/api'
 
 export type UploadStatus = 'queued' | 'uploading' | 'error' | 'done'
 
@@ -10,6 +10,8 @@ export interface UploadJob {
   courseId: string
   lessonTitle: string
   file: File
+  durationSeconds: number | null
+  multipartSession: MultipartUploadSession | null
   status: UploadStatus
   progress: number     // 0–100
   note: string | null  // e.g. "Connection problem — retrying (1/2)…"
@@ -22,6 +24,7 @@ interface EnqueueArgs {
   courseId: string
   lessonTitle: string
   file: File
+  durationSeconds: number | null
 }
 
 interface UploadState {
@@ -73,7 +76,7 @@ function patch(key: string, changes: Partial<UploadJob>, token?: number) {
 export const useVideoUploads = create<UploadState>(() => ({
   jobs: {},
 
-  enqueue: ({ key, courseId, lessonTitle, file }) => {
+  enqueue: ({ key, courseId, lessonTitle, file, durationSeconds }) => {
     abortRunning(key) // replacing a video: stop any earlier upload for this lesson
     const job: UploadJob = {
       key,
@@ -81,6 +84,8 @@ export const useVideoUploads = create<UploadState>(() => ({
       courseId,
       lessonTitle,
       file,
+      durationSeconds,
+      multipartSession: null,
       status: 'queued',
       progress: 0,
       note: null,
@@ -126,6 +131,7 @@ async function runJob(key: string, token: number) {
   const controller = new AbortController()
   controllers.set(key, controller)
   patch(key, { status: 'uploading', progress: 0, note: null, error: null }, token)
+  let multipartSession = job.multipartSession
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const res = await coursesManageAPI.uploadFile(
@@ -134,6 +140,12 @@ async function runJob(key: string, token: number) {
       { lesson_id: key },
       {
         signal: controller.signal,
+        durationSeconds: job.durationSeconds ?? undefined,
+        multipartSession,
+        onMultipartSession: (session) => {
+          multipartSession = session
+          patch(key, { multipartSession: session }, token)
+        },
         onProgress: (pct) => patch(key, { progress: pct }, token),
       },
     )

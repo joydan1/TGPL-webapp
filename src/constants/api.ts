@@ -32,6 +32,10 @@ export const API_ENDPOINTS = {
   // Courses — uploads (used for lesson video and lesson resources)
   COURSES_UPLOADS_PRESIGN: '/v1/courses/uploads/presign/',
   COURSES_UPLOADS_CONFIRM: '/v1/courses/uploads/confirm/',
+  COURSES_UPLOADS_MULTIPART_CREATE: '/v1/courses/uploads/multipart/create/',
+  COURSES_UPLOADS_MULTIPART_PARTS: '/v1/courses/uploads/multipart/parts/',
+  COURSES_UPLOADS_MULTIPART_STATUS: '/v1/courses/uploads/multipart/status/',
+  COURSES_UPLOADS_MULTIPART_COMPLETE: '/v1/courses/uploads/multipart/complete/',
  
 LEARNER_PROFILE: '/v1/users/me/learner-profile/',
  // Live sessions — learner side

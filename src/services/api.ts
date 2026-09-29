@@ -924,6 +924,156 @@ function putFileWithProgress(
 export interface UploadFileOptions {
   onProgress?: (percent: number) => void
   signal?: AbortSignal
+  durationSeconds?: number
+  multipartSession?: MultipartUploadSession | null
+  onMultipartSession?: (session: MultipartUploadSession) => void
+}
+
+export interface MultipartUploadSession {
+  objectKey: string
+  uploadId: string
+  partSize: number
+  completed?: boolean
+}
+
+const MULTIPART_THRESHOLD_BYTES = 100 * 1024 * 1024
+const MULTIPART_SIGN_BATCH_SIZE = 4
+
+async function putMultipartPart(
+  url: string,
+  file: Blob,
+  onProgress: (loaded: number) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Upload aborted', 'AbortError'))
+      return
+    }
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded)
+    }
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new StorageUploadError(humanizeStorageUploadError(xhr.status), xhr.status))
+        return
+      }
+      const etag = xhr.getResponseHeader('ETag')
+      if (!etag) {
+        reject(new StorageUploadError('Storage did not return an ETag for an uploaded part.'))
+        return
+      }
+      resolve(etag)
+    }
+    xhr.onerror = () => reject(new StorageUploadError('Network error during upload.'))
+    xhr.ontimeout = () => reject(new StorageUploadError('Upload timed out.'))
+    xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'))
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.send(file)
+  })
+}
+
+async function uploadMultipartVideo(
+  file: File,
+  lessonId: string,
+  options: UploadFileOptions | undefined,
+): Promise<ConfirmUploadResponse> {
+  const contentType = file.type || 'application/octet-stream'
+  let session = options?.multipartSession ?? null
+
+  if (!session) {
+    const response = await apiClient.post<{
+      object_key: string
+      upload_id: string
+      part_size: number
+    }>(API_ENDPOINTS.COURSES_UPLOADS_MULTIPART_CREATE, {
+      lesson_id: lessonId,
+      filename: file.name,
+      content_type: contentType,
+      file_size: file.size,
+    }, { signal: options?.signal })
+    session = {
+      objectKey: response.data.object_key,
+      uploadId: response.data.upload_id,
+      partSize: response.data.part_size,
+    }
+    options?.onMultipartSession?.(session)
+  }
+  if (session.partSize <= 0) throw new Error('Multipart upload returned an invalid part size.')
+
+  if (!session.completed) {
+    const statusResponse = await apiClient.post<{
+      uploaded_parts: { part_number: number; size: number; etag: string }[]
+    }>(API_ENDPOINTS.COURSES_UPLOADS_MULTIPART_STATUS, {
+      lesson_id: lessonId,
+      object_key: session.objectKey,
+      upload_id: session.uploadId,
+    }, { signal: options?.signal })
+    const uploaded = new Map(statusResponse.data.uploaded_parts.map((part) => [part.part_number, part]))
+    const partCount = Math.ceil(file.size / session.partSize)
+    let uploadedBytes = statusResponse.data.uploaded_parts.reduce((sum, part) => sum + part.size, 0)
+
+    for (let start = 1; start <= partCount; start += MULTIPART_SIGN_BATCH_SIZE) {
+      const partNumbers = Array.from(
+        { length: Math.min(MULTIPART_SIGN_BATCH_SIZE, partCount - start + 1) },
+        (_, index) => start + index,
+      ).filter((partNumber) => !uploaded.has(partNumber))
+      if (!partNumbers.length) continue
+
+      const signedResponse = await apiClient.post<{
+        parts: { part_number: number; upload_url: string }[]
+      }>(API_ENDPOINTS.COURSES_UPLOADS_MULTIPART_PARTS, {
+        lesson_id: lessonId,
+        object_key: session.objectKey,
+        upload_id: session.uploadId,
+        part_numbers: partNumbers,
+      }, { signal: options?.signal })
+      const loadedByPart = new Map<number, number>()
+
+      await Promise.all(signedResponse.data.parts.map(async ({ part_number, upload_url }) => {
+        const startOffset = (part_number - 1) * session!.partSize
+        const endOffset = Math.min(file.size, startOffset + session!.partSize)
+        const part = file.slice(startOffset, endOffset)
+        const etag = await putMultipartPart(upload_url, part, (loaded) => {
+          loadedByPart.set(part_number, loaded)
+          const inFlightBytes = Array.from(loadedByPart.values()).reduce((sum, value) => sum + value, 0)
+          options?.onProgress?.(Math.min(99, Math.round(((uploadedBytes + inFlightBytes) / file.size) * 100)))
+        }, options?.signal)
+        loadedByPart.delete(part_number)
+        uploaded.set(part_number, { part_number, size: part.size, etag })
+        uploadedBytes += part.size
+        options?.onProgress?.(Math.min(99, Math.round((uploadedBytes / file.size) * 100)))
+      }))
+    }
+
+    await apiClient.post(API_ENDPOINTS.COURSES_UPLOADS_MULTIPART_COMPLETE, {
+      lesson_id: lessonId,
+      object_key: session.objectKey,
+      upload_id: session.uploadId,
+      parts: Array.from(uploaded.values()).map(({ part_number, etag }) => ({ part_number, etag })),
+    }, { signal: options?.signal })
+    session = { ...session, completed: true }
+    options?.onMultipartSession?.(session)
+  }
+
+  const confirmResponse = await apiClient.post<ConfirmUploadResponse>(
+    API_ENDPOINTS.COURSES_UPLOADS_CONFIRM,
+    {
+      target: 'lesson_video',
+      lesson_id: lessonId,
+      object_key: session.objectKey,
+      file_name: file.name,
+      file_size: file.size,
+      content_type: contentType,
+      ...(options?.durationSeconds && options.durationSeconds > 0
+        ? { duration_seconds: Math.round(options.durationSeconds) }
+        : {}),
+    } as ConfirmUploadPayload,
+    { signal: options?.signal },
+  )
+  return confirmResponse.data
 }
 
 export const coursesAPI = {
@@ -1565,6 +1715,7 @@ export interface ConfirmUploadPayload {
   file_name: string
   file_size: number
   content_type: string
+  duration_seconds?: number
 }
  
 export interface ConfirmUploadResponse {
@@ -1784,6 +1935,12 @@ getCurriculum: async (courseId: string) => {
     | { success: false; error: string; statusCode?: number; cancelled?: boolean; retryable?: boolean }
   > => {
     try {
+      if (target === 'lesson_video' && file.size > MULTIPART_THRESHOLD_BYTES && ids.lesson_id) {
+        const data = await uploadMultipartVideo(file, ids.lesson_id, options)
+        options?.onProgress?.(100)
+        return { success: true as const, data }
+      }
+
       const presignRes = await apiClient.post<PresignUploadResponse>(
         API_ENDPOINTS.COURSES_UPLOADS_PRESIGN,
         {
@@ -1818,6 +1975,9 @@ getCurriculum: async (courseId: string) => {
           file_name: file.name,
           file_size: file.size,
           content_type: file.type || 'application/octet-stream',
+          ...(target === 'lesson_video' && options?.durationSeconds && options.durationSeconds > 0
+            ? { duration_seconds: Math.round(options.durationSeconds) }
+            : {}),
         } as ConfirmUploadPayload,
         { signal: options?.signal },
       )

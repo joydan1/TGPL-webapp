@@ -57,6 +57,7 @@ type Lesson = {
   title: string
   description: string
   videoFile: File | null
+  durationSeconds: number | null
   existingVideoUrl: string | null
   materialFiles: File[] // files picked but not yet uploaded; each is removed as soon as it uploads
   existingMaterialsCount: number
@@ -123,6 +124,23 @@ function formatPrice(raw: string): string {
   return decimals !== undefined ? `${formatted}.${decimals}` : formatted
 }
 
+function readVideoDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    const objectUrl = URL.createObjectURL(file)
+    const finish = (duration: number | null) => {
+      URL.revokeObjectURL(objectUrl)
+      video.removeAttribute('src')
+      video.load()
+      resolve(duration)
+    }
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => finish(Number.isFinite(video.duration) && video.duration > 0 ? Math.round(video.duration) : null)
+    video.onerror = () => finish(null)
+    video.src = objectUrl
+  })
+}
+
 // "Managers, Analysts" -> ['Managers', 'Analysts'] (same format the manage page saves)
 function parseAudience(text: string): string[] {
   return text
@@ -138,6 +156,7 @@ function emptyLesson(): Lesson {
     title: '',
     description: '',
     videoFile: null,
+    durationSeconds: null,
     existingVideoUrl: null,
     materialFiles: [],
     existingMaterialsCount: 0,
@@ -332,6 +351,7 @@ const PAGE_CSS = `
   .ac-lesson-uploads { padding: 0 1rem 1rem; display: grid; gap: 0.75rem; }
   .ac-upload-chip { display: flex; align-items: center; gap: 0.75rem; border: 1px dashed #93C5FD; background: #EFF6FF; border-radius: 0.85rem; padding: 0.85rem 1rem; cursor: pointer; }
   .ac-upload-chip.busy { cursor: default; }
+  .ac-upload-chip.busy { padding: 0.55rem 0.75rem; }
   .ac-upload-chip.failed { border-color: #FCA5A5; background: #FEF2F2; cursor: default; }
   .ac-upload-chip-icon { width: 34px; height: 34px; border-radius: 0.6rem; background: #DBEAFE; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ac-upload-chip.failed .ac-upload-chip-icon { background: #FEE2E2; color: #B91C1C; }
@@ -714,6 +734,7 @@ export default function AddCoursePage() {
             title: lesson.title ?? '',
             description: detail?.body ?? '',
             videoFile: null,
+            durationSeconds: lesson.duration_seconds ?? detail?.duration_seconds ?? null,
             existingVideoUrl: rawVideoUrl,
             materialFiles: [],
             existingMaterialsCount: detail?.resource_keys?.length ?? 0,
@@ -947,6 +968,12 @@ export default function AddCoursePage() {
         const lesson = mod.lessons[i]
         if (!lesson.title.trim()) continue
 
+        let durationSeconds = lesson.durationSeconds
+        if (lesson.videoFile && durationSeconds === null) {
+          durationSeconds = await readVideoDuration(lesson.videoFile)
+          if (durationSeconds !== null) updateLesson(mod.id, lesson.id, { durationSeconds })
+        }
+
         let remoteId = lesson.remoteId
 
         if (!remoteId) {
@@ -960,10 +987,11 @@ export default function AddCoursePage() {
           // Remember the server id straight away so a later failure + retry can't create a duplicate lesson.
           updateLesson(mod.id, lesson.id, { remoteId })
 
-          if (lesson.description.trim() || lesson.isPreview) {
+          if (lesson.description.trim() || lesson.isPreview || durationSeconds !== null) {
             const bodyResult = await coursesManageAPI.updateLesson(remoteId, {
               body: lesson.description,
               is_preview: lesson.isPreview,
+              ...(durationSeconds !== null ? { duration_seconds: durationSeconds } : {}),
             })
             if (!bodyResult.success) {
               setSaveError(bodyResult.error || `Failed to save description for "${lesson.title}".`)
@@ -976,6 +1004,7 @@ export default function AddCoursePage() {
             title: lesson.title,
             body: lesson.description,
             is_preview: lesson.isPreview,
+            ...(durationSeconds !== null ? { duration_seconds: durationSeconds } : {}),
           })
           if (!updateResult.success) {
             setSaveError(updateResult.error || `Failed to update lesson "${lesson.title}".`)
@@ -991,6 +1020,7 @@ export default function AddCoursePage() {
             courseId,
             lessonTitle: lesson.title,
             file: lesson.videoFile,
+            durationSeconds,
           })
         }
 
@@ -1312,7 +1342,21 @@ export default function AddCoursePage() {
     }
     setSaveError(null)
     if (lesson.remoteId) cancelVideo(lesson.remoteId) // replacing: stop any earlier upload
-    updateLesson(moduleLocalId, lesson.id, { videoFile: file, videoUploaded: false })
+    updateLesson(moduleLocalId, lesson.id, { videoFile: file, durationSeconds: null, videoUploaded: false })
+    void readVideoDuration(file).then((durationSeconds) => {
+      if (durationSeconds === null) return
+      setForm((current) => ({
+        ...current,
+        modules: current.modules.map((module) => module.id !== moduleLocalId ? module : {
+          ...module,
+          lessons: module.lessons.map((currentLesson) =>
+            currentLesson.id === lesson.id && currentLesson.videoFile === file && currentLesson.durationSeconds === null
+              ? { ...currentLesson, durationSeconds }
+              : currentLesson,
+          ),
+        }),
+      }))
+    })
   }
 
   function handleVideoCancel(moduleLocalId: string, lesson: Lesson) {
@@ -1713,6 +1757,26 @@ export default function AddCoursePage() {
                               onCancel={() => handleVideoCancel(mod.id, lesson)}
                               onRetry={() => lesson.remoteId && retryVideo(lesson.remoteId)}
                             />
+
+                            <div className="ac-field">
+                              <label className="ac-label" htmlFor={`duration-${lesson.id}`}>Video duration (seconds)</label>
+                              <input
+                                id={`duration-${lesson.id}`}
+                                className="ac-input"
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputMode="numeric"
+                                placeholder="Filled from video when available"
+                                value={lesson.durationSeconds ?? ''}
+                                onChange={(e) => updateLesson(
+                                  mod.id,
+                                  lesson.id,
+                                  { durationSeconds: e.target.value ? Math.max(1, Math.round(Number(e.target.value))) : null },
+                                )}
+                              />
+                              <p className="ac-hint">Read automatically from the video; enter seconds here if the browser cannot read it.</p>
+                            </div>
 
                             <label className="ac-upload-chip">
                               <input

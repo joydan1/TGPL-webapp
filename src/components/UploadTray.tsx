@@ -1,7 +1,7 @@
 import { useVideoUploads, useUploadGuard } from '../store/videoUploads'
 
 const TRAY_CSS = `
-  .ut-tray { position: fixed; right: 1rem; bottom: 1rem; width: min(340px, calc(100vw - 2rem)); background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; box-shadow: 0 12px 32px rgba(0,0,0,0.15); z-index: 400; overflow: hidden; }
+  .ut-tray { position: fixed; top: 4.75rem; right: 1rem; width: min(340px, calc(100vw - 2rem)); background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; box-shadow: 0 12px 32px rgba(0,0,0,0.15); z-index: 400; overflow: hidden; }
   .ut-head { padding: 0.7rem 1rem; font-size: 0.8rem; font-weight: 700; color: #111827; background: #F9FAFB; border-bottom: 1px solid #F3F4F6; }
   .ut-row { padding: 0.7rem 1rem; border-top: 1px solid #F3F4F6; display: grid; gap: 0.4rem; }
   .ut-row:first-of-type { border-top: none; }
