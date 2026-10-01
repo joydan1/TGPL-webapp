@@ -3,7 +3,7 @@ import {
   LayoutGrid, Users, BookOpen, CreditCard, Settings as SettingsIcon,
   Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen,
-  LogOut, User as UserIcon, MessageCircle
+  LogOut, User as UserIcon, MessageCircle, Award, RotateCw, Activity
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
@@ -124,6 +124,9 @@ const navItems = [
   { key: 'courses',   label: 'Courses',   route: ROUTES.ADMIN_COURSES,    Icon: BookOpen, permission: 'manage_courses' as const },
   { key: 'community', label: 'Community', route: ROUTES.ADMIN_COMMUNITY, Icon: MessageCircle, permission: 'moderate_content' as const },
   { key: 'revenue',   label: 'Revenue',   route: ROUTES.ADMIN_REVENUE,    Icon: CreditCard, permission: 'view_revenue' as const },
+  { key: 'missing-certificates', label: 'Missing certificates', route: ROUTES.ADMIN_MISSING_CERTIFICATES, Icon: Award, permission: 'manage_courses' as const },
+  { key: 'dead-letter', label: 'Failed webhooks', route: ROUTES.ADMIN_DEAD_LETTER, Icon: RotateCw, permission: 'manage_payouts' as const },
+  { key: 'system-status', label: 'System status', route: ROUTES.ADMIN_SYSTEM_STATUS, Icon: Activity, permission: 'system_settings' as const },
   { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon, permission: 'system_settings' as const },
 ]
 
@@ -140,7 +143,7 @@ export default function AdminShell({ children }: AdminShellProps) {
 
   if (!user) return null
 
-  const visibleNavItems = navItems.filter((item) => user.permissions?.[item.permission] !== false)
+  const visibleNavItems = navItems.filter((item) => user.permissions?.[item.permission] === true)
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
   const avatarUrl = user.avatar_url ?? null
   const activeRoute = visibleNavItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.ADMIN_DASHBOARD

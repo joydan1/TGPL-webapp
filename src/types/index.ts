@@ -20,14 +20,14 @@ export interface User {
 }
 
 export interface AdminPermissions {
-  manage_users?: boolean
-  moderate_content?: boolean
-  manage_courses?: boolean
-  view_analytics?: boolean
-  send_announcements?: boolean
-  view_revenue?: boolean
-  manage_payouts?: boolean
-  system_settings?: boolean
+  manage_users: boolean
+  moderate_content: boolean
+  manage_courses: boolean
+  view_analytics: boolean
+  send_announcements: boolean
+  view_revenue: boolean
+  manage_payouts: boolean
+  system_settings: boolean
 }
 
 export interface LearnerProfile {

@@ -420,12 +420,18 @@ const [paywalled, setPaywalled] = useState(false)
   const [volume, setVolume]                   = useState(1)
   const [muted, setMuted]                     = useState(false)
   const [buffering, setBuffering]             = useState(false)
+  const [videoRefreshError, setVideoRefreshError] = useState<string | null>(null)
   const [qualityOpen, setQualityOpen]         = useState(false)
   const [quality, setQuality]                 = useState('Auto')
   const [saveData, setSaveData]               = useState(false)
   const [ccOpen, setCcOpen]                   = useState(false)
   const [ccOn, setCcOn]                       = useState(false)
   const positionTimerRef                      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const refreshingVideoRef                    = useRef(false)
+  const attemptedVideoRefreshUrlRef           = useRef<string | null>(null)
+  const scheduledVideoRefreshUrlRef           = useRef<string | null>(null)
+  const pendingVideoResumeRef                 = useRef<{ position: number; wasPlaying: boolean } | null>(null)
+  const initialResumeLessonRef                 = useRef<string | null>(null)
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
@@ -504,6 +510,63 @@ const [paywalled, setPaywalled] = useState(false)
     return () => { cancelled = true }
   }, [slug, lessonId])
 
+  const refreshVideoUrl = useCallback(async (force = false) => {
+    if (!slug || !lessonId || !lesson?.video_url || refreshingVideoRef.current) return
+    const expiredUrl = lesson.video_url
+    if (!force && attemptedVideoRefreshUrlRef.current === expiredUrl) return
+
+    attemptedVideoRefreshUrlRef.current = expiredUrl
+    refreshingVideoRef.current = true
+    setVideoRefreshError(null)
+    const video = videoRef.current
+    const resumeState = {
+      position: video?.currentTime ?? 0,
+      wasPlaying: Boolean(video && !video.paused && !video.ended),
+    }
+
+    try {
+      const result = await coursesAPI.getLesson(slug, lessonId)
+      if (!result.success) {
+        setVideoRefreshError(result.error || 'Could not refresh the video link.')
+        return
+      }
+      if (!result.data.video_url || result.data.video_url === expiredUrl) {
+        setVideoRefreshError('The video link could not be renewed yet. Try again.')
+        return
+      }
+
+      pendingVideoResumeRef.current = resumeState
+      setLesson((previous) => previous && previous.id === lessonId
+        ? { ...previous, ...result.data }
+        : previous)
+    } catch {
+      setVideoRefreshError('Could not refresh the video link. Check your connection and retry.')
+    } finally {
+      refreshingVideoRef.current = false
+    }
+  }, [slug, lessonId, lesson?.video_url])
+
+  useEffect(() => {
+    const videoUrl = lesson?.video_url
+    const expiresAt = lesson?.video_url_expires_at
+    if (!videoUrl || !expiresAt || scheduledVideoRefreshUrlRef.current === videoUrl) return
+
+    const expiryTime = Date.parse(expiresAt)
+    if (!Number.isFinite(expiryTime)) return
+    scheduledVideoRefreshUrlRef.current = videoUrl
+    const refreshDelay = Math.max(0, expiryTime - Date.now() - 60_000)
+    const timer = setTimeout(() => { void refreshVideoUrl() }, refreshDelay)
+    return () => clearTimeout(timer)
+  }, [lesson?.video_url, lesson?.video_url_expires_at, refreshVideoUrl])
+
+  useEffect(() => {
+    attemptedVideoRefreshUrlRef.current = null
+    scheduledVideoRefreshUrlRef.current = null
+    pendingVideoResumeRef.current = null
+    initialResumeLessonRef.current = null
+    setVideoRefreshError(null)
+  }, [lessonId])
+
   // Full module list from the learn view, kept around so we can re-derive the
   // current lesson's module assignments below whenever `lesson` changes.
   const [allModules, setAllModules] = useState<LearnModule[]>([])
@@ -572,15 +635,21 @@ const [paywalled, setPaywalled] = useState(false)
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    const resumePos = lesson?.resume_position_seconds
-    if (resumePos && resumePos > 0) {
-      const onMeta = () => { v.currentTime = resumePos }
-      v.addEventListener('loadedmetadata', onMeta, { once: true })
-    }
     const onPlay         = () => setIsPlaying(true)
     const onPause        = () => setIsPlaying(false)
     const onTimeUpdate   = () => setCurrentTime(v.currentTime)
-    const onDuration     = () => setDuration(v.duration)
+    const onDuration     = () => {
+      setDuration(v.duration)
+      const pendingResume = pendingVideoResumeRef.current
+      if (pendingResume) {
+        pendingVideoResumeRef.current = null
+        v.currentTime = Math.min(pendingResume.position, Math.max(0, v.duration - 1))
+        if (pendingResume.wasPlaying) v.play().catch(() => {})
+      } else if (lesson?.resume_position_seconds && initialResumeLessonRef.current !== lesson.id) {
+        initialResumeLessonRef.current = lesson.id
+        v.currentTime = lesson.resume_position_seconds
+      }
+    }
     const onWaiting      = () => setBuffering(true)
     const onCanPlay      = () => setBuffering(false)
     const onVolumeChange = () => { setVolume(v.volume); setMuted(v.muted) }
@@ -956,6 +1025,7 @@ async function downloadResource(r: LessonResource) {
                     preload="metadata"
                     playsInline
                     muted={muted}
+                    onError={() => { void refreshVideoUrl() }}
                     style={{ display: hasVideo ? 'block' : 'none' }}
                   />
 
@@ -1103,6 +1173,20 @@ async function downloadResource(r: LessonResource) {
                   </div>
                 </div>
               </div>
+
+              {videoRefreshError && (
+                <div className="error-banner" role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                  <span>{videoRefreshError}</span>
+                  <button
+                    type="button"
+                    className="ac-chip-btn"
+                    onClick={() => { void refreshVideoUrl(true) }}
+                    disabled={refreshingVideoRef.current}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
 
               {/* ── Breadcrumb + title ── */}
               <div className="lesson-meta">

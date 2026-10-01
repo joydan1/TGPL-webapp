@@ -96,7 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr)
-        set({ token, refreshToken, user, isAuthenticated: true })
+        set({ token, refreshToken, user, isAuthenticated: true, isLoading: true })
       } catch (error) {
         console.error('Failed to parse user from localStorage:', error)
         localStorage.removeItem('token')

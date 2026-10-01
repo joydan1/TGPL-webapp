@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
+import { useAuth } from './hooks/useAuth'
 import { ROUTES, RouteBuilder } from './constants/routes'
 import MaintenanceGate from './components/MaintenanceGate'
 import PushPrompt from './components/layout/PushPrompt'
@@ -58,6 +59,9 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'))
 const AdminCommunityPage = lazy(() => import('./pages/admin/AdminCommunityPage'))
 const AdminCourseManagePage = lazy(() => import('./pages/admin/AdminCourseManagePage'))
 const AdminActivityPage = lazy(() => import('./pages/admin/AdminActivityPage'))
+const AdminMissingCertificatesPage = lazy(() => import('./pages/admin/AdminMissingCertificatesPage'))
+const AdminDeadLetterPage = lazy(() => import('./pages/admin/AdminDeadLetterPage'))
+const AdminSystemStatusPage = lazy(() => import('./pages/admin/AdminSystemStatusPage'))
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -66,7 +70,11 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole, requiredPermission }) => {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, isLoading, user } = useAuthStore()
+
+  if (isLoading) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#6B7280' }}>Checking access…</div>
+  }
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} replace />
@@ -83,7 +91,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
     return <Navigate to={ROUTES.FORBIDDEN} replace />
   }
 
-  if (requiredPermission && user?.role === 'admin' && user.permissions?.[requiredPermission] === false) {
+  if (requiredPermission && (user?.role !== 'admin' || user.permissions?.[requiredPermission] !== true)) {
     return <Navigate to={ROUTES.FORBIDDEN} replace />
   }
 
@@ -95,9 +103,6 @@ function DashboardPageWrapper() {
   return <DashboardPage key={location.key} />
 }
 
-// Handles old bookmarked/shared links to the retired standalone preview route.
-// The preview lesson experience now lives inside CourseDetailPage's
-// PublicCourseOverview, so this just forwards straight to the course detail page.
 function CoursePreviewRedirect() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -107,6 +112,31 @@ function CoursePreviewRedirect() {
       navigate(RouteBuilder.course(slug), { replace: true })
     }
   }, [slug, navigate])
+
+  return null
+}
+
+function AdminPermissionRefresh() {
+  const location = useLocation()
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const { loadCurrentUser } = useAuth()
+  const previousPath = useRef<string | null>(null)
+
+  useEffect(() => {
+    const previous = previousPath.current
+    previousPath.current = location.pathname
+    if (!isAuthenticated) return
+    const enteringAdmin = location.pathname.startsWith('/admin') && !previous?.startsWith('/admin')
+    if (enteringAdmin) {
+      void loadCurrentUser()
+    }
+  }, [isAuthenticated, location.pathname, loadCurrentUser])
+
+  useEffect(() => {
+    const refreshPermissions = () => { void loadCurrentUser() }
+    window.addEventListener('admin-permissions-stale', refreshPermissions)
+    return () => window.removeEventListener('admin-permissions-stale', refreshPermissions)
+  }, [loadCurrentUser])
 
   return null
 }
@@ -121,6 +151,7 @@ function App() {
 
   return (
     <Router>
+      <AdminPermissionRefresh />
       <Suspense fallback={<div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#6B7280' }}>Loading…</div>}>
         <MaintenanceGate>
         <Routes>
@@ -444,6 +475,30 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin" requiredPermission="view_analytics">
               <AdminActivityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_MISSING_CERTIFICATES}
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_courses">
+              <AdminMissingCertificatesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_DEAD_LETTER}
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="manage_payouts">
+              <AdminDeadLetterPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_SYSTEM_STATUS}
+          element={
+            <ProtectedRoute requiredRole="admin" requiredPermission="system_settings">
+              <AdminSystemStatusPage />
             </ProtectedRoute>
           }
         />

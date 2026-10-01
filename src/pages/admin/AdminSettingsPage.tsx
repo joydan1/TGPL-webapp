@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Settings as SettingsIcon, User, CreditCard, Bell, Award, Wrench, Check,
+  Settings as SettingsIcon, User, CreditCard, Bell, Wrench, Check,
   ShieldCheck, ExternalLink, Upload, Eye, EyeOff, AlertTriangle, Camera,
   Loader2,
 } from 'lucide-react'
@@ -9,7 +9,7 @@ import MaintenanceScreen from '../../components/MaintenanceScreen'
 import { useAuthStore } from '../../store/auth'
 import { adminSettingsAPI, adminProfileAPI, NO_OP_ERROR_MESSAGE } from '../../services/adminSettingsApi'
 import {
-  SETTINGS_SECTIONS, CERTIFICATE_TEMPLATES,
+  SETTINGS_SECTIONS,
   type SystemSettings, type PatchedSystemSettings, type FieldConfig, type FieldGroup,
   type AdminProfile, type SectionConfig, type SelectOption,
 } from '../../types/adminSettings'
@@ -73,20 +73,6 @@ const PAGE_CSS = `
   .as-gateway-text { font-size: 13px; font-weight: 600; color: #10B981; }
   .as-manage-link { display: flex; align-items: center; gap: 6px; padding: 12px 0; font-size: 12px; font-weight: 600; color: #2492EB; text-decoration: none; }
 
-  .as-cert-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 16px 0; }
-  .as-cert-card { position: relative; border: 2px solid #EBEBEB; border-radius: 14px; overflow: hidden; cursor: pointer; background: #fff; text-align: left; padding: 0; }
-  .as-cert-card.selected { border-color: #2492EB; box-shadow: 0 4px 6px -1px rgba(36,146,235,0.1), 0 2px 4px -2px rgba(36,146,235,0.1); }
-  .as-cert-swatch { height: 64px; display: flex; align-items: center; justify-content: center; }
-  .as-cert-swatch.classic_parchment { background: linear-gradient(135deg, rgba(233,213,160,0.13), rgba(233,213,160,0.27)); border-bottom: 2px solid rgba(233,213,160,0.19); }
-  .as-cert-swatch.modern_minimal { background: linear-gradient(135deg, rgba(36,146,235,0.13), rgba(36,146,235,0.27)); border-bottom: 2px solid rgba(36,146,235,0.19); }
-  .as-cert-swatch.corporate_blue { background: linear-gradient(135deg, rgba(43,57,66,0.13), rgba(43,57,66,0.27)); border-bottom: 2px solid rgba(43,57,66,0.19); }
-  .as-cert-swatch.vibrant_gradient { background: linear-gradient(135deg, rgba(139,92,246,0.13), rgba(139,92,246,0.27)); border-bottom: 2px solid rgba(139,92,246,0.19); }
-  .as-cert-swatch-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-  .as-cert-check { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 999px; background: #2492EB; display: flex; align-items: center; justify-content: center; }
-  .as-cert-label { padding: 8px 12px; font-size: 11px; font-weight: 600; color: #2B2B2C; }
-  .as-cert-card.selected .as-cert-label { color: #2492EB; }
-  @media (max-width: 780px) { .as-cert-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
   .as-upload-box { width: 240px; height: 64px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; cursor: pointer; }
   .as-upload-box.empty { background: #FAFAFA; border: 2px dashed #D1D5DB; }
   .as-upload-box.filled { background: rgba(233,245,255,0.4); border: 2px dashed #2492EB; }
@@ -137,7 +123,6 @@ const PAGE_CSS = `
     .as-content-inner { padding: 16px 0 0; }
     .as-row { flex-direction: column; align-items: stretch; gap: 8px; }
     .as-row-input.wide, .as-password-input-wrap { width: 100%; }
-    .as-cert-grid { grid-template-columns: 1fr; }
   }
 `
 
@@ -146,11 +131,10 @@ const SECTION_ICONS: Record<string, typeof SettingsIcon> = {
   profile: User,
   payment: CreditCard,
   notifications: Bell,
-  certificates: Award,
   maintenance: Wrench,
 }
 
-const NAV_ORDER = ['general', 'profile', 'payment', 'notifications', 'certificates', 'maintenance']
+const NAV_ORDER = ['general', 'profile', 'payment', 'notifications', 'maintenance']
 const FIELD_AVAILABILITY: Partial<Record<keyof SystemSettings, boolean>> = Object.fromEntries(
   SETTINGS_SECTIONS.flatMap((s) => s.groups.flatMap((g) => g.fields.map((f) => [f.key, f.available])))
 )
@@ -262,7 +246,7 @@ export default function AdminSettingsPage() {
         <div className="as-header">
           <div>
             <h1 className="as-title">System Configuration</h1>
-            <p className="as-subtitle">Global platform settings — changes apply to all users</p>
+            <p className="as-subtitle">Global platform settings, changes apply to all users</p>
           </div>
           {activeName !== 'profile' && (
             <button className={`as-save-btn${justSaved ? ' saved' : ''}`} type="button" onClick={handleSave} disabled={!isDirty || saving}>
@@ -328,7 +312,7 @@ export default function AdminSettingsPage() {
   )
 }
 
-// ─── Generic group card (General / Payment / Notifications / Certificates) ─
+// ─── Generic group card (General / Payment / Notifications) ────────────────
 
 function GroupCard({
   group, currentValue, onChange,
@@ -351,6 +335,23 @@ function GroupCard({
       <div className="as-card-body">
         {group.title === 'Payment Gateway' ? (
           <PaymentGatewayGroup currentValue={currentValue} />
+        ) : group.title === 'Currency & Tax' ? (
+          <>
+            <div className="as-row">
+              <div className="as-row-label">
+                <p className="as-row-label-title">Checkout currency</p>
+                <p className="as-row-label-help">Course payments are currently processed in Nigerian naira.</p>
+              </div>
+              <div className="as-row-input wide">
+                <input className="as-input readonly" readOnly value="NGN — Nigerian Naira" />
+              </div>
+            </div>
+            {group.fields
+              .filter((field) => field.key !== 'currency' && (!field.showIf || Boolean(currentValue(field.showIf))))
+              .map((field: FieldConfig) => (
+                <FieldRow key={field.key} field={field} value={currentValue(field.key)} onChange={(v) => onChange(field.key, v as never)} />
+              ))}
+          </>
         ) : (
           group.fields
             .filter((f: FieldConfig) => !f.showIf || Boolean(currentValue(f.showIf)))
@@ -388,7 +389,7 @@ function PaymentGatewayGroup({ currentValue }: { currentValue: <K extends keyof 
       <div className="as-row">
         <div className="as-row-label">
           <p className="as-row-label-title">Secret key</p>
-          <p className="as-row-label-help">Server-side only — never exposed to learners</p>
+          <p className="as-row-label-help">Server-side only, never exposed to learners</p>
         </div>
         <div className="as-row-input wide">
           <input className="as-input readonly" readOnly value={(currentValue('paystack_secret_key') as string) || '—'} />
@@ -419,30 +420,6 @@ function FieldRow({ field, value, onChange }: { field: FieldConfig; value: unkno
           {field.help && <p className="as-row-label-help">{field.help}</p>}
         </div>
         <span className="as-unavailable">Not available yet</span>
-      </div>
-    )
-  }
-
-  if (field.type === 'certificate_grid') {
-    return (
-      <div className="as-cert-grid">
-        {CERTIFICATE_TEMPLATES.map((tpl: SelectOption) => (
-          <button
-            key={tpl.value}
-            type="button"
-            className={`as-cert-card${value === tpl.value ? ' selected' : ''}`}
-            onClick={() => onChange(tpl.value)}
-            disabled={!field.available || field.disabled}
-          >
-            <div className={`as-cert-swatch ${tpl.value}`}>
-              <div className="as-cert-swatch-icon" style={{ background: 'rgba(255,255,255,0.5)' }}>
-                <Award size={16} />
-              </div>
-            </div>
-            {value === tpl.value && <span className="as-cert-check"><Check size={10} color="#fff" /></span>}
-            <div className="as-cert-label">{tpl.label}</div>
-          </button>
-        ))}
       </div>
     )
   }
@@ -520,9 +497,7 @@ function FileUploadField({ currentUrl, onChange: _onChange, disabled }: { curren
 
   async function handleFile(file: File) {
     setLocalPreview(URL.createObjectURL(file))
-    // TODO: no upload endpoint is documented for signature images — wire this
-    // to whatever media-upload route your backend exposes, then call
-    // onChange(uploadedUrl). Left unwired until that's confirmed.
+  
     console.warn('Signature upload endpoint not wired yet — selected file was not uploaded.', file.name)
   }
 
@@ -582,7 +557,7 @@ function MaintenancePanel({
               <div className="as-row">
                 <div className="as-row-label">
                   <p className="as-row-label-title">Message body</p>
-                  <p className="as-row-label-help">Plain text — keep it friendly and informative</p>
+                  <p className="as-row-label-help">Plain text, keep it friendly and informative</p>
                 </div>
                 <div style={{ width: 340 }}>
                   <textarea className="as-textarea" value={message} onChange={(e) => onChange('maintenance_scheduled_message', e.target.value as never)} />
@@ -787,7 +762,7 @@ function ProfilePanel() {
                 Coming soon
               </span>
             </p>
-            <p className="as-card-desc">Two-factor authentication and session management — not yet available</p>
+            <p className="as-card-desc">Two-factor authentication and session management,not yet available</p>
           </div>
         </div>
         <div className="as-card-body">

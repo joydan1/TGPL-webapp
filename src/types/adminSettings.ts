@@ -57,12 +57,6 @@ export interface SystemSettings {
   quiet_hours_from: string | null
   quiet_hours_until: string | null
 
-  certificate_template: string
-  certificate_director_signature: string
-  certificate_cosignature: string
-  certificate_verification_url_prefix: string
-  certificate_sample_url: string
-
   maintenance_mode: boolean
   maintenance_scheduled_message: string
   maintenance_expected_end_time: string | null
@@ -111,7 +105,7 @@ export interface AuditLogPage {
 
 export type FieldType =
   | 'text' | 'url' | 'email' | 'phone' | 'password' | 'number' | 'boolean'
-  | 'select' | 'time' | 'datetime' | 'textarea' | 'color' | 'certificate_grid' | 'file'
+  | 'select' | 'time' | 'datetime' | 'textarea' | 'color' | 'file'
 
 export interface SelectOption {
   value: string
@@ -178,13 +172,6 @@ export const CURRENCY_OPTIONS: SelectOption[] = [
   { value: 'EUR', label: 'EUR — Euro' },
 ]
 
-export const CERTIFICATE_TEMPLATES: SelectOption[] = [
-  { value: 'classic_parchment', label: 'Classic Parchment' },
-  { value: 'modern_minimal', label: 'Modern Minimal' },
-  { value: 'corporate_blue', label: 'Corporate Blue' },
-  { value: 'vibrant_gradient', label: 'Vibrant Gradient' },
-]
-
 export const SESSION_TIMEOUT_OPTIONS: SelectOption[] = [
   { value: '15', label: '15 minutes' },
   { value: '30', label: '30 minutes' },
@@ -226,7 +213,6 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
           { key: 'enable_live_sessions', label: 'Enable live sessions', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_tutor_booking', label: 'Enable tutor booking', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_assignments', label: 'Enable assignments', type: 'boolean', showOnOffLabel: true, available: true },
-          { key: 'enable_certificates', label: 'Enable certificates', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_email', label: 'Enable email notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_inapp', label: 'Enable in-app notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_push', label: 'Enable push notifications', type: 'boolean', showOnOffLabel: true, available: true },
@@ -301,31 +287,6 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
           { key: 'quiet_hours_until', label: 'Until', type: 'time', showIf: 'enable_quiet_hours', available: false },
         ],
         unavailableBanner: "Quiet hours aren't available on the backend yet — nothing here is saved.",
-      },
-    ],
-  },
-  {
-    name: 'certificates',
-    label: 'Certificates',
-    groups: [
-      {
-        title: 'Certificate template',
-        fields: [{ key: 'certificate_template', label: '', type: 'certificate_grid', available: false }],
-        unavailableBanner: "Certificate configuration isn't available on the backend yet — nothing here is saved.",
-      },
-      {
-        title: 'Signatures',
-        fields: [
-          { key: 'certificate_director_signature', label: 'Director signature', type: 'file', available: false },
-          { key: 'certificate_cosignature', label: 'Co-signatory', type: 'file', available: false },
-        ],
-      },
-      {
-        title: 'Verification',
-        fields: [
-          { key: 'certificate_verification_url_prefix', label: 'Verification URL prefix', type: 'url', available: false },
-          { key: 'certificate_sample_url', label: 'Sample URL', type: 'url', available: false },
-        ],
       },
     ],
   },

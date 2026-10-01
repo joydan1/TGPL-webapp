@@ -28,14 +28,14 @@ export interface UserResponse {
   avatar_url: string | null
   available_modes?: UserMode[]
   permissions?: {
-    manage_users?: boolean
-    moderate_content?: boolean
-    manage_courses?: boolean
-    view_analytics?: boolean
-    send_announcements?: boolean
-    view_revenue?: boolean
-    manage_payouts?: boolean
-    system_settings?: boolean
+    manage_users: boolean
+    moderate_content: boolean
+    manage_courses: boolean
+    view_analytics: boolean
+    send_announcements: boolean
+    view_revenue: boolean
+    manage_payouts: boolean
+    system_settings: boolean
   } | null
 }
 
@@ -768,6 +768,7 @@ export interface LessonDetailResponse {
   module: { id: string; title: string; order: number }
   course: { slug: string; title: string }
   video_url: string
+  video_url_expires_at?: string | null
   duration_seconds: number
   duration_display: string
   status: LessonStatus

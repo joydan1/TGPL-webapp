@@ -96,6 +96,9 @@ ADMIN_COURSE_MANAGE: 'admin/courses/:slug/manage',
 ADMIN_SETTINGS: '/admin/settings', 
 ADMIN_COMMUNITY: '/admin/community',
 ADMIN_ACTIVITY: '/admin/activity',
+ADMIN_MISSING_CERTIFICATES: '/admin/certificates/missing',
+ADMIN_DEAD_LETTER: '/admin/payments/dead-letter',
+ADMIN_SYSTEM_STATUS: '/admin/system/status',
   // ===========================
   // ERROR PAGES
   // ===========================
