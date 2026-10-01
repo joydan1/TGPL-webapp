@@ -126,6 +126,10 @@ function AdminPermissionRefresh() {
     const previous = previousPath.current
     previousPath.current = location.pathname
     if (!isAuthenticated) return
+    if (previous === null) {
+      void loadCurrentUser()
+      return
+    }
     const enteringAdmin = location.pathname.startsWith('/admin') && !previous?.startsWith('/admin')
     if (enteringAdmin) {
       void loadCurrentUser()
@@ -159,13 +163,7 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route
             path="/"
-            element={
-              isAuthenticated ? (
-                <Navigate to={getAuthenticatedHome()} replace />
-              ) : (
-                <LandingPage />
-              )
-            }
+            element={<LandingPage />}
           />
         </Route>
 
