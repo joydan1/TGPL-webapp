@@ -803,7 +803,7 @@ export default function AddCoursePage() {
   // Steps save when you press Continue, so you can only jump back — never skip ahead
   // past a step that hasn't been saved.
   function goToStep(target: Step) {
-    if (target < step && !saving) setStep(target)
+    if ((isEditMode || target < step) && !saving) setStep(target)
   }
 
   // ---------- Cover image ----------
@@ -968,11 +968,7 @@ export default function AddCoursePage() {
         const lesson = mod.lessons[i]
         if (!lesson.title.trim()) continue
 
-        let durationSeconds = lesson.durationSeconds
-        if (lesson.videoFile && durationSeconds === null) {
-          durationSeconds = await readVideoDuration(lesson.videoFile)
-          if (durationSeconds !== null) updateLesson(mod.id, lesson.id, { durationSeconds })
-        }
+        const durationSeconds = lesson.durationSeconds
 
         let remoteId = lesson.remoteId
 
@@ -1463,7 +1459,7 @@ export default function AddCoursePage() {
                     type="button"
                     className="ac-step"
                     onClick={() => goToStep(s.id)}
-                    disabled={s.id >= step || saving}
+                    disabled={(!isEditMode && s.id >= step) || saving}
                     aria-label={`Go to ${s.label}`}
                   >
                     <div className={`ac-step-circle ${status}`}>
@@ -1759,7 +1755,7 @@ export default function AddCoursePage() {
                             />
 
                             <div className="ac-field">
-                              <label className="ac-label" htmlFor={`duration-${lesson.id}`}>Video duration (seconds)</label>
+                              <label className="ac-label" htmlFor={`duration-${lesson.id}`}>Video duration (seconds, optional)</label>
                               <input
                                 id={`duration-${lesson.id}`}
                                 className="ac-input"
@@ -1775,7 +1771,7 @@ export default function AddCoursePage() {
                                   { durationSeconds: e.target.value ? Math.max(1, Math.round(Number(e.target.value))) : null },
                                 )}
                               />
-                              <p className="ac-hint">Read automatically from the video; enter seconds here if the browser cannot read it.</p>
+                              <p className="ac-hint">Detected automatically when possible. Leave blank if unavailable.</p>
                             </div>
 
                             <label className="ac-upload-chip">
