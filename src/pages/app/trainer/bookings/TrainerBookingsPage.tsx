@@ -127,7 +127,12 @@ const PAGE_CSS = `
   .bk-avail-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
   .bk-avail-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 999px; background: #fff; transition: transform 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
   .bk-avail-toggle.on .bk-avail-toggle-thumb { transform: translateX(18px); }
-  .bk-avail-duration-note { color: #6B7280; font-size: 0.8rem; }
+  .bk-avail-duration { display: grid; gap: 0.45rem; margin-bottom: 1.1rem; }
+  .bk-avail-duration-label { font-size: 0.75rem; font-weight: 700; color: #6B7280; }
+  .bk-avail-duration-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+  .bk-avail-duration-option { border: 1px solid #D1D5DB; border-radius: 0.7rem; padding: 0.65rem 0.5rem; background: #fff; color: #374151; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+  .bk-avail-duration-option.selected { border-color: #2492EB; background: #EFF6FF; color: #1D4ED8; }
+  .bk-avail-duration-option:disabled { opacity: 0.6; cursor: not-allowed; }
   .bk-avail-grid-loading { color: #9CA3AF; font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
   /* ── Confirmation modal ──────────────────────────────────────────────── */
@@ -152,6 +157,8 @@ type StatusFilterKey = 'all' | 'requested' | 'confirmed' | 'rejected' | 'cancell
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const
 const AVAILABILITY_WINDOW_DAYS = 14
+const SESSION_DURATIONS = [30, 45, 60] as const
+type SessionDuration = (typeof SESSION_DURATIONS)[number]
 
 type WeekdayName = (typeof DAYS_OF_WEEK)[number]
 
@@ -206,12 +213,66 @@ function combineDateAndTime(date: Date, hhmm: string): string {
 
 function slotMatchesTemplateRow(slot: LiveSlot, row: AvailTemplateRow): boolean {
   const start = new Date(slot.starts_at)
-  if (isNaN(start.getTime())) return false
+  const end = new Date(slot.ends_at)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return false
   const dayName = DAYS_OF_WEEK.find((d) => WEEKDAY_JS_INDEX[d] === start.getDay())
   if (dayName !== row.day) return false
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const hhmm = `${pad(start.getHours())}:${pad(start.getMinutes())}`
-  return hhmm === row.start
+  const startMinute = start.getHours() * 60 + start.getMinutes()
+  const endMinute = end.getHours() * 60 + end.getMinutes()
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    return hours * 60 + minutes
+  }
+  return startMinute >= toMinutes(row.start) && endMinute <= toMinutes(row.end) && endMinute > startMinute
+}
+
+function isSessionDuration(value: number): value is SessionDuration {
+  return SESSION_DURATIONS.some((duration) => duration === value)
+}
+
+function readSavedDuration(courseId: string): SessionDuration | null {
+  try {
+    const value = Number(localStorage.getItem(`trainer-live-duration:${courseId}`))
+    return isSessionDuration(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function saveDuration(courseId: string, duration: SessionDuration) {
+  try {
+    localStorage.setItem(`trainer-live-duration:${courseId}`, String(duration))
+  } catch {
+    // The live slot data still preserves the preference when browser storage is unavailable.
+  }
+}
+
+function inferDuration(slots: LiveSlot[]): SessionDuration | null {
+  const counts = new Map<SessionDuration, number>()
+  for (const slot of slots) {
+    if (slot.status === 'unavailable') continue
+    const minutes = Math.round((new Date(slot.ends_at).getTime() - new Date(slot.starts_at).getTime()) / 60000)
+    if (isSessionDuration(minutes)) counts.set(minutes, (counts.get(minutes) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+}
+
+function formatMinuteOfDay(value: number): string {
+  const hours = Math.floor(value / 60)
+  const minutes = value % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function sameLocalDate(first: Date, second: Date): boolean {
+  return first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+}
+
+function slotsOverlap(slot: LiveSlot, startsAt: Date, endsAt: Date): boolean {
+  const slotStart = new Date(slot.starts_at).getTime()
+  const slotEnd = new Date(slot.ends_at).getTime()
+  return slotStart < endsAt.getTime() && slotEnd > startsAt.getTime()
 }
 
 function initials(name?: string | null) {
@@ -292,6 +353,7 @@ export default function TrainerBookingsPage() {
   const [availResolvedSlug, setAvailResolvedSlug] = useState<string>('')
   const [availSlugResolving, setAvailSlugResolving] = useState(false)
   const [availExistingSlots, setAvailExistingSlots] = useState<LiveSlot[]>([])
+  const [selectedDuration, setSelectedDuration] = useState<SessionDuration>(60)
   const [availSlotsLoading, setAvailSlotsLoading] = useState(false)
 
   useEffect(() => {
@@ -359,10 +421,14 @@ export default function TrainerBookingsPage() {
       setAvailSlotsLoading(false)
       if (result.success) {
         setAvailExistingSlots(result.data)
+        setSelectedDuration(readSavedDuration(availSelectedCourseId) ?? inferDuration(result.data) ?? 60)
         const enabled = new Set<string>()
         for (const row of AVAIL_TEMPLATE_ROWS) {
-          const hasFutureMatch = result.data.some(
-            (slot) => slot.status !== 'unavailable' && slotMatchesTemplateRow(slot, row),
+          const targetDates = upcomingDatesForWeekday(row.day, AVAILABILITY_WINDOW_DAYS)
+          const hasFutureMatch = result.data.some((slot) =>
+            slot.status !== 'unavailable' &&
+            slotMatchesTemplateRow(slot, row) &&
+            targetDates.some((date) => sameLocalDate(new Date(slot.starts_at), date)),
           )
           if (hasFutureMatch) enabled.add(row.id)
         }
@@ -551,38 +617,68 @@ export default function TrainerBookingsPage() {
         (slot) => slot.status !== 'unavailable' && slotMatchesTemplateRow(slot, row),
       )
 
-      if (wantsEnabled) {
-        // Create any missing dated instances for this weekday/time in the window.
-        for (const date of targetDates) {
-          const alreadyExists = matchingExisting.some((slot) => {
-            const start = new Date(slot.starts_at)
-            return (
-              start.getFullYear() === date.getFullYear() &&
-              start.getMonth() === date.getMonth() &&
-              start.getDate() === date.getDate()
-            )
-          })
-          if (alreadyExists) continue
-
-          const result = await liveSessionsAPI.createManageCourseSlot(availResolvedSlug, {
-            starts_at: combineDateAndTime(date, row.start),
-            ends_at: combineDateAndTime(date, row.end),
-          })
-          if (result.success) created++
-          else failed++
-        }
-      } else {
-        // Remove existing instances for this weekday/time — but never touch booked slots.
-        for (const slot of matchingExisting) {
-          if (slot.status === 'booked') {
-            skippedBooked++
-            continue
+      for (const date of targetDates) {
+        const dateSlots = matchingExisting.filter((slot) => sameLocalDate(new Date(slot.starts_at), date))
+        if (!wantsEnabled) {
+          for (const slot of dateSlots) {
+            if (slot.status === 'booked') {
+              skippedBooked++
+              continue
+            }
+            const result = await liveSessionsAPI.deleteManageSlot(slot.id)
+            if (result.success) deleted++
+            else failed++
           }
+          continue
+        }
+
+        const rowStart = row.start.split(':').map(Number)
+        const rowEnd = row.end.split(':').map(Number)
+        const firstMinute = rowStart[0] * 60 + rowStart[1]
+        const lastMinute = rowEnd[0] * 60 + rowEnd[1]
+        const desiredSlots: { startsAt: Date; endsAt: Date }[] = []
+        for (let minute = firstMinute; minute + selectedDuration <= lastMinute; minute += selectedDuration) {
+          desiredSlots.push({
+            startsAt: new Date(combineDateAndTime(date, formatMinuteOfDay(minute))),
+            endsAt: new Date(combineDateAndTime(date, formatMinuteOfDay(minute + selectedDuration))),
+          })
+        }
+
+        for (const slot of dateSlots) {
+          const exactDesiredSlot = desiredSlots.some(({ startsAt, endsAt }) =>
+            new Date(slot.starts_at).getTime() === startsAt.getTime() &&
+            new Date(slot.ends_at).getTime() === endsAt.getTime(),
+          )
+          if (exactDesiredSlot || slot.status === 'booked') continue
           const result = await liveSessionsAPI.deleteManageSlot(slot.id)
           if (result.success) deleted++
           else failed++
         }
+
+        for (const { startsAt, endsAt } of desiredSlots) {
+          const exactExistingSlot = dateSlots.some((slot) =>
+            new Date(slot.starts_at).getTime() === startsAt.getTime() &&
+            new Date(slot.ends_at).getTime() === endsAt.getTime(),
+          )
+          if (exactExistingSlot) continue
+
+          const overlapsBooking = dateSlots.some((slot) =>
+            slot.status === 'booked' && slotsOverlap(slot, startsAt, endsAt),
+          )
+          if (overlapsBooking) {
+            skippedBooked++
+            continue
+          }
+
+          const result = await liveSessionsAPI.createManageCourseSlot(availResolvedSlug, {
+            starts_at: startsAt.toISOString(),
+            ends_at: endsAt.toISOString(),
+          })
+          if (result.success) created++
+          else failed++
+        }
       }
+
     }
 
     setSavingAvailability(false)
@@ -590,6 +686,7 @@ export default function TrainerBookingsPage() {
     // Refresh what's actually on the server so the grid reflects reality.
     const refreshed = await liveSessionsAPI.getManageCourseSlots(availResolvedSlug)
     if (refreshed.success) setAvailExistingSlots(refreshed.data)
+    saveDuration(availSelectedCourseId, selectedDuration)
 
     if (failed > 0) {
       setAvailError(`Saved with some errors — ${failed} slot change${failed === 1 ? '' : 's'} failed. Try again.`)
@@ -972,6 +1069,27 @@ export default function TrainerBookingsPage() {
                 {availCoursesError && <p className="bk-modal-error">{availCoursesError}</p>}
               </div>
 
+              {availSelectedCourseId && (
+                <div className="bk-avail-duration">
+                  <span className="bk-avail-duration-label" id="avail-duration-label">Preferred session duration</span>
+                  <div className="bk-avail-duration-options" role="group" aria-labelledby="avail-duration-label">
+                    {SESSION_DURATIONS.map((duration) => (
+                      <button
+                        key={duration}
+                        type="button"
+                        className={`bk-avail-duration-option${selectedDuration === duration ? ' selected' : ''}`}
+                        aria-pressed={selectedDuration === duration}
+                        disabled={savingAvailability || !availGridReady}
+                        onClick={() => setSelectedDuration(duration)}
+                      >
+                        {duration} min
+                      </button>
+                    ))}
+                  </div>
+                  <p className="bk-field-hint">Each enabled time window is divided into bookable sessions of this length. Existing bookings are kept.</p>
+                </div>
+              )}
+
               {availSelectedCourseId && !availGridReady ? (
                 <div className="bk-avail-grid-loading">Loading current availability…</div>
               ) : (
@@ -1011,7 +1129,7 @@ export default function TrainerBookingsPage() {
             </div>
 
             <div className="bk-modal-footer" style={{ alignItems: 'center' }}>
-              <span className="bk-avail-duration-note">Session duration: 30, 45, or 60 min</span>
+              <span className="bk-field-hint">Slots open for the next {AVAILABILITY_WINDOW_DAYS} days</span>
               <button
                 type="button"
                 className="bk-modal-btn secondary"
