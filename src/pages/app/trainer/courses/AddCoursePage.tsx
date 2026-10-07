@@ -218,6 +218,9 @@ function normalizeAssignmentDraft(detail: TrainerAssignmentDetail | null): Assig
 
   return {
     title: detail.title ?? '',
+    isFinal: detail.is_final ?? false,
+    savedIsFinal: detail.is_final ?? false,
+    submissionCount: detail.submission_count ?? 0,
     description: '',
     instructions: detail.instructions ?? '',
     maxAttempts: String(detail.max_attempts ?? 1),
@@ -573,12 +576,16 @@ export default function AddCoursePage() {
 
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm()
 
-  const [step, setStep] = useState<Step>(1)
+  const [step, setStep] = useState<Step>(() => {
+    const initialStep = (location.state as { initialStep?: Step } | null)?.initialStep
+    return initialStep === 3 ? 3 : 1
+  })
   const [form, setForm] = useState<CourseForm>(initialForm)
   const [submitOutcome, setSubmitOutcome] = useState<SubmitOutcome | null>(null)
 
   const [courseId, setCourseId] = useState<string | null>(id ?? null)
   const [courseSlug, setCourseSlug] = useState<string | null>(null)
+  const [certificateSetupIssue, setCertificateSetupIssue] = useState<string | null>(null)
   // Current status on the server. null until the course exists / has loaded.
   const [courseStatus, setCourseStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -588,6 +595,7 @@ export default function AddCoursePage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [assignmentTarget, setAssignmentTarget] = useState<{ moduleId: string; lessonId: string } | null>(null)
+  const [assignmentFieldError, setAssignmentFieldError] = useState<string | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
@@ -678,6 +686,7 @@ export default function AddCoursePage() {
       }
 
       const draft = draftRes.data
+      setCertificateSetupIssue(draft.certificate_setup_issue ?? null)
 
       const curriculumModules = curriculumRes.success ? curriculumRes.data : []
       const curriculumLessons = curriculumModules.flatMap((mod) =>
@@ -1057,28 +1066,49 @@ export default function AddCoursePage() {
           const payload: CreateTrainerAssignmentPayload = {
             module_id: activeModuleId,
             title: lesson.assignment.title,
+            is_final: lesson.assignment.isFinal,
             instructions: lesson.assignment.instructions,
             max_attempts: draftToMaxAttempts(lesson.assignment),
             grading_criteria: draftToGradingCriteria(lesson.assignment),
             order: i + 1,
           }
 
+          const isFinalOnlyUpdate = lesson.assignment.submissionCount > 0 && lesson.assignment.isFinal !== lesson.assignment.savedIsFinal
+          const assignmentPatch = isFinalOnlyUpdate
+            ? { is_final: lesson.assignment.isFinal }
+            : payload
+
           const assignmentResult = assignmentRemoteId
-            ? await trainerAssignmentsAPI.update(courseSlug, assignmentRemoteId, payload)
+            ? await trainerAssignmentsAPI.update(courseSlug, assignmentRemoteId, assignmentPatch)
             : await trainerAssignmentsAPI.create(courseSlug, payload)
 
           if (!assignmentResult.success) {
-            setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
+            const finalProjectError = assignmentResult.fieldErrors?.is_final
+            if (finalProjectError) {
+              setAssignmentTarget({ moduleId: mod.id, lessonId: lesson.id })
+              setAssignmentFieldError(Array.isArray(finalProjectError) ? finalProjectError.join(' ') : finalProjectError)
+              setSaveError(null)
+            } else {
+              setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
+            }
             setSaving(false)
             return
           }
+
+          if (assignmentRemoteId && lesson.assignment.isFinal !== lesson.assignment.savedIsFinal) {
+            updateLesson(mod.id, lesson.id, {
+              assignment: { ...lesson.assignment, savedIsFinal: lesson.assignment.isFinal },
+            })
+          }
+          if (lesson.assignment.isFinal) setCertificateSetupIssue(null)
+          else if (lesson.assignment.savedIsFinal) setCertificateSetupIssue('no_final_project')
 
           assignmentRemoteId = assignmentResult.data.id
           // Same reason as the lesson id above: don't create the assignment twice on retry.
           updateLesson(mod.id, lesson.id, { assignmentRemoteId })
 
           let shouldCreateRequirements = isNewAssignment
-          if (!isNewAssignment) {
+          if (!isNewAssignment && !isFinalOnlyUpdate) {
             const existingReqs = await trainerAssignmentsAPI.listRequirements(courseSlug, assignmentRemoteId)
             shouldCreateRequirements = existingReqs.success && existingReqs.data.length === 0
           }
@@ -1144,6 +1174,7 @@ export default function AddCoursePage() {
       setSaveError(result.error || 'Failed to save course settings.')
       return
     }
+    setCertificateSetupIssue(result.data.certificate_setup_issue ?? null)
     setStep(5)
   }
 
@@ -1173,6 +1204,7 @@ export default function AddCoursePage() {
         return
       }
       setCourseStatus('published')
+      setCertificateSetupIssue(result.data.certificate_setup_issue ?? null)
       outcome = 'published'
     } else if (form.visibility === 'hidden' && isLive) {
       const result = await coursesManageAPI.unpublishDraft(courseId)
@@ -1384,6 +1416,7 @@ export default function AddCoursePage() {
   }
   function closeAssignmentModal() {
     setAssignmentTarget(null)
+    setAssignmentFieldError(null)
   }
   function saveAssignmentDraft(moduleLocalId: string, lessonLocalId: string, draft: AssignmentDraft) {
     updateLesson(moduleLocalId, lessonLocalId, { assignment: draft })
@@ -1449,6 +1482,15 @@ export default function AddCoursePage() {
             </button>
             <h2 className="ac-title">{isEditMode ? 'Edit course' : 'Add New course'}</h2>
           </div>
+
+          {!isAdmin && certificateSetupIssue != null && (
+            <div className="ac-notice warn" role="alert" style={{ margin: '1rem 1.25rem 0' }}>
+              <span>Certificates can&apos;t be issued until you mark a final project.</span>
+              <button className="ac-notice-btn" type="button" onClick={() => goToStep(3)}>
+                Open course assignments
+              </button>
+            </div>
+          )}
 
           <div className="ac-stepper">
             {STEPS.map((s, i) => {
@@ -2122,7 +2164,10 @@ export default function AddCoursePage() {
           courseTitle={form.title || 'Untitled course'}
           moduleTitle={assignmentModalModule.title.trim() || `Module ${form.modules.indexOf(assignmentModalModule) + 1}`}
           initialData={assignmentModalLesson.assignment}
+          requirementsLocked={(assignmentModalLesson.assignment?.submissionCount ?? 0) > 0}
+          finalProjectError={assignmentFieldError}
           onClose={closeAssignmentModal}
+          onFinalProjectChange={() => setAssignmentFieldError(null)}
           onSave={(draft: AssignmentDraft) =>
             saveAssignmentDraft(assignmentTarget.moduleId, assignmentTarget.lessonId, draft)
           }

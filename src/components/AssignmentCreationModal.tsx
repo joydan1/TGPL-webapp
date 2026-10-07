@@ -32,6 +32,9 @@ export type AssignmentRequirementDraft = {
 
 export type AssignmentDraft = {
   title: string
+  isFinal: boolean
+  savedIsFinal: boolean
+  submissionCount: number
   description: string // local-only — not sent, no confirmed field for it
   instructions: string
   maxAttempts: string // confirmed field: max_attempts
@@ -68,6 +71,9 @@ export function emptyAssignmentDraft(): AssignmentDraft {
   const defaultTypes = ['pdf', 'docx']
   return {
     title: '',
+    isFinal: false,
+    savedIsFinal: false,
+    submissionCount: 0,
     description: '',
     instructions: '',
     maxAttempts: '1',
@@ -193,6 +199,7 @@ const MODAL_CSS = `
   .acm-toggle input:checked + .track::before { transform: translateX(18px); }
 
   .acm-field-error { font-family: 'Sora', sans-serif; font-weight: 500; font-size: 11px; color: #DC2626; }
+  .acm-locked-fieldset { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
 
   /* section header (icon + title + sub) */
   .acm-section { display: flex; flex-direction: column; gap: 12px; }
@@ -364,12 +371,15 @@ export default function AssignmentCreatorModal({
   moduleTitle,
   initialData,
   requirementsLocked = false,
+  finalProjectError,
   onClose,
+  onFinalProjectChange,
   onSave,
 }: {
   courseTitle: string
   moduleTitle: string
   initialData: AssignmentDraft | null
+  finalProjectError?: string | null
   /** Pass true when the assignment being edited already has submissions
    *  (e.g. submission_count > 0 from TrainerAssignmentListItem/Detail).
    *  The backend returns 409 on requirement create/update/delete once
@@ -377,6 +387,7 @@ export default function AssignmentCreatorModal({
    *  to match, rather than letting the user hit the error. */
   requirementsLocked?: boolean
   onClose: () => void
+  onFinalProjectChange: () => void
   onSave: (draft: AssignmentDraft) => void
 }) {
   const [draft, setDraft] = useState<AssignmentDraft>(initialData ?? emptyAssignmentDraft())
@@ -488,6 +499,33 @@ export default function AssignmentCreatorModal({
         </div>
 
         <div className="acm-body">
+          <div className="acm-top-fields">
+            <div className="acm-toggle-field">
+              <div className="acm-toggle-labels">
+                <label className="acm-toggle-title" htmlFor="acm-is-final">Final project</label>
+                <span className="acm-toggle-sub">Required for certificate</span>
+              </div>
+              <label className="acm-toggle">
+                <input
+                  id="acm-is-final"
+                  type="checkbox"
+                  checked={draft.isFinal}
+                  aria-describedby={finalProjectError ? 'acm-is-final-error' : undefined}
+                  onChange={(e) => {
+                    update('isFinal', e.target.checked)
+                    onFinalProjectChange()
+                  }}
+                />
+                <span className="track" />
+              </label>
+            </div>
+            {finalProjectError && <span id="acm-is-final-error" className="acm-field-error" role="alert">{finalProjectError}</span>}
+            {requirementsLocked && (
+              <div className="acm-lock-banner">This assignment has submissions. Only its final-project status can be changed.</div>
+            )}
+          </div>
+
+          <fieldset className="acm-locked-fieldset" disabled={requirementsLocked}>
           {/* Assignment title / Module / Course / Max attempts */}
           <div className="acm-top-fields">
             <div className="acm-field-half">
@@ -515,7 +553,7 @@ export default function AssignmentCreatorModal({
               <textarea
                 className="acm-textarea"
                 style={{ minHeight: 60 }}
-                placeholder="One or two sentences summarizing the assignment (kept here for your reference — no backend field for it yet)"
+                placeholder="One or two sentences summarizing the assignment"
                 value={draft.description}
                 onChange={(e) => update('description', e.target.value)}
               />
@@ -894,6 +932,7 @@ export default function AssignmentCreatorModal({
               </div>
             </div>
           </div>
+          </fieldset>
         </div>
 
         <div className="acm-footer">

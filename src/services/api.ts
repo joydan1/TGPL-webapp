@@ -1641,6 +1641,7 @@ export interface CourseDraft {
   id: string
   slug: string
   status: CourseDraftStatus
+  certificate_setup_issue?: string | null
   title: string
   subtitle?: string
   category?: string
@@ -2513,6 +2514,7 @@ export interface TrainerGradingCriterion {
 export interface CreateTrainerAssignmentPayload {
   title: string
   module_id: string
+  is_final?: boolean
   description?: string
   instructions?: string
   max_attempts: number
@@ -2633,9 +2635,10 @@ export const trainerAssignmentsAPI = {
           error: 'Another final assignment already exists for this course. Only one is allowed.',
           statusCode,
           code,
+          fieldErrors: extractFieldErrors(error),
         }
       }
-      return { success: false as const, error: message, statusCode, code }
+      return { success: false as const, error: message, statusCode, code, fieldErrors: extractFieldErrors(error) }
     }
   },
 
@@ -2654,6 +2657,7 @@ export const trainerAssignmentsAPI = {
           success: false as const,
           error: 'This assignment can no longer be edited — learners have already submitted work.',
           statusCode,
+          fieldErrors: extractFieldErrors(error),
         }
       }
       if (statusCode === 400 && message.toLowerCase().includes('deadline')) {
@@ -2661,9 +2665,10 @@ export const trainerAssignmentsAPI = {
           success: false as const,
           error: 'Deadline can only be moved forward, not backward.',
           statusCode,
+          fieldErrors: extractFieldErrors(error),
         }
       }
-      return { success: false as const, error: message, statusCode }
+      return { success: false as const, error: message, statusCode, fieldErrors: extractFieldErrors(error) }
     }
   },
 

@@ -48,6 +48,7 @@ export interface AdminCourseRow {
   completion_percentage: number
   revenue_kobo: number
   is_final_assignment_set: boolean
+  certificate_setup_issue?: string | null
   has_live_sessions: boolean
   created_at: string
 }

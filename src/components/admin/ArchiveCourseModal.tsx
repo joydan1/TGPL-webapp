@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, BookOpen, Check } from 'lucide-react'
+import { AlertCircle, Archive, BookOpen, Check, Loader2 } from 'lucide-react'
 import type { AdminCourseRow, ArchiveReason, ArchiveCoursePayload } from '../../types/adminCourse'
 
 export const ARCHIVE_COURSE_MODAL_CSS = `
@@ -32,11 +32,15 @@ export const ARCHIVE_COURSE_MODAL_CSS = `
   .ac-note { width: 100%; border: 1.5px solid #E5E7EB; border-radius: 0.75rem; padding: 0.7rem 0.85rem; font-size: 0.86rem; color: #111827; resize: vertical; min-height: 64px; margin-bottom: 1.25rem; font-family: inherit; }
   .ac-note:focus { outline: none; border-color: #F59E0B; }
 
+  .ac-error { display:flex; align-items:flex-start; gap:.5rem; background:#FEF2F2; border:1px solid #FECACA; color:#B91C1C; border-radius:.75rem; padding:.75rem .9rem; font-size:.82rem; line-height:1.45; margin-bottom:1.25rem; }
+  .ac-error svg { flex-shrink:0; margin-top:.1rem; }
+
   .ac-actions { display: flex; gap: 0.6rem; }
   .ac-btn { flex: 1; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
   .ac-btn.cancel { border: 1.5px solid #E5E7EB; background: #fff; color: #374151; }
   .ac-btn.confirm { border: 1.5px solid #F59E0B; background: #fff; color: #D97706; }
   .ac-btn.confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ac-btn:disabled { opacity:.5; cursor:not-allowed; }
 `
 
 const CONSEQUENCES = [
@@ -57,11 +61,14 @@ const REASON_OPTIONS: { value: ArchiveReason; label: string }[] = [
 interface ArchiveCourseModalProps {
   course: AdminCourseRow
   onClose: () => void
-  
   onConfirm: (payload: ArchiveCoursePayload) => void
+  error?: string | null
+  submitting?: boolean
 }
 
-export default function ArchiveCourseModal({ course, onClose, onConfirm }: ArchiveCourseModalProps) {
+export default function ArchiveCourseModal({
+  course, onClose, onConfirm, error = null, submitting = false,
+}: ArchiveCourseModalProps) {
   const [reason, setReason] = useState<ArchiveReason>('low_completion')
   const [note, setNote] = useState('')
 
@@ -116,6 +123,7 @@ export default function ArchiveCourseModal({ course, onClose, onConfirm }: Archi
             className="ac-select"
             value={reason}
             onChange={(e) => setReason(e.target.value as ArchiveReason)}
+            disabled={submitting}
           >
             {REASON_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -129,14 +137,23 @@ export default function ArchiveCourseModal({ course, onClose, onConfirm }: Archi
             placeholder="Any extra context for this archive decision..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            disabled={submitting}
           />
 
+          {error && (
+            <div className="ac-error" role="alert">
+              <AlertCircle size={15} />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="ac-actions">
-            <button className="ac-btn cancel" onClick={onClose} type="button">
+            <button className="ac-btn cancel" onClick={onClose} type="button" disabled={submitting}>
               Cancel
             </button>
-            <button className="ac-btn confirm" onClick={handleConfirm} type="button">
-              <Archive size={15} /> Archive course
+            <button className="ac-btn confirm" onClick={handleConfirm} type="button" disabled={submitting}>
+              {submitting ? <Loader2 size={15} className="ac-spin" /> : <Archive size={15} />}
+              {submitting ? 'Archiving…' : 'Archive course'}
             </button>
           </div>
         </div>

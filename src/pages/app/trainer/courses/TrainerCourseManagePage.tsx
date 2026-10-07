@@ -82,6 +82,8 @@ const PAGE_CSS = `
 
   .cm-save-row { display: flex; justify-content: flex-end; margin-top: 1.1rem; }
   .cm-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.75rem; padding: 0.75rem 1rem; font-size: 0.85rem; margin-bottom: 1rem; }
+  .cm-certificate-warning { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.85rem 1rem; border: 1px solid #FDE68A; border-radius: 0.75rem; background: #FFFBEB; color: #92400E; font-size: 0.85rem; }
+  .cm-certificate-warning button { border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   .cm-success-note { color: #16A34A; font-size: 0.8rem; font-weight: 600; }
 
   .cm-module { border: 1px solid #E5E7EB; border-radius: 0.9rem; margin-bottom: 0.85rem; overflow: hidden; }
@@ -233,7 +235,7 @@ export default function TrainerCourseManagePage() {
       setPublishError(result.error)
       return
     }
-    setCourse((c) => (c ? { ...c, status: 'published' } : c))
+    setCourse(result.data)
   }
 
   async function handleUnpublish() {
@@ -246,7 +248,7 @@ export default function TrainerCourseManagePage() {
       setPublishError(result.error)
       return
     }
-    setCourse((c) => (c ? { ...c, status: 'draft' } : c))
+    setCourse(result.data)
   }
 
   async function handleAddModule() {
@@ -477,6 +479,18 @@ export default function TrainerCourseManagePage() {
               </button>
             )}
           </div>
+
+          {course.certificate_setup_issue != null && (
+            <div className="cm-certificate-warning" role="alert">
+              <span>Certificates can&apos;t be issued until you mark a final project.</span>
+              <button
+                type="button"
+                onClick={() => navigate(RouteBuilder.trainerCourseEdit(course.id), { state: { initialStep: 3 } })}
+              >
+                Open course assignments
+              </button>
+            </div>
+          )}
 
           {/* ── Course details ── */}
           <div className="cm-card">

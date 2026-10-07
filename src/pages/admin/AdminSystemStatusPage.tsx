@@ -36,6 +36,11 @@ const PAGE_CSS = `
   .ss-metrics { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.75rem; }
   .ss-metric { padding:.3rem .5rem; border-radius:.4rem; background:#F3F4F6; color:#4B5563; font-size:.7rem; overflow-wrap:anywhere; }
   .ss-metric strong { color:#111827; margin-left:.2rem; }
+  .ss-failures { flex:1 1 100%; padding:.65rem .75rem; border:1px solid #FDE68A; border-radius:.55rem; background:#FFFBEB; color:#78350F; font-size:.75rem; }
+  .ss-failures-title { margin:0 0 .45rem; font-weight:800; }
+  .ss-failure-list { display:grid; gap:.35rem; margin:0; padding:0; list-style:none; }
+  .ss-failure-row { display:flex; justify-content:space-between; gap:.75rem; color:#4B5563; }
+  .ss-failure-row strong { color:#111827; font-weight:700; }
   .ss-state { padding:3rem 1rem; text-align:center; color:#6B7280; }
   .ss-state.error { color:#B91C1C; }
   .ss-updated { margin-top:1rem; color:#9CA3AF; font-size:.75rem; text-align:right; }
@@ -70,8 +75,33 @@ function overallStatus(data: SystemStatusResponse | null) {
 
 function metricValue(value: unknown): string {
   if (value == null) return '—'
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') return Array.isArray(value) ? `${value.length} item${value.length === 1 ? '' : 's'}` : 'Details available'
   return String(value)
+}
+
+const METRIC_LABELS: Record<string, string> = {
+  dead_lettered_last_24h: 'Dead-lettered (24h)',
+  dead_letter_unresolved: 'Unresolved dead letters',
+  dead_letter_oldest_unresolved_at: 'Oldest unresolved',
+  dead_letter_oldest_unresolved_age_seconds: 'Age of oldest unresolved',
+  stale_pending_count: 'Stale pending payments',
+  stale_after_minutes: 'Stale after',
+  oldest_pending_at: 'Oldest pending',
+  oldest_pending_age_seconds: 'Age of oldest pending',
+  failures_last_24h: 'Failures (24h)',
+  window_hours: 'Time window',
+  registered_tasks: 'Registered tasks',
+  minutely_task_last_run_at: 'Minutely task last run',
+  last_heartbeat_at: 'Last worker heartbeat',
+  last_sweep_at: 'Last certificate sweep',
+  sweep_stale_after_hours: 'Sweep alert threshold',
+  sweep_candidates_evaluated: 'Learners checked',
+  sweep_candidates_total: 'Learners in rotation',
+  sweep_rotation_nights: 'Rotation night',
+  sweep_rotation_max_nights: 'Rotation length',
+  still_owed: 'Learners still owed',
+  issued_without_pdf: 'Issued without PDF',
+  sweep_issued: 'Certificates issued',
 }
 
 function formatMetricValue(metric: string, value: unknown): string {
@@ -94,6 +124,59 @@ function formatMetricValue(metric: string, value: unknown): string {
     }
   }
   return metricValue(value)
+}
+
+function metricLabel(metric: string): string {
+  if (metric === 'minutely_task') return 'Scheduled task'
+  if (metric === 'recent_failures') return 'Recent failures'
+  return METRIC_LABELS[metric] ?? formatLabel(metric)
+}
+
+function formatComponentMessage(name: string, message: string): string {
+  if (name !== 'task_failures') return message
+  return message.replace(/(\d+) task failure\(s\)/g, (_, count: string) =>
+    `${count} task failure${count === '1' ? '' : 's'}`,
+  )
+}
+
+function renderMetric(name: string, value: unknown) {
+  if (name === 'queues' && value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.entries(value as Record<string, unknown>).map(([queue, count]) => (
+      <span className="ss-metric" key={`${name}-${queue}`}>
+        {formatLabel(queue)} queue<strong>{metricValue(count)} pending</strong>
+      </span>
+    ))
+  }
+
+  if (name === 'recent_failures' && Array.isArray(value)) {
+    return (
+      <div className="ss-failures" key={name}>
+        <p className="ss-failures-title">Recent failures</p>
+        {value.length === 0 ? (
+          <span>No recent task failures.</span>
+        ) : (
+          <ul className="ss-failure-list">
+            {value.map((failure, index) => {
+              const item = failure && typeof failure === 'object' ? failure as Record<string, unknown> : {}
+              const task = item.task ?? item.task_name ?? item.name
+              return (
+                <li className="ss-failure-row" key={`${String(item.failed_at ?? 'failure')}-${index}`}>
+                  <strong>{typeof task === 'string' && task.trim() ? formatLabel(task) : 'Task name unavailable'}</strong>
+                  <span>{formatMetricValue('failed_at', item.failed_at)}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <span className="ss-metric" key={name}>
+      {metricLabel(name)}<strong>{formatMetricValue(name, value)}</strong>
+    </span>
+  )
 }
 
 export default function AdminSystemStatusPage() {
@@ -186,15 +269,10 @@ export default function AdminSystemStatusPage() {
                       </h3>
                       <span className={`ss-badge ${componentStatus}`}><Icon size={12} />{componentStatus}</span>
                     </div>
-                    <p className="ss-message">{component.message}</p>
+                    <p className="ss-message">{formatComponentMessage(name, component.message)}</p>
                     {metrics.length > 0 && (
                       <div className="ss-metrics">
-                        {metrics.map(([metric, value]) => (
-                          <span className="ss-metric" key={metric}>
-                            {metric === 'minutely_task' ? 'Scheduled task' : formatLabel(metric)}
-                            <strong>{formatMetricValue(metric, value)}</strong>
-                          </span>
-                        ))}
+                        {metrics.flatMap(([metric, value]) => renderMetric(metric, value))}
                       </div>
                     )}
                   </article>

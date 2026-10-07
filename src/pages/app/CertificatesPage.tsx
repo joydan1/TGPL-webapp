@@ -125,7 +125,17 @@ export default function CertificatesPage() {
       const response = await apiClient.get<DownloadResponse>(
         `/v1/learner/certificates/${cert.id}/download/`,
       )
-      window.open(response.data.download_url, '_blank')
+      const fileResponse = await fetch(response.data.download_url)
+      if (!fileResponse.ok) throw new Error('Certificate download failed')
+
+      const blobUrl = window.URL.createObjectURL(await fileResponse.blob())
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = response.data.filename || `${cert.course_title}-certificate.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000)
     } catch (err: any) {
       console.error('Failed to get certificate download link:', err)
       const status = err?.response?.status

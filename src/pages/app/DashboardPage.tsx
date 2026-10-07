@@ -30,6 +30,7 @@ interface EnrolledCourse {
 
 interface CertChecklistItem {
   requirement: string
+  label?: string
   satisfied: boolean
   implemented?: boolean
   reason?: string
@@ -250,6 +251,10 @@ const PAGE_CSS = `
   background: #E9F5FF;
   border: 0.5px solid #2492EB;
 }
+.asgn-card.revision-requested {
+  background: #FFFBEB;
+  border: 1px solid #F59E0B;
+}
 
 .asgn-badge {
   display: flex;
@@ -262,6 +267,7 @@ const PAGE_CSS = `
   text-transform: uppercase;
 }
 .asgn-badge.active { color: #2492EB; }
+.asgn-badge.revision-requested { color: #B45309; }
 .asgn-badge.upcoming { color: #6A7282; opacity: 0.7; }
 .asgn-badge::before {
   content: '';
@@ -471,11 +477,15 @@ export default function DashboardPage() {
         }
 
         const active = all
-  .filter((a) => a.my_submission_status === 'in_progress')
-  .sort(byDueDate)
-const upcoming = all
-  .filter((a) => a.my_submission_status === 'not_started' || a.my_submission_status == null)
-  .sort(byDueDate)
+          .filter((a) => a.my_submission_status === 'in_progress' || a.my_submission_status === 'revision_requested')
+          .sort((a, b) => {
+            const aNeedsRevision = a.my_submission_status === 'revision_requested'
+            const bNeedsRevision = b.my_submission_status === 'revision_requested'
+            return Number(bNeedsRevision) - Number(aNeedsRevision) || byDueDate(a, b)
+          })
+        const upcoming = all
+          .filter((a) => a.my_submission_status === 'not_started' || a.my_submission_status == null)
+          .sort(byDueDate)
 
         setAssignmentsActive(active)
         setAssignmentsUpcoming(upcoming)
@@ -783,17 +793,18 @@ function goToCertification() {
                 <div className="assignments-scroll">
                   {[...assignmentsActive, ...assignmentsUpcoming].map((a) => {
                     const isActive = assignmentsActive.some((x) => x.id === a.id)
+                    const needsRevision = a.my_submission_status === 'revision_requested'
                     return (
                       <div
                         key={a.id}
-                        className={`asgn-card${isActive ? ' active' : ''}`}
+                        className={`asgn-card${needsRevision ? ' revision-requested' : isActive ? ' active' : ''}`}
                         role="button"
                         tabIndex={0}
                         onClick={() => goToAssignment(a)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToAssignment(a) }}
                       >
-                        <div className={`asgn-badge ${isActive ? 'active' : 'upcoming'}`}>
-                          {isActive ? 'Active' : 'Upcoming'}
+                        <div className={`asgn-badge ${needsRevision ? 'revision-requested' : isActive ? 'active' : 'upcoming'}`}>
+                          {needsRevision ? 'Revision requested' : isActive ? 'Active' : 'Upcoming'}
                         </div>
                         <div className="asgn-title">{a.title}</div>
                         {a.course_title && <div className="asgn-course">{a.course_title}</div>}
@@ -963,7 +974,7 @@ function goToCertification() {
                     {item.satisfied
                       ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
                       : <Circle size={16} color="#D1D5DB" />}
-                    <span>{labelForRequirement(item.requirement)}</span>
+                    <span>{item.label || labelForRequirement(item.requirement)}</span>
                   </div>
                 ))}
                  {showCertNudge && (

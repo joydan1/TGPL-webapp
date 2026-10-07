@@ -58,6 +58,7 @@ const PAGE_CSS = `
   .cc-course-icon { width: 38px; height: 38px; border-radius: 0.6rem; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cc-course-title { font-weight: 600; color: #111827; white-space: nowrap; }
   .cc-course-sub { font-size: 0.75rem; color: #9CA3AF; }
+  .cc-certificate-warning { display: block; margin-top: 0.25rem; padding: 0; border: 0; background: none; color: #B45309; font: inherit; font-size: 0.72rem; text-align: left; text-decoration: underline; cursor: pointer; }
 
   .cc-trainer-cell { display: flex; align-items: center; gap: 0.55rem; }
   .cc-trainer-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.68rem; flex-shrink: 0; }
@@ -317,6 +318,7 @@ export default function AdminCoursesPage() {
 
   function handleArchive(course: AdminCourseRow) {
     closeRowMenu()
+    setActionError(null)
     setArchivingCourse(course)
   }
 
@@ -414,7 +416,7 @@ function handleCreateCourse() {
           </button>
         </div>
 
-          {actionError && !deletingCourse && (
+          {actionError && !deletingCourse && !archivingCourse && (
     <div className="cc-error-banner">
       <AlertCircle size={16} />
       <span>{actionError}</span>
@@ -530,6 +532,15 @@ function handleCreateCourse() {
                             {course.completion_percentage}% avg. completion
                             {!course.is_final_assignment_set && ' · No capstone set'}
                           </div>
+                          {course.certificate_setup_issue != null && (
+                            <button
+                              className="cc-certificate-warning"
+                              type="button"
+                              onClick={() => handleViewCourse(course)}
+                            >
+                              Certificates can&apos;t be issued until a final project is marked
+                            </button>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -662,8 +673,10 @@ function handleCreateCourse() {
       {archivingCourse && (
         <ArchiveCourseModal
           course={archivingCourse}
-          onClose={() => setArchivingCourse(null)}
+          onClose={() => { setArchivingCourse(null); setActionError(null) }}
           onConfirm={(payload: ArchiveCoursePayload) => confirmArchive(archivingCourse, payload)}
+          error={actionError}
+          submitting={actioningSlug === archivingCourse.slug}
         />
       )}
 

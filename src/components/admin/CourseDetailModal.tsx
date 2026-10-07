@@ -54,6 +54,8 @@ export const COURSE_DETAIL_MODAL_CSS = `
   .admincdm-pending-note svg { flex-shrink: 0; margin-top: 0.1rem; color: #9CA3AF; }
 
   .admincdm-archive-note { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.85rem; padding: 0.85rem 1rem; font-size: 0.82rem; color: #92400E; line-height: 1.5; }
+  .admincdm-certificate-note { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.85rem; padding: 0.85rem 1rem; font-size: 0.82rem; color: #92400E; line-height: 1.5; }
+  .admincdm-certificate-note button { border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
   .admincdm-footer { display: flex; align-items: center; gap: 0.6rem; padding: 1.1rem 1.5rem; border-top: 1px solid #F3F4F6; flex-wrap: wrap; }
   .admincdm-footer-btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 0.75rem; padding: 0.75rem 1rem; font-size: 0.86rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
@@ -353,6 +355,13 @@ export default function CourseDetailModal({
                   Archived {new Date(detail.archive.archived_at).toLocaleDateString()} by {detail.archive.archived_by_email}
                   {' '}— reason: {detail.archive.reason.replace(/_/g, ' ')}
                   {detail.archive.note ? `. ${detail.archive.note}` : ''}
+                </div>
+              )}
+
+              {(detail ? detail.certificate_setup_issue : course.certificate_setup_issue) != null && (
+                <div className="admincdm-certificate-note" role="alert">
+                  <span>Certificates can&apos;t be issued until a final project is marked.</span>
+                  {onEdit && <button type="button" onClick={onEdit}>Review course setup</button>}
                 </div>
               )}
 
