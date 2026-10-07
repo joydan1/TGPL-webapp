@@ -153,6 +153,8 @@ const PUBLIC_CSS = `
   .state-screen.error { color: #EF4444; }
   .hero { position: relative; width: 100%; aspect-ratio: 16/7; overflow: hidden; background: #D0D0D0; }
   .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-preview-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .hero-preview-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; background: #111; color: #fff; text-align: center; font-size: 0.9rem; }
   .hero-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #c8c8c8 0%, #a0a0a0 100%); }
   .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 25%, rgba(0,0,0,0.7) 100%); }
   .hero-back {
@@ -444,13 +446,29 @@ function PublicCourseOverview({
   const navigate = useNavigate()
   const [enrolling, setEnrolling] = useState(false)
   const [enrollError, setEnrollError] = useState<string | null>(null)
+  const [expandedModuleIds, setExpandedModuleIds] = useState<Set<string>>(() => new Set())
 
   // ── Free-preview lesson playback ──
-  const [activePreviewLessonId, setActivePreviewLessonId] = useState<string | null>(null)
+  const [activePreviewLessonId, setActivePreviewLessonId] = useState<string | null>(() =>
+    course.modules.flatMap((module) => module.lessons).find((lesson) => lesson.is_preview)?.id ?? null,
+  )
   const [previewLessonDetail, setPreviewLessonDetail] = useState<{ video_url: string | null; title: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
-  const allLessons = course.modules.flatMap((m) => m.lessons)
+  function toggleModule(moduleId: string) {
+    setExpandedModuleIds((expanded) => {
+      const next = new Set(expanded)
+      if (next.has(moduleId)) next.delete(moduleId)
+      else next.add(moduleId)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    setActivePreviewLessonId(
+      course.modules.flatMap((module) => module.lessons).find((lesson) => lesson.is_preview)?.id ?? null,
+    )
+  }, [course.slug])
 
   useEffect(() => {
     if (!activePreviewLessonId) {
@@ -535,18 +553,35 @@ function PublicCourseOverview({
           <h1 className="outer-title">Course Overview</h1>
           <div className="card">
             <div className="hero">
-              {course.thumbnail_url
-                ? <img src={course.thumbnail_url} alt={course.title} />
-                : <div className="hero-placeholder" />
-              }
-              <div className="hero-overlay" />
+              {activePreviewLessonId ? (
+                previewLoading ? (
+                  <div className="hero-preview-state">Loading preview…</div>
+                ) : previewLessonDetail?.video_url ? (
+                  <video
+                    key={previewLessonDetail.video_url}
+                    className="hero-preview-video"
+                    src={previewLessonDetail.video_url}
+                    controls
+                    playsInline
+                  />
+                ) : (
+                  <div className="hero-preview-state">Preview video not available yet.</div>
+                )
+              ) : course.thumbnail_url ? (
+                <img src={course.thumbnail_url} alt={course.title} />
+              ) : (
+                <div className="hero-placeholder" />
+              )}
+              {!activePreviewLessonId && <div className="hero-overlay" />}
               <button className="hero-back" onClick={() => navigate(ROUTES.COURSES)}>
                 <ChevronLeft />
               </button>
-              <div className="hero-content">
-                <span className="badge">{course.category}</span>
-                <h1 className="hero-title">{course.title}</h1>
-              </div>
+              {!activePreviewLessonId && (
+                <div className="hero-content">
+                  <span className="badge">{course.category}</span>
+                  <h1 className="hero-title">{course.title}</h1>
+                </div>
+              )}
             </div>
 
             <div className="body">
@@ -570,65 +605,77 @@ function PublicCourseOverview({
                 ))}
               </div>
 
-              {allLessons.length > 0 && (
+              {course.modules.length > 0 && (
                 <div className="section">
                   <h2>Course content</h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {allLessons.map((lesson) => {
-                      const locked = !lesson.is_preview
-                      const isActive = activePreviewLessonId === lesson.id
-                      return (
-                        <div
-                          key={lesson.id}
-                          onClick={() => !locked && setActivePreviewLessonId(lesson.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            padding: '0.75rem 0.875rem',
-                            border: isActive ? '1px solid #2492EB' : '1px solid #E5E7EB',
-                            borderRadius: '0.625rem',
-                            cursor: locked ? 'default' : 'pointer',
-                            opacity: locked ? 0.6 : 1,
-                            background: isActive ? '#EFF6FF' : '#fff',
-                          }}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {course.modules.map((module, moduleIndex) => (
+                      <div key={module.id} style={{ border: '1px solid #E5E7EB', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                        <button
+                          type="button"
+                          aria-expanded={expandedModuleIds.has(module.id)}
+                          aria-controls={`module-lessons-${module.id}`}
+                          onClick={() => toggleModule(module.id)}
+                          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.875rem', background: '#F9FAFB', border: 'none', textAlign: 'left', cursor: 'pointer' }}
                         >
-                          {locked
-                            ? <Lock size={15} color="#9CA3AF" />
-                            : <Play size={15} color="#2492EB" />
-                          }
-                          <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: '#111' }}>
-                            {lesson.title}
+                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111' }}>
+                            Module {moduleIndex + 1}: {module.title}
                           </span>
-                          {!locked && (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2492EB' }}>
-                              FREE PREVIEW
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                              {module.lessons.length} {module.lessons.length === 1 ? 'lesson' : 'lessons'}
                             </span>
-                          )}
-                          <span style={{ fontSize: '0.8125rem', color: '#9CA3AF' }}>
-                            {lesson.duration_display}
+                            <ChevronDown
+                              size={16}
+                              aria-hidden="true"
+                              style={{ transform: expandedModuleIds.has(module.id) ? 'rotate(180deg)' : undefined, transition: 'transform 150ms ease' }}
+                            />
                           </span>
+                        </button>
+                        {expandedModuleIds.has(module.id) && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.625rem' }}>
+                          {module.lessons.map((lesson) => {
+                            const locked = !lesson.is_preview
+                            const isActive = activePreviewLessonId === lesson.id
+                            return (
+                              <div
+                                key={lesson.id}
+                                onClick={() => !locked && setActivePreviewLessonId(lesson.id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  padding: '0.75rem 0.875rem',
+                                  border: isActive ? '1px solid #2492EB' : '1px solid #E5E7EB',
+                                  borderRadius: '0.625rem',
+                                  cursor: locked ? 'default' : 'pointer',
+                                  opacity: locked ? 0.6 : 1,
+                                  background: isActive ? '#EFF6FF' : '#fff',
+                                }}
+                              >
+                                {locked
+                                  ? <Lock size={15} color="#9CA3AF" />
+                                  : <Play size={15} color="#2492EB" />
+                                }
+                                <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: '#111' }}>
+                                  {lesson.title}
+                                </span>
+                                {!locked && (
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2492EB' }}>
+                                    FREE PREVIEW
+                                  </span>
+                                )}
+                                <span style={{ fontSize: '0.8125rem', color: '#9CA3AF' }}>
+                                  {lesson.duration_display}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
-                      )
-                    })}
+                        )}
+                      </div>
+                    ))}
                   </div>
-
-                  {activePreviewLessonId && (
-                    <div style={{ marginTop: '0.75rem', borderRadius: '0.875rem', overflow: 'hidden', background: '#111' }}>
-                      {previewLoading ? (
-                        <div className="state-screen">Loading preview…</div>
-                      ) : previewLessonDetail?.video_url ? (
-                        <video
-                          key={previewLessonDetail.video_url}
-                          src={previewLessonDetail.video_url}
-                          controls
-                          style={{ width: '100%', display: 'block' }}
-                        />
-                      ) : (
-                        <div className="state-screen">Preview video not available yet.</div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
