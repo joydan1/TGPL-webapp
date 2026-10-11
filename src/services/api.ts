@@ -1936,9 +1936,22 @@ getCurriculum: async (courseId: string) => {
     | { success: true; data: ConfirmUploadResponse }
     | { success: false; error: string; statusCode?: number; cancelled?: boolean; retryable?: boolean }
   > => {
+    const friendlyError = target === 'lesson_video'
+      ? 'Video upload failed. Please check the file and try again.'
+      : 'File upload failed. Please check the file and try again.'
+    const durationSeconds = target === 'lesson_video' && Number.isFinite(options?.durationSeconds)
+      ? Math.round(options!.durationSeconds!)
+      : undefined
+    if (target === 'lesson_video' && (!durationSeconds || durationSeconds < 1)) {
+      return {
+        success: false as const,
+        error: "We couldn't read this video's length. Please try an MP4 file.",
+        retryable: false,
+      }
+    }
     try {
       if (target === 'lesson_video' && file.size > MULTIPART_THRESHOLD_BYTES && ids.lesson_id) {
-        const data = await uploadMultipartVideo(file, ids.lesson_id, options)
+        const data = await uploadMultipartVideo(file, ids.lesson_id, { ...options, durationSeconds })
         options?.onProgress?.(100)
         return { success: true as const, data }
       }
@@ -1977,8 +1990,8 @@ getCurriculum: async (courseId: string) => {
           file_name: file.name,
           file_size: file.size,
           content_type: file.type || 'application/octet-stream',
-          ...(target === 'lesson_video' && options?.durationSeconds && options.durationSeconds > 0
-            ? { duration_seconds: Math.round(options.durationSeconds) }
+          ...(durationSeconds !== undefined
+            ? { duration_seconds: durationSeconds }
             : {}),
         } as ConfirmUploadPayload,
         { signal: options?.signal },
@@ -2000,12 +2013,12 @@ getCurriculum: async (courseId: string) => {
         }
       }
       if (error instanceof Error && !(error as { response?: unknown }).response) {
-        return { success: false as const, error: error.message, retryable: true }
+        return { success: false as const, error: friendlyError, retryable: true }
       }
-      const { message, statusCode } = parseApiError(error, 'Upload failed')
+      const { statusCode } = parseApiError(error, 'Upload failed')
       return {
         success: false as const,
-        error: message,
+        error: friendlyError,
         statusCode,
         retryable: !statusCode || statusCode >= 500 || statusCode === 429,
       }

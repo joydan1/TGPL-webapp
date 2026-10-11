@@ -34,6 +34,8 @@ interface CertChecklistItem {
   satisfied: boolean
   implemented?: boolean
   reason?: string
+  status?: string
+  status_label?: string
   details?: string | Record<string, string>
 }
 
@@ -41,7 +43,7 @@ interface CertificationApiResponse {
   eligible: boolean
   checklist: CertChecklistItem[]
   completion_percentage: number
-  next_incomplete: string | null
+  next_incomplete: 'modules_complete' | 'project_complete' | null
 }
 
 interface CourseCertProgress {
@@ -50,7 +52,7 @@ interface CourseCertProgress {
   course_title: string
   eligible: boolean
   completion_percentage: number
-  next_incomplete: string | null
+  next_incomplete: 'modules_complete' | 'project_complete' | null
   checklist: CertChecklistItem[]
 }
 
@@ -115,18 +117,28 @@ function fmtDueDate(iso: string): string {
   return `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 }
 
-const REQUIREMENT_LABELS: Record<string, string> = {
-  modules_complete: 'Complete all modules',
-  project_complete: 'Submit final project',
-  live_session_attended: 'Attend a live session',
-  quiz_passing: 'Pass all quizzes',
-  final_assessment: 'Pass final assessment',
+const CERT_REQUIREMENT_ORDER: Record<string, number> = {
+  modules_complete: 0,
+  project_complete: 1,
 }
 
-function labelForRequirement(requirement: string): string {
-  return REQUIREMENT_LABELS[requirement] ?? requirement
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+const CERT_REQUIREMENT_LABELS: Record<string, string> = {
+  modules_complete: 'Complete all modules',
+  project_complete: 'Submit final project',
+}
+
+function projectStatusLabel(item: CertChecklistItem): string | null {
+  switch (item.status) {
+    case 'not_submitted':
+    case 'awaiting_grade':
+    case 'revision_requested':
+    case 'not_passed':
+    case 'passed':
+    case 'not_set_up':
+      return item.status_label ?? null
+    default:
+      return null
+  }
 }
 
 // ── Page CSS ───────────────────────────────────────────────────────────────
@@ -346,6 +358,7 @@ const PAGE_CSS = `
   .cert-desc { font-size: 0.8375rem; color: #6B7280; margin-bottom: 1rem; line-height: 1.55; }
   .cert-desc strong { color: #2492EB; }
   .cert-config-note { font-size: 0.8125rem; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.5rem; padding: 0.625rem 0.75rem; margin-bottom: 0.875rem; line-height: 1.5; }
+  .cert-status { flex: 1 1 calc(100% - 24px); margin-left: 24px; color: #6B7280; font-size: 0.75rem; line-height: 1.4; }
   .cert-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8375rem; color: #374151; padding: 0.3rem 0; }
   .cert-item.done { color: #6B7280; }
   .cert-view { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-size: 0.8125rem; color: #2492EB; font-weight: 600; cursor: pointer; background: none; border: none; margin-top: 0.875rem; width: 100%; }
@@ -525,7 +538,7 @@ export default function DashboardPage() {
             completion_percentage: data.completion_percentage ?? 0,
             next_incomplete: data.next_incomplete ?? null,
             
-            checklist: (data.checklist || []).filter((item) => item.implemented !== false),
+            checklist: data.checklist || [],
           })
         })
 
@@ -961,7 +974,7 @@ function goToCertification() {
                   </div>
                 ) : activeCert.eligible ? (
                   <div className="cert-desc">
-                    You've met all the requirements — your certificate is being generated and will show up under My Certificates shortly.
+                    All certificate requirements are complete. Your certificate is being prepared and will appear in My Certificates when it&apos;s ready.
                   </div>
                 ) : (
                   <div className="cert-desc">
@@ -969,14 +982,21 @@ function goToCertification() {
                   </div>
                 )}
 
-                {activeCert.checklist.map((item, i) => (
-                  <div key={i} className={`cert-item${item.satisfied ? ' done' : ''}`}>
-                    {item.satisfied
-                      ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
-                      : <Circle size={16} color="#D1D5DB" />}
-                    <span>{item.label || labelForRequirement(item.requirement)}</span>
-                  </div>
-                ))}
+                {[...activeCert.checklist]
+                  .filter((item) => item.requirement in CERT_REQUIREMENT_ORDER)
+                  .sort((a, b) => CERT_REQUIREMENT_ORDER[a.requirement] - CERT_REQUIREMENT_ORDER[b.requirement])
+                  .map((item) => {
+                    const statusLabel = item.requirement === 'project_complete' ? projectStatusLabel(item) : null
+                    return (
+                      <div key={item.requirement} className={`cert-item${item.satisfied ? ' done' : ''}`}>
+                        {item.satisfied
+                          ? <CheckCircle size={16} color="#00C950" fill="#EFF6FF" />
+                          : <Circle size={16} color="#D1D5DB" />}
+                        <span>{item.label || CERT_REQUIREMENT_LABELS[item.requirement]}</span>
+                        {statusLabel && <span className="cert-status">{statusLabel}</span>}
+                      </div>
+                    )
+                  })}
                  {showCertNudge && (
                  <div style={{ marginTop: '0.875rem' }}>
                    <CertificateNudge

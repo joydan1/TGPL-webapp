@@ -1362,29 +1362,20 @@ export default function AddCoursePage() {
   }
 
   // ---------- Video pick / cancel / retry ----------
-  function handleVideoPick(moduleLocalId: string, lesson: Lesson, file: File | null) {
+  async function handleVideoPick(moduleLocalId: string, lesson: Lesson, file: File | null) {
     if (!file) return
     if (file.size > MAX_VIDEO_BYTES) {
       setSaveError(`"${file.name}" is larger than 2 GB. Please choose a smaller video.`)
       return
     }
     setSaveError(null)
+    const durationSeconds = await readVideoDuration(file)
+    if (durationSeconds === null) {
+      setSaveError("We couldn't read this video's length. Please try an MP4 file.")
+      return
+    }
     if (lesson.remoteId) cancelVideo(lesson.remoteId) // replacing: stop any earlier upload
-    updateLesson(moduleLocalId, lesson.id, { videoFile: file, durationSeconds: null, videoUploaded: false })
-    void readVideoDuration(file).then((durationSeconds) => {
-      if (durationSeconds === null) return
-      setForm((current) => ({
-        ...current,
-        modules: current.modules.map((module) => module.id !== moduleLocalId ? module : {
-          ...module,
-          lessons: module.lessons.map((currentLesson) =>
-            currentLesson.id === lesson.id && currentLesson.videoFile === file && currentLesson.durationSeconds === null
-              ? { ...currentLesson, durationSeconds }
-              : currentLesson,
-          ),
-        }),
-      }))
-    })
+    updateLesson(moduleLocalId, lesson.id, { videoFile: file, durationSeconds, videoUploaded: false })
   }
 
   function handleVideoCancel(moduleLocalId: string, lesson: Lesson) {
