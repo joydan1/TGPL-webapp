@@ -2665,6 +2665,14 @@ export const trainerAssignmentsAPI = {
       return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to update assignment')
+      if (statusCode === 403) {
+        return {
+          success: false as const,
+          error: "You don't have permission to edit this assignment. Confirm you're signed in with the trainer account assigned to this course.",
+          statusCode,
+          fieldErrors: extractFieldErrors(error),
+        }
+      }
       if (statusCode === 409) {
         return {
           success: false as const,

@@ -1416,6 +1416,9 @@ export default function AddCoursePage() {
 
   const totalModules = form.modules.length
   const totalLessons = form.modules.reduce((sum, m) => sum + m.lessons.length, 0)
+  const hasFinalProject = form.modules.some((module) =>
+    module.lessons.some((lesson) => lesson.assignment?.isFinal),
+  )
 
   const assignmentModalModule = assignmentTarget
     ? form.modules.find((m) => m.id === assignmentTarget.moduleId) ?? null
@@ -1994,6 +1997,12 @@ export default function AddCoursePage() {
                 <h3 className="ac-section-title">Review &amp; publish</h3>
                 <p className="ac-section-sub">Check everything looks right before going live.</p>
 
+                {form.hasCertificate && !hasFinalProject && (
+                  <div className="ac-notice warn" role="status">
+                    Certificates are enabled, but learners can&apos;t receive one until a final project is added and passed.
+                  </div>
+                )}
+
                 {pendingUploads.length > 0 && (
                   <div className={`ac-notice ${failedUploads.length > 0 ? 'warn' : ''}`}>
                     <span>
@@ -2044,7 +2053,7 @@ export default function AddCoursePage() {
                     <div className="ac-preview-badges">
                       <span className="ac-preview-badge"><Layers size={14} /> {totalModules} module{totalModules === 1 ? '' : 's'}</span>
                       <span className="ac-preview-badge"><BookOpen size={14} /> {totalLessons} lesson{totalLessons === 1 ? '' : 's'}</span>
-                      {form.hasCertificate && <span className="ac-preview-badge"><Award size={14} /> Certificate</span>}
+                      {form.hasCertificate && <span className="ac-preview-badge"><Award size={14} /> Certificate enabled</span>}
                     </div>
                   </div>
                 </div>
@@ -2082,7 +2091,11 @@ export default function AddCoursePage() {
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Certificate</span>
-                    <span className="ac-review-row-value">{form.hasCertificate ? 'Yes' : 'No'}</span>
+                    <span className="ac-review-row-value">{form.hasCertificate ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                  <div className="ac-review-row">
+                    <span className="ac-review-row-label">Final project</span>
+                    <span className="ac-review-row-value">{hasFinalProject ? 'Added' : 'Not added'}</span>
                   </div>
                   <div className="ac-review-row">
                     <span className="ac-review-row-label">Visibility</span>
