@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import SettingsLayout from '../../components/layout/SettingsLayout'
 import { useAuth } from '../../hooks/useAuth'
 import { usePushNotifications } from '../../hooks/usePushNotification'
@@ -77,7 +78,11 @@ function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disa
 
 export default function SettingsNotificationPage() {
   const { user } = useAuth()
-  const isTrainer = user?.role === 'trainer'
+  const location = useLocation()
+  const settingsMode = location.pathname.startsWith('/trainer/settings/') || user?.role === 'trainer'
+    ? 'trainer'
+    : 'learner'
+  const isTrainer = settingsMode === 'trainer'
 
   const { isSupported, permission, subscribing, error: pushError, subscribe, unsubscribe } = usePushNotifications()
   const pushEnabled = isSupported && permission === 'granted'
@@ -99,7 +104,7 @@ export default function SettingsNotificationPage() {
         pauseAll?: boolean
         categories?: CategoryPrefs[]
       }
-      if (parsed.role && parsed.role !== user?.role) return
+      if (parsed.role && parsed.role !== settingsMode) return
 
       const nextPauseAll = parsed.pauseAll === true
       const nextCategories = Array.isArray(parsed.categories) ? parsed.categories : DEFAULT_CATEGORIES
@@ -110,7 +115,7 @@ export default function SettingsNotificationPage() {
       // Ignore malformed local settings and keep the defaults.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.role])
+  }, [settingsMode])
 
   const toggleChannel = (id: string, channel: Channel) => {
     setSaved(false)
@@ -136,7 +141,7 @@ export default function SettingsNotificationPage() {
 
   const handleSave = () => {
     const nextSettings = { pauseAll, categories }
-    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify({ ...nextSettings, role: user?.role }))
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify({ ...nextSettings, role: settingsMode }))
     setSavedSettings(nextSettings)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)

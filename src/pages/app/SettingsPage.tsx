@@ -29,10 +29,9 @@ const PAGE_CSS = `
   }
 `
 
-export default function SettingsPage() {
+export default function SettingsPage({ trainerMode = false }: { trainerMode?: boolean }) {
   const navigate = useNavigate()
   const { logout, user } = useAuth()
-  console.log('SettingsPage user:', user)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   const handleConfirmLogout = async () => {
@@ -52,7 +51,7 @@ export default function SettingsPage() {
           <span className="settings-row-label">Profile</span>
           <ChevronRight size={18} className="settings-row-chevron" />
         </button>
-{user?.role === 'trainer' && (
+  {(trainerMode || user?.role === 'trainer') && (
   <button className="settings-row" onClick={() => navigate(ROUTES.TRAINER_PROFILE)}>
     <div className="settings-row-icon"><Award size={19} /></div>
     <span className="settings-row-label">Trainer Profile</span>
@@ -89,7 +88,7 @@ export default function SettingsPage() {
     <>
       <style>{SHELL_CSS + PAGE_CSS + LOGOUT_MODAL_CSS}</style>
 
-      {user?.role === 'trainer' ? (
+      {trainerMode || user?.role === 'trainer' ? (
         <TrainerShell>{content}</TrainerShell>
       ) : (
         <AppShell activeNav="settings" onNavChange={() => {}}>{content}</AppShell>

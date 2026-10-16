@@ -274,6 +274,38 @@ function App() {
           }
         />
         <Route
+          path={ROUTES.TRAINER_SETTINGS}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <SettingsPage trainerMode />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_SETTINGS_SECURITY}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <SettingsSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_SETTINGS_NOTIFICATIONS}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <SettingsNotificationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.TRAINER_HELP_SUPPORT}
+          element={
+            <ProtectedRoute requiredRole="trainer">
+              <HelpSupportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path={ROUTES.TRAINER_COURSES}
           element={
             <ProtectedRoute requiredRole="trainer">

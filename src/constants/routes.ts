@@ -56,6 +56,10 @@ SETTINGS_NOTIFICATIONS: '/settings/notifications',
   // TRAINER ROUTES (Authenticated trainers only)
   // ===========================
   TRAINER_DASHBOARD: '/trainer/dashboard',
+  TRAINER_SETTINGS: '/trainer/settings',
+  TRAINER_SETTINGS_SECURITY: '/trainer/settings/security',
+  TRAINER_SETTINGS_NOTIFICATIONS: '/trainer/settings/notifications',
+  TRAINER_HELP_SUPPORT: '/trainer/settings/help',
   TRAINER_COURSES: '/trainer/courses',
   TRAINER_COURSE_ADD: '/trainer/courses/addcourse',
   TRAINER_COURSE_EDIT: '/trainer/courses/:id/edit',

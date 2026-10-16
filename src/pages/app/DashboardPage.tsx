@@ -386,6 +386,7 @@ const PAGE_CSS = `
     .session-card { width: 100%; height: auto; }
     .content { padding: 1.25rem 1rem 5rem; }
     .resume-banner { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .resume-banner-left { width: 100%; }
     .resume-btn { align-self: flex-start; }
     .resume-banner-empty { flex-direction: column; align-items: flex-start; }
     .course-card { width: 100%; }

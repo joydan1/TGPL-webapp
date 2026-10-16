@@ -20,9 +20,9 @@ import UploadTray from '../components/UploadTray'
 export const SETTINGS_SUBITEMS = [
   { key: 'profile',       label: 'Profile',         Icon: UserIcon,   route: ROUTES.PROFILE },
   { key: 'trainerProfile', label: 'Trainer Profile', Icon: Award,      route: ROUTES.TRAINER_PROFILE },
-  { key: 'security',      label: 'Security',        Icon: Shield,     route: ROUTES.SETTINGS_SECURITY },
-  { key: 'notifications', label: 'Notifications',   Icon: Bell,       route: ROUTES.SETTINGS_NOTIFICATIONS },
-  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle, route: ROUTES.HELP_SUPPORT },
+  { key: 'security',      label: 'Security',        Icon: Shield,     route: ROUTES.TRAINER_SETTINGS_SECURITY },
+  { key: 'notifications', label: 'Notifications',   Icon: Bell,       route: ROUTES.TRAINER_SETTINGS_NOTIFICATIONS },
+  { key: 'help',          label: 'Help & Support',  Icon: HelpCircle, route: ROUTES.TRAINER_HELP_SUPPORT },
   { key: 'logout',        label: 'Log out',         Icon: LogOut,     route: null, danger: true },
 ]
 
@@ -189,7 +189,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
     { key: 'reviews',   label: 'Reviews',      route: ROUTES.TRAINER_REVIEWS,      Icon: Star, badge: pendingReviewsCount || undefined },
     { key: 'live',      label: 'Live Classes', route: ROUTES.TRAINER_LIVE_CLASSES, Icon: Radio },
     { key: 'bookings',  label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,     Icon: Calendar },
-    { key: 'settings',  label: 'Settings',     route: ROUTES.SETTINGS,             Icon: Settings },
+    { key: 'settings',  label: 'Settings',     route: ROUTES.TRAINER_SETTINGS,      Icon: Settings },
   ]
 
   if (!user) return null
@@ -409,7 +409,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
               <button
                 key={key}
                 className={`tab-item${activeRoute === route ? ' active' : ''}`}
-                onClick={() => key === 'settings' ? navigate(ROUTES.SETTINGS) : navigate(route)}
+                onClick={() => key === 'settings' ? navigate(ROUTES.TRAINER_SETTINGS) : navigate(route)}
               >
                 {!!badge && <span className="tab-badge">{badge}</span>}
                 <Icon size={20} />

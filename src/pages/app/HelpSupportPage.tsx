@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Search, Plus, Minus, Zap, CreditCard, ShieldCheck, BookOpen, Edit3, Users, Clock } from 'lucide-react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
 import { useAuth } from '../../hooks/useAuth' 
@@ -307,7 +308,8 @@ const PAGE_CSS = `
 
 export default function HelpSupportPage() {
   const { user } = useAuth()
-const isTrainer = user?.role === 'trainer' 
+  const location = useLocation()
+  const isTrainer = location.pathname.startsWith('/trainer/settings/') || user?.role === 'trainer'
 
   const CATEGORIES = isTrainer ? TRAINER_CATEGORIES : LEARNER_CATEGORIES
   const FAQS = isTrainer ? TRAINER_FAQS : LEARNER_FAQS
