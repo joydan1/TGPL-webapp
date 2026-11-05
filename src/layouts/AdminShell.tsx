@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, Users, BookOpen, CreditCard, Settings as SettingsIcon,
   Search, Bell, ChevronDown, ChevronLeft,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, MoreHorizontal,
   LogOut, User as UserIcon, MessageCircle, Award, RotateCw, Activity
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
@@ -79,6 +79,13 @@ export const ADMIN_SHELL_CSS = `
   .mobile-tabbar-inner { display: flex; height: 100%; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
   .tab-item.active { color: #2492EB; }
+  .mobile-more-wrap { position: relative; flex: 1; min-width: 0; }
+  .mobile-more-wrap.open { z-index: 2; }
+  .mobile-more-wrap > .tab-item { width: 100%; height: 100%; }
+  .mobile-more-backdrop { position: fixed; inset: 0; z-index: 1; border: 0; background: transparent; }
+  .mobile-more-menu { position: absolute; right: 0.5rem; bottom: calc(100% + 0.5rem); z-index: 2; width: min(240px, calc(100vw - 1rem)); max-height: min(60vh, 420px); overflow-y: auto; padding: 0.4rem; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+  .mobile-more-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0.65rem 0.75rem; border: 0; border-radius: 0.5rem; background: none; color: #374151; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+  .mobile-more-item:hover, .mobile-more-item.active { background: #EFF6FF; color: #1676C4; }
 
   @media (max-width: 640px) {
     .sidebar { display: none; }
@@ -130,6 +137,8 @@ const navItems = [
   { key: 'settings',  label: 'Settings',  route: ROUTES.ADMIN_SETTINGS,   Icon: SettingsIcon, permission: 'system_settings' as const },
 ]
 
+const MOBILE_PRIMARY_KEYS = ['dashboard', 'users', 'revenue', 'community']
+
 export default function AdminShell({ children }: AdminShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -140,10 +149,13 @@ export default function AdminShell({ children }: AdminShellProps) {
   const [profileOpen,       setProfileOpen]       = useState(false)
   const [notifOpen,         setNotifOpen]         = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
 
   if (!user) return null
 
   const visibleNavItems = navItems.filter((item) => user.permissions?.[item.permission] === true)
+  const mobilePrimaryItems = visibleNavItems.filter((item) => MOBILE_PRIMARY_KEYS.includes(item.key))
+  const mobileMoreItems = visibleNavItems.filter((item) => !MOBILE_PRIMARY_KEYS.includes(item.key))
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
   const avatarUrl = user.avatar_url ?? null
   const activeRoute = visibleNavItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.ADMIN_DASHBOARD
@@ -300,16 +312,54 @@ export default function AdminShell({ children }: AdminShellProps) {
         {/* ── Mobile tab bar ── */}
         <div className="mobile-tabbar">
           <div className="mobile-tabbar-inner">
-            {visibleNavItems.map(({ key, label, route, Icon }) => (
+            {mobilePrimaryItems.map(({ key, label, route, Icon }) => (
               <button
                 key={key}
                 className={`tab-item${activeRoute === route ? ' active' : ''}`}
-                onClick={() => navigate(route)}
+                onClick={() => { setMobileMoreOpen(false); navigate(route) }}
               >
                 <Icon size={20} />
                 <span>{label}</span>
               </button>
             ))}
+            {mobileMoreItems.length > 0 && (
+              <div className={`mobile-more-wrap${mobileMoreOpen ? ' open' : ''}`}>
+                {mobileMoreOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="mobile-more-backdrop"
+                      aria-label="Close more navigation"
+                      onClick={() => setMobileMoreOpen(false)}
+                    />
+                    <nav id="admin-mobile-more-menu" className="mobile-more-menu" aria-label="More admin pages">
+                      {mobileMoreItems.map(({ key, label, route, Icon }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`mobile-more-item${activeRoute === route ? ' active' : ''}`}
+                          onClick={() => { setMobileMoreOpen(false); navigate(route) }}
+                        >
+                          <Icon size={18} />
+                          <span>{label}</span>
+                        </button>
+                      ))}
+                    </nav>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className={`tab-item${mobileMoreItems.some((item) => item.route === activeRoute) ? ' active' : ''}`}
+                  aria-expanded={mobileMoreOpen}
+                  aria-haspopup="true"
+                  aria-controls="admin-mobile-more-menu"
+                  onClick={() => setMobileMoreOpen((open) => !open)}
+                >
+                  <MoreHorizontal size={20} />
+                  <span>More</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

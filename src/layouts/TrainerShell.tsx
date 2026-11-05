@@ -3,7 +3,7 @@ import {
   Home, BookOpen, Star, Radio, Settings,
   Search, Bell, ChevronDown, ChevronLeft,
   PanelLeftClose, PanelLeftOpen, MessageCircle,
-  LogOut, User as UserIcon, Shield, HelpCircle, Award, Calendar,
+  LogOut, User as UserIcon, Shield, HelpCircle, Award, Calendar, MoreHorizontal,
 } from 'lucide-react'
 import { ROUTES } from '../constants/routes'
 import { useAuth } from '../hooks/useAuth'
@@ -110,11 +110,18 @@ export const SHELL_CSS = `
   .page-dashboard-back button:hover { color: #2492EB; border-color: #BFDBFE; background: #EFF6FF; }
 
   /* ── Mobile tab bar ── */
-  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
-  .mobile-tabbar-inner { display: flex; height: 100%; }
+  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: calc(60px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
+  .mobile-tabbar-inner { display: flex; height: 60px; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; position: relative; }
   .tab-item.active { color: #2492EB; }
   .tab-item .tab-badge { position: absolute; top: 2px; right: calc(50% - 18px); background: #F59E0B; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 999px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+  .mobile-more-wrap { position: relative; flex: 1; min-width: 0; }
+  .mobile-more-wrap.open { z-index: 2; }
+  .mobile-more-wrap > .tab-item { width: 100%; height: 100%; }
+  .mobile-more-backdrop { position: fixed; inset: 0; z-index: 1; border: 0; background: transparent; }
+  .mobile-more-menu { position: absolute; right: 0.5rem; bottom: calc(100% + 0.5rem); z-index: 2; width: min(240px, calc(100vw - 1rem)); max-height: min(60vh, 420px); overflow-y: auto; padding: 0.4rem; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+  .mobile-more-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0.65rem 0.75rem; border: 0; border-radius: 0.5rem; background: none; color: #374151; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+  .mobile-more-item:hover, .mobile-more-item.active { background: #EFF6FF; color: #2492EB; }
 
   @media (max-width: 640px) {
     .sidebar { display: none; }
@@ -125,6 +132,7 @@ export const SHELL_CSS = `
     .mobile-tabbar { display: block; }
     .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
     .profile-dropdown { width: min(220px, calc(100vw - 2rem)); }
+    .mobile-more-item .nav-badge { margin-left: auto; background: #F59E0B; color: #fff; font-size: 0.68rem; font-weight: 700; border-radius: 999px; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
   }
   @media (max-width: 900px) {
     .navbar { padding-left: 1.25rem; padding-right: 1.25rem; }
@@ -168,6 +176,7 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
   const [notifOpen,           setNotifOpen]           = useState(false)
   const [settingsOpen,        setSettingsOpen]        = useState(false)
   const [logoutConfirmOpen,   setLogoutConfirmOpen]   = useState(false)
+  const [mobileMoreOpen,      setMobileMoreOpen]      = useState(false)
   const [pendingReviewsCount, setPendingReviewsCount] = useState<number | null>(null)
 
   useEffect(() => {
@@ -191,12 +200,16 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
     { key: 'bookings',  label: 'Bookings',     route: ROUTES.TRAINER_BOOKINGS,     Icon: Calendar },
     { key: 'settings',  label: 'Settings',     route: ROUTES.TRAINER_SETTINGS,      Icon: Settings },
   ]
+  const mobilePrimaryKeys = ['home', 'courses', 'community', 'bookings']
+  const mobilePrimaryItems = navItems.filter((item) => mobilePrimaryKeys.includes(item.key))
+  const mobileMoreItems = navItems.filter((item) => !mobilePrimaryKeys.includes(item.key))
 
   if (!user) return null
 
   const initials = (user.name || user.email || 'U').charAt(0).toUpperCase()
   const avatarUrl = user.avatar_url ?? null
   const activeRoute = navItems.find((item) => location.pathname.startsWith(item.route))?.route || ROUTES.TRAINER_DASHBOARD
+  const activeMore = mobileMoreItems.some((item) => item.route === activeRoute)
 
   function handleNav(key: string, route: string) {
     if (key === 'settings') {
@@ -405,17 +418,59 @@ export default function TrainerShell({ children, pageHeader }: TrainerShellProps
         {/* ── Mobile tab bar ── */}
         <div className="mobile-tabbar">
           <div className="mobile-tabbar-inner">
-            {navItems.map(({ key, label, route, Icon, badge }) => (
+            {mobilePrimaryItems.map(({ key, label, route, Icon, badge }) => (
               <button
                 key={key}
                 className={`tab-item${activeRoute === route ? ' active' : ''}`}
-                onClick={() => key === 'settings' ? navigate(ROUTES.TRAINER_SETTINGS) : navigate(route)}
+                onClick={() => {
+                  setMobileMoreOpen(false)
+                  navigate(route)
+                }}
               >
                 {!!badge && <span className="tab-badge">{badge}</span>}
                 <Icon size={20} />
-                <span>{label === 'Live Classes' ? 'Live' : label === 'My Courses' ? 'Courses' : label}</span>
+                <span>{key === 'home' ? 'Dashboard' : label}</span>
               </button>
             ))}
+            {mobileMoreItems.length > 0 && (
+              <div className={`mobile-more-wrap${mobileMoreOpen ? ' open' : ''}`}>
+                {mobileMoreOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="mobile-more-backdrop"
+                      aria-label="Close more navigation"
+                      onClick={() => setMobileMoreOpen(false)}
+                    />
+                    <nav id="trainer-mobile-more-menu" className="mobile-more-menu" aria-label="More Trainer navigation">
+                      {mobileMoreItems.map(({ key, label, route, Icon, badge }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`mobile-more-item${activeRoute === route ? ' active' : ''}`}
+                          onClick={() => { setMobileMoreOpen(false); navigate(route) }}
+                        >
+                          <Icon size={18} />
+                          <span>{label}</span>
+                          {!!badge && <span className="nav-badge">{badge}</span>}
+                        </button>
+                      ))}
+                    </nav>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className={`tab-item${activeMore ? ' active' : ''}`}
+                  aria-haspopup="true"
+                  aria-expanded={mobileMoreOpen}
+                  aria-controls="trainer-mobile-more-menu"
+                  onClick={() => setMobileMoreOpen((open) => !open)}
+                >
+                  <MoreHorizontal size={20} />
+                  <span>More</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
