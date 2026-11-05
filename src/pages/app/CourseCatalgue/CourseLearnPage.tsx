@@ -1192,7 +1192,7 @@ async function downloadResource(r: LessonResource) {
               <div className="lesson-meta">
                 <div className="crumb">
                   <span className="crumb-link" onClick={() => navigate(RouteBuilder.course(slug as string))}>
-                    {courseTitle ?? slug}
+                    {courseTitle ?? lesson.course?.title ?? slug}
                   </span>
                   {moduleTitle && <>{' › '}<span>{moduleTitle}</span></>}
                 </div>

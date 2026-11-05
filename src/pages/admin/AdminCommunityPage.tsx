@@ -24,6 +24,7 @@ export default function AdminCommunityPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const cursorRef = useRef<string | null>(null)
 
@@ -70,7 +71,11 @@ export default function AdminCommunityPage() {
     const interval = setInterval(async () => {
       if (cursorRef.current === null) return
       const res = await communityAPI.getMessages(cursorRef.current)
-      if (!res.success) return
+      if (!res.success) {
+        setActionError(res.error)
+        return
+      }
+      setActionError(null)
 
       setActiveMembers(res.data.active_members)
       setTotalMembers(res.data.total_members)
@@ -116,7 +121,7 @@ export default function AdminCommunityPage() {
       const res = await communityAPI.getReplies(openThreadParent.id, threadCursorRef.current)
       if (!res.success) {
         
-        setOpenThreadParent(null)
+        setThreadError(res.error)
         return
       }
       if (res.data.results.length > 0) {
@@ -131,14 +136,18 @@ export default function AdminCommunityPage() {
     }
   }, [openThreadParent?.id])
 
-  async function handleSend(body: string) {
+  async function handleSend(body: string): Promise<boolean> {
     setSending(true)
+    setActionError(null)
     const res = await communityAPI.sendMessage(body)
     setSending(false)
     if (res.success) {
       setMessages(prev => [...prev, res.data])
       cursorRef.current = res.data.created_at
+      return true
     }
+    setActionError(res.error)
+    return false
   }
 
   async function handleDeleteMine(messageId: string) {
@@ -150,7 +159,7 @@ export default function AdminCommunityPage() {
         setOpenThreadParent(null)
         threadCursorRef.current = null
       }
-    }
+    } else setActionError(res.error)
   }
 
   async function handleDeleteModerator(messageId: string) {
@@ -162,7 +171,7 @@ export default function AdminCommunityPage() {
         setOpenThreadParent(null)
         threadCursorRef.current = null
       }
-    }
+    } else setActionError(res.error)
   }
 
   function handleOpenThread(msg: CommunityMessage) {
@@ -180,9 +189,10 @@ export default function AdminCommunityPage() {
     threadCursorRef.current = null
   }
 
-  async function handleSendReply(body: string) {
-    if (!openThreadParent) return
+  async function handleSendReply(body: string): Promise<boolean> {
+    if (!openThreadParent) return false
     setThreadSending(true)
+    setThreadError(null)
     const res = await communityAPI.sendMessage(body, openThreadParent.id)
     setThreadSending(false)
     if (res.success) {
@@ -192,7 +202,10 @@ export default function AdminCommunityPage() {
       setMessages(prev => prev.map(m =>
         m.id === openThreadParent.id ? { ...m, reply_count: (m.reply_count ?? 0) + 1 } : m
       ))
+      return true
     }
+    setThreadError(res.error)
+    return false
   }
 
   return (
@@ -209,6 +222,7 @@ export default function AdminCommunityPage() {
           rules={rules}
           loading={loading}
           error={error}
+          actionError={actionError}
           sending={sending}
           onSend={handleSend}
           onDeleteMine={handleDeleteMine}

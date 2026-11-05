@@ -71,6 +71,9 @@ export const adminUsersAPI = {
       if (!res.success) return res
       all.push(...res.data.results)
       if (!res.data.next) break
+      if (i === MAX_EXPORT_PAGES - 1) {
+        return { success: false as const, error: 'User export exceeds the 5,000-user limit. Apply a role or search filter and export a smaller set.' }
+      }
       page += 1
     }
     return { success: true as const, data: all }

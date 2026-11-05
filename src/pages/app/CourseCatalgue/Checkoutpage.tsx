@@ -156,7 +156,7 @@ function promoRejectionMessage(reason: string, detail?: string): string {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode; courseInfo: CourseInfo }) {
+function CheckoutProvider({ children, courseInfo, initialReference }: { children: React.ReactNode; courseInfo: CourseInfo; initialReference?: string | null }) {
   const user = useAuthStore(s => s.user)
 
   const [screen, setScreen]       = useState<Screen>('checkout')
@@ -231,13 +231,31 @@ function CheckoutProvider({ children, courseInfo }: { children: React.ReactNode;
       pollErrors.current = 0
 
       const data = res.data!
+      setResult(data)
       if (data.is_terminal) {
         stopPolling()
-        setResult(data)
         setScreen(data.status === 'succeeded' ? 'success' : 'failed')
       }
     }, POLL_INTERVAL_MS)
   }, [stopPolling, failPayment])
+
+  useEffect(() => {
+    if (!initialReference) return
+    setReference(initialReference)
+    setResult({
+      reference: initialReference,
+      status: 'pending',
+      amount_kobo: 0,
+      amount_naira: '0.00',
+      paid_at: null,
+      is_terminal: false,
+      failure_reason: null,
+      course: { slug: courseInfo.slug, title: courseInfo.title, trainer_name: courseInfo.trainerName },
+      created_at: new Date().toISOString(),
+    })
+    setScreen('processing')
+    pollStatus(initialReference)
+  }, [initialReference, courseInfo.slug, courseInfo.title, courseInfo.trainerName, pollStatus])
 
   
   const setPromoCode = useCallback((v: string) => {
@@ -838,22 +856,29 @@ export default function CheckoutPage() {
   } | null)
 
   const courseSlug = state?.courseSlug
+  const searchParams = new URLSearchParams(location.search)
+  const paymentReference = searchParams.get('reference') || searchParams.get('trxref')
 
-  if (!courseSlug) {
-    navigate(ROUTES.COURSES, { replace: true })
+  useEffect(() => {
+    if (!courseSlug && !paymentReference) {
+      navigate(ROUTES.COURSES, { replace: true })
+    }
+  }, [courseSlug, navigate, paymentReference])
+
+  if (!courseSlug && !paymentReference) {
     return null
   }
 
   const courseInfo: CourseInfo = {
-    slug:        courseSlug,
-    title:       state?.courseTitle ?? courseSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    slug:        courseSlug ?? '',
+    title:       state?.courseTitle ?? (courseSlug ? courseSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Course purchase'),
     trainerName: state?.trainerName ?? '',
     priceNaira:  state?.priceNaira  ?? '0',
     priceKobo:   state?.priceKobo   ?? 0,
   }
 
   return (
-    <CheckoutProvider courseInfo={courseInfo}>
+    <CheckoutProvider courseInfo={courseInfo} initialReference={paymentReference}>
       <CheckoutPageInner />
     </CheckoutProvider>
   )

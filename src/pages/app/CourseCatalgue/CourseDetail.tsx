@@ -16,6 +16,7 @@ interface Trainer {
   id: string
   name: string
   credential: string
+  bio?: string | null
 }
 
 interface Lesson {
@@ -171,6 +172,7 @@ const PUBLIC_CSS = `
   .instructor-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2492EB; font-size: 1rem; flex-shrink: 0; border: 2px solid #E8E8E8; }
   .instructor-name { font-size: 0.9375rem; font-weight: 600; color: #111; }
   .instructor-role { font-size: 0.8rem; color: #6B7280; }
+  .instructor-bio { margin-top: 0.3rem; max-width: 680px; color: #4B5563; font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #F3F4F6; border-radius: 0.75rem; overflow: hidden; }
   .stat { display: flex; flex-direction: column; align-items: center; padding: 1rem 0.5rem; gap: 0.3rem; border-right: 1px solid #F3F4F6; }
   .stat:last-child { border-right: none; }
@@ -591,7 +593,8 @@ function PublicCourseOverview({
                 </div>
                 <div>
                   <p className="instructor-name">{course.trainer.name}</p>
-                  <p className="instructor-role">{course.trainer.credential}</p>
+                  {course.trainer.credential && <p className="instructor-role">{course.trainer.credential}</p>}
+                  {course.trainer.bio?.trim() && <p className="instructor-bio">{course.trainer.bio}</p>}
                 </div>
               </div>
 

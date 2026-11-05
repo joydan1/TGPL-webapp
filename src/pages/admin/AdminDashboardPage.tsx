@@ -368,7 +368,7 @@ export default function AdminDashboardPage() {
     const complete = revenueMonthly.filter((m) => !m.isCurrentMonth)
     if (complete.length < 2) return null
     const [prev, latest] = complete.slice(-2)
-    if (prev.revenue_kobo === 0) return null
+    if (prev.revenue_kobo === 0 || latest.revenue_kobo === 0) return null
     return ((latest.revenue_kobo - prev.revenue_kobo) / prev.revenue_kobo) * 100
   }, [revenueMonthly])
 
@@ -563,7 +563,7 @@ export default function AdminDashboardPage() {
                     {stats.revenue_naira != null ? formatNaira(stats.revenue_naira) : '—'}
                   </p>
                 )}
-                <p className="ad-stat-title">Revenue</p>
+                <p className="ad-stat-title">All-time course revenue</p>
               </div>
               <div className="ad-stat-icon" style={{ background: '#D1FAE5' }}>
                 <CreditCard size={18} color="#059669" />

@@ -36,7 +36,8 @@ const PAGE_CSS = `
   .ss-metrics { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.75rem; }
   .ss-metric { padding:.3rem .5rem; border-radius:.4rem; background:#F3F4F6; color:#4B5563; font-size:.7rem; overflow-wrap:anywhere; }
   .ss-metric strong { color:#111827; margin-left:.2rem; }
-  .ss-failures { flex:1 1 100%; padding:.65rem .75rem; border:1px solid #FDE68A; border-radius:.55rem; background:#FFFBEB; color:#78350F; font-size:.75rem; }
+  .ss-failures { flex:1 1 100%; padding:.65rem .75rem; border:1px solid #E5E7EB; border-radius:.55rem; background:#F9FAFB; color:#6B7280; font-size:.75rem; }
+  .ss-failures.has-failures { border-color:#FDE68A; background:#FFFBEB; color:#78350F; }
   .ss-failures-title { margin:0 0 .45rem; font-weight:800; }
   .ss-failure-list { display:grid; gap:.35rem; margin:0; padding:0; list-style:none; }
   .ss-failure-row { display:flex; justify-content:space-between; gap:.75rem; color:#4B5563; }
@@ -150,7 +151,7 @@ function renderMetric(name: string, value: unknown) {
 
   if (name === 'recent_failures' && Array.isArray(value)) {
     return (
-      <div className="ss-failures" key={name}>
+      <div className={`ss-failures${value.length > 0 ? ' has-failures' : ''}`} key={name}>
         <p className="ss-failures-title">Recent failures</p>
         {value.length === 0 ? (
           <span>No recent task failures.</span>

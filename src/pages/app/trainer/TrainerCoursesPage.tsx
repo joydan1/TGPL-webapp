@@ -45,6 +45,7 @@ const PAGE_CSS = `
 
   .course-card-img-wrap { position: relative; width: 100%; aspect-ratio: 247 / 215.72; background: #E2E8F0; }
   .course-card-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .course-card-img-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #E8EDF2, #D8E0E8); }
   .course-card-img-gradient {
     position: absolute; inset: 0;
     background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%);
@@ -269,6 +270,23 @@ export default function TrainerCoursesPage() {
   }
 
   function handlePreview(courseId: string) {
+    setPendingActionId(courseId)
+    clearActionError()
+    void coursesManageAPI.getDraft(courseId).then((result) => {
+      setPendingActionId(null)
+      if (!result.success) {
+        applyActionError(courseId, result.error)
+        return
+      }
+      if (!result.data.slug) {
+        applyActionError(courseId, 'This course does not have a preview URL yet.')
+        return
+      }
+      navigate(RouteBuilder.course(result.data.slug))
+    })
+  }
+
+  function handleContinueEdit(courseId: string) {
     navigate(RouteBuilder.trainerCourseEdit(courseId))
   }
 
@@ -354,12 +372,16 @@ export default function TrainerCoursesPage() {
     return (
       <div className="course-card">
         <div className="course-card-img-wrap">
-          <img
-            src={course.thumbnail_url || '/image1.png'}
-            alt={course.title}
-            className="course-card-img"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/image1.png' }}
-          />
+          {course.thumbnail_url ? (
+            <img
+              src={course.thumbnail_url}
+              alt={`${course.title} cover`}
+              className="course-card-img"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            />
+          ) : (
+            <div className="course-card-img-placeholder" aria-label="No course cover uploaded" />
+          )}
           <div className="course-card-img-gradient" />
         </div>
 
@@ -376,12 +398,16 @@ export default function TrainerCoursesPage() {
 
           <div className="course-card-action-row">
             {isDraft ? (
-              <button type="button" className="continue-edit-btn" onClick={() => handlePreview(course.id)}>
+              <button type="button" className="continue-edit-btn" onClick={() => handleContinueEdit(course.id)}>
                 Continue to edit
               </button>
+            ) : isPublished ? (
+              <button type="button" className="course-card-preview" onClick={() => handlePreview(course.id)} disabled={isPending}>
+                {isPending ? 'Loading…' : 'Preview'}
+              </button>
             ) : (
-              <button type="button" className="course-card-preview" onClick={() => handlePreview(course.id)}>
-                Preview
+              <button type="button" className="continue-edit-btn" onClick={() => handleContinueEdit(course.id)}>
+                Edit course
               </button>
             )}
 

@@ -304,6 +304,10 @@ const PAGE_CSS = `
   .ac-body { padding: 1.25rem; }
   .ac-section-title { margin: 0; font-size: 1.15rem; font-weight: 800; color: #111827; }
   .ac-section-sub { margin: 0.4rem 0 1.25rem; color: #6B7280; font-size: 0.875rem; }
+  .ac-saved-assignments { margin: 0 0 1.25rem; padding: 0.9rem 0; border-top: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB; }
+  .ac-saved-assignments-title { margin: 0 0 0.55rem; color: #111827; font-size: 0.875rem; font-weight: 700; }
+  .ac-saved-assignment-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; color: #4B5563; font-size: 0.8125rem; }
+  .ac-saved-assignment-module { color: #9CA3AF; text-align: right; }
 
   .ac-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.85rem; padding: 0.85rem 1rem; margin-bottom: 1.1rem; font-size: 0.85rem; }
   .ac-notice { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; border-radius: 0.85rem; padding: 0.85rem 1rem; margin-bottom: 1.1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
@@ -531,7 +535,7 @@ function VideoUploadChip({
   // A file the trainer just picked always wins over an older finished job or saved URL,
   // so replacing a video shows the new file name instead of "Video uploaded".
   const hasNewFile = Boolean(lesson.videoFile)
-  const uploadedLabel = !hasNewFile && (job?.status === 'done' || Boolean(lesson.existingVideoUrl))
+  const uploadedLabel = !hasNewFile && (job?.status === 'done' || lesson.videoUploaded || Boolean(lesson.existingVideoUrl))
 
   return (
     <label className="ac-upload-chip">
@@ -596,6 +600,8 @@ export default function AddCoursePage() {
 
   const [assignmentTarget, setAssignmentTarget] = useState<{ moduleId: string; lessonId: string } | null>(null)
   const [assignmentFieldError, setAssignmentFieldError] = useState<string | null>(null)
+  const [savedAssignments, setSavedAssignments] = useState<TrainerAssignmentDetail[]>([])
+  const [assignmentLoadError, setAssignmentLoadError] = useState<string | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
@@ -671,6 +677,8 @@ export default function AddCoursePage() {
     async function load() {
       setLoading(true)
       setLoadError(null)
+      setSavedAssignments([])
+      setAssignmentLoadError(null)
 
       const [draftRes, curriculumRes] = await Promise.all([
         coursesManageAPI.getDraft(id as string),
@@ -706,15 +714,22 @@ export default function AddCoursePage() {
           const assignmentDetails = await Promise.all(
             assignmentsRes.data.map((assignment) => trainerAssignmentsAPI.get(draft.slug, assignment.id)),
           )
+          if (cancelled) return
 
-          assignmentDetails.forEach((result) => {
-            if (!result.success) return
-            const detail = result.data as TrainerAssignmentDetail & AssignmentExtras
+          const loadedAssignments = assignmentDetails.flatMap((result) => result.success ? [result.data] : [])
+          setSavedAssignments(loadedAssignments)
+          const failedDetail = assignmentDetails.find((result) => !result.success)
+          if (failedDetail && !failedDetail.success) setAssignmentLoadError(failedDetail.error)
+
+          loadedAssignments.forEach((loadedAssignment) => {
+            const detail = loadedAssignment as TrainerAssignmentDetail & AssignmentExtras
             const assignmentModuleId = detail.module?.id ?? detail.module_id ?? null
             if (!assignmentModuleId) return
             const existing = assignmentsByModule.get(assignmentModuleId) ?? []
             assignmentsByModule.set(assignmentModuleId, [...existing, detail])
           })
+        } else {
+          setAssignmentLoadError(assignmentsRes.error)
         }
       }
 
@@ -735,6 +750,7 @@ export default function AddCoursePage() {
           const detailX = detail as (typeof detail & LessonExtras) | null
           const rawVideoUrl =
             lessonX.video_url ?? lessonX.videoUrl ?? detailX?.video_url ?? detailX?.videoUrl ?? null
+          const rawVideoKey = lesson.video_key ?? detail?.video_key ?? null
           const rawIsPreview = lessonX.is_preview ?? detailX?.is_preview ?? false
 
           return {
@@ -747,7 +763,7 @@ export default function AddCoursePage() {
             existingVideoUrl: rawVideoUrl,
             materialFiles: [],
             existingMaterialsCount: detail?.resource_keys?.length ?? 0,
-            videoUploaded: !!rawVideoUrl,
+            videoUploaded: Boolean(rawVideoUrl || rawVideoKey),
             assignment: loadedAssignment,
             assignmentRemoteId: savedAssignment?.id ?? null,
             isPreview: Boolean(rawIsPreview),
@@ -855,6 +871,7 @@ export default function AddCoursePage() {
       setCourseId(activeCourseId)
       setCourseSlug(result.data.slug)
       setCourseStatus(result.data.status ?? 'draft')
+      setCertificateSetupIssue(result.data.certificate_setup_issue)
     } else {
       const result = await coursesManageAPI.updateDraft(activeCourseId, basics)
       if (!result.success) {
@@ -1089,11 +1106,22 @@ export default function AddCoursePage() {
               setAssignmentFieldError(Array.isArray(finalProjectError) ? finalProjectError.join(' ') : finalProjectError)
               setSaveError(null)
             } else {
-              setSaveError(assignmentResult.error || `Failed to save the assignment for "${lesson.title}".`)
+              const fieldErrorText = assignmentResult.fieldErrors
+                ? Object.entries(assignmentResult.fieldErrors)
+                  .filter(([field]) => field !== 'message' && field !== 'detail')
+                  .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(' ') : messages}`)
+                  .join('\n')
+                : ''
+              setSaveError([assignmentResult.error, fieldErrorText].filter(Boolean).join('\n') || `Failed to save the assignment for "${lesson.title}".`)
             }
             setSaving(false)
             return
           }
+
+          setSavedAssignments((previous) => [
+            ...previous.filter((assignment) => assignment.id !== assignmentResult.data.id),
+            assignmentResult.data,
+          ])
 
           if (assignmentRemoteId && lesson.assignment.isFinal !== lesson.assignment.savedIsFinal) {
             updateLesson(mod.id, lesson.id, {
@@ -1110,7 +1138,12 @@ export default function AddCoursePage() {
           let shouldCreateRequirements = isNewAssignment
           if (!isNewAssignment && !isFinalOnlyUpdate) {
             const existingReqs = await trainerAssignmentsAPI.listRequirements(courseSlug, assignmentRemoteId)
-            shouldCreateRequirements = existingReqs.success && existingReqs.data.length === 0
+            if (!existingReqs.success) {
+              setSaveError(existingReqs.error || `Failed to check submission requirements for "${lesson.title}".`)
+              setSaving(false)
+              return
+            }
+            shouldCreateRequirements = existingReqs.data.length === 0
           }
 
           if (shouldCreateRequirements) {
@@ -1416,9 +1449,7 @@ export default function AddCoursePage() {
 
   const totalModules = form.modules.length
   const totalLessons = form.modules.reduce((sum, m) => sum + m.lessons.length, 0)
-  const hasFinalProject = form.modules.some((module) =>
-    module.lessons.some((lesson) => lesson.assignment?.isFinal),
-  )
+  const hasFinalProject = certificateSetupIssue === null
 
   const assignmentModalModule = assignmentTarget
     ? form.modules.find((m) => m.id === assignmentTarget.moduleId) ?? null
@@ -1709,6 +1740,19 @@ export default function AddCoursePage() {
                   {totalModules} {totalModules === 1 ? 'module' : 'modules'} · {totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}
                   {' · '}Videos upload in the background after you continue.
                 </p>
+
+                {assignmentLoadError && <div className="ac-error" role="alert">Could not load saved assignments: {assignmentLoadError}</div>}
+                {savedAssignments.length > 0 && (
+                  <div className="ac-saved-assignments" aria-label="Saved assignments">
+                    <p className="ac-saved-assignments-title">Saved assignments ({savedAssignments.length})</p>
+                    {savedAssignments.map((assignment) => (
+                      <div className="ac-saved-assignment-row" key={assignment.id}>
+                        <span>{assignment.title}{assignment.is_final ? ' · Final project' : ''}</span>
+                        <span className="ac-saved-assignment-module">{assignment.module?.title ?? 'Module not available'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {form.modules.map((mod, mi) => (
                   <div className="ac-module-card" key={mod.id}>

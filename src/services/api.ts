@@ -1641,7 +1641,7 @@ export interface CourseDraft {
   id: string
   slug: string
   status: CourseDraftStatus
-  certificate_setup_issue?: string | null
+  certificate_setup_issue: string | null
   title: string
   subtitle?: string
   category?: string
@@ -1680,6 +1680,7 @@ export interface CourseLesson {
   order: number
   video_key?: string | null
   video_url?: string | null
+  videoUrl?: string | null
   resource_keys?: string[]
 }
 
@@ -1723,6 +1724,8 @@ export interface ConfirmUploadPayload {
 export interface ConfirmUploadResponse {
   key: string
   url?: string
+  video_url?: string | null
+  videoUrl?: string | null
 }
  
 // ─── Courses Manage API (trainer course-builder wizard) ───────────────────
@@ -2015,10 +2018,10 @@ getCurriculum: async (courseId: string) => {
       if (error instanceof Error && !(error as { response?: unknown }).response) {
         return { success: false as const, error: friendlyError, retryable: true }
       }
-      const { statusCode } = parseApiError(error, 'Upload failed')
+      const { message, statusCode } = parseApiError(error, 'Upload failed')
       return {
         success: false as const,
-        error: friendlyError,
+        error: message || friendlyError,
         statusCode,
         retryable: !statusCode || statusCode >= 500 || statusCode === 429,
       }

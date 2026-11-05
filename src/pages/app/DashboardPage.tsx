@@ -41,6 +41,10 @@ interface CertChecklistItem {
 
 interface CertificationApiResponse {
   eligible: boolean
+  certificate_status?: 'issued' | 'pending' | 'not_eligible'
+  certificate_serial?: string | null
+  certificate_issued_at?: string | null
+  certificate_issue_date?: string | null
   checklist: CertChecklistItem[]
   completion_percentage: number
   next_incomplete: 'modules_complete' | 'project_complete' | null
@@ -51,6 +55,10 @@ interface CourseCertProgress {
   course_slug: string
   course_title: string
   eligible: boolean
+  certificate_status?: 'issued' | 'pending' | 'not_eligible'
+  certificate_serial?: string | null
+  certificate_issued_at?: string | null
+  certificate_issue_date?: string | null
   completion_percentage: number
   next_incomplete: 'modules_complete' | 'project_complete' | null
   checklist: CertChecklistItem[]
@@ -115,6 +123,14 @@ function fmtDueDate(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return 'No due date'
   return `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+}
+
+function fmtCertificateDate(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 const CERT_REQUIREMENT_ORDER: Record<string, number> = {
@@ -536,6 +552,10 @@ export default function DashboardPage() {
             course_slug: course.course_slug,
             course_title: course.title,
             eligible: data.eligible,
+            certificate_status: data.certificate_status,
+            certificate_serial: data.certificate_serial,
+            certificate_issued_at: data.certificate_issued_at,
+            certificate_issue_date: data.certificate_issue_date,
             completion_percentage: data.completion_percentage ?? 0,
             next_incomplete: data.next_incomplete ?? null,
             
@@ -965,22 +985,33 @@ function goToCertification() {
               <div className="cert-left">
                 <div className="cert-badge">
                   <Trophy size={20} color="#F59E0B" />
-                  <span className="cert-badge-label">Certificate</span>
+                  <span className="cert-badge-label">
+                    {activeCert.certificate_status === 'issued' ? 'Issued' : 'Certificate'}
+                  </span>
                 </div>
                 <div className="cert-name">{activeCert.course_title}</div>
 
-                {configMissingNote ? (
-                  <div className="cert-config-note">
-                    This course doesn't have a final assignment configured yet — that's on the course admin, not something you can complete from your side.
+                {activeCert.certificate_status === 'issued' ? (
+                  <div className="cert-desc">
+                    Your certificate was issued{fmtCertificateDate(activeCert.certificate_issued_at ?? activeCert.certificate_issue_date)
+                      ? ` on ${fmtCertificateDate(activeCert.certificate_issued_at ?? activeCert.certificate_issue_date)}`
+                      : ''}.
+                    {activeCert.certificate_serial && <> Serial: <strong>{activeCert.certificate_serial}</strong>.</>}
                   </div>
-                ) : activeCert.eligible ? (
+                ) : activeCert.certificate_status === 'pending' ? (
                   <div className="cert-desc">
                     All certificate requirements are complete. Your certificate is being prepared and will appear in My Certificates when it&apos;s ready.
                   </div>
-                ) : (
+                ) : configMissingNote ? (
+                  <div className="cert-config-note">
+                    This course doesn't have a final assignment configured yet — that's on the course admin, not something you can complete from your side.
+                  </div>
+                ) : activeCert.certificate_status === 'not_eligible' || !activeCert.eligible ? (
                   <div className="cert-desc">
                     You're <strong>{activeCert.completion_percentage}%</strong> to your {activeCert.course_title} certificate — keep going!
                   </div>
+                ) : (
+                  <div className="cert-desc">Certificate status is unavailable. Check My Certificates for the latest status.</div>
                 )}
 
                 {[...activeCert.checklist]
@@ -1009,8 +1040,9 @@ function goToCertification() {
                   </div>
                 )}
                 <button className="cert-view" onClick={goToCertification}>
-  View all requirements <ChevronRight size={14} />
-</button>
+                  {activeCert.certificate_status === 'issued' ? 'View & download certificate' : 'View all requirements'}
+                  <ChevronRight size={14} />
+                </button>
               </div>
               <div className="cert-right">
                 <Ring pct={activeCert.completion_percentage} size={110} stroke={10} color="#2492EB" />

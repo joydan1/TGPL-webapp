@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Download, Search, TrendingUp, CheckCircle2, Clock3, ArrowUpRight, ChevronRight, Plus, Tag, Pencil } from 'lucide-react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { Download, Search, TrendingUp, CheckCircle2, Clock3, ArrowUpRight, ChevronRight, Plus, Tag, Pencil, ChevronLeft } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
 import { adminRevenueAPI } from '../../services/adminRevenueApi'
 import { adminPromoCodesAPI } from '../../services/adminPromoCodesApi'
@@ -99,6 +99,7 @@ const PAGE_CSS = `
 
 const AVATAR_COLORS = ['#2492EB', '#8B5CF6', '#10B981', '#FE9A00', '#EF4444']
 const UNKNOWN_AVATAR_COLOR = '#9CA3AF'
+const TRANSACTIONS_PAGE_SIZE = 100
 
 // `seed` is `learner.id`, which the API sends as `null` for anonymous/guest
 // checkouts or learners whose account no longer exists — the payment record
@@ -178,13 +179,17 @@ export default function AdminRevenuePage() {
 
   // ─── Transactions tab state ───
   const [transactions, setTransactions] = useState<AdminPaymentRow[]>([])
+  const [transactionCount, setTransactionCount] = useState(0)
+  const [transactionPage, setTransactionPage] = useState(1)
   const [summary, setSummary] = useState<RevenueSummaryData | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const loadRequestId = useRef(0)
 
   // ─── Promo codes tab state ───
   const [promoCodes, setPromoCodes] = useState<AdminPromoCode[]>([])
@@ -197,20 +202,21 @@ export default function AdminRevenuePage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    const requestId = ++loadRequestId.current
     setLoading(true)
     setError(null)
-    const params = {
+    const filters = {
       status: statusFilter === 'all' ? undefined : statusFilter,
       search: searchQuery.trim() || undefined,
-      page: 1,
-      page_size: 100,
     }
     const [listResult, summaryResult] = await Promise.all([
-      adminRevenueAPI.listTransactions(params),
-      adminRevenueAPI.getRevenueSummary(params),
+      adminRevenueAPI.listTransactions({ ...filters, page: transactionPage, page_size: TRANSACTIONS_PAGE_SIZE }),
+      adminRevenueAPI.getRevenueSummary(filters),
     ])
+    if (requestId !== loadRequestId.current) return
     if (listResult.success) {
       setTransactions(listResult.data)
+      setTransactionCount(listResult.count)
     } else {
       setError(listResult.error)
     }
@@ -218,7 +224,7 @@ export default function AdminRevenuePage() {
       setSummary(summaryResult.data.summary)
     }
     setLoading(false)
-  }, [statusFilter, searchQuery])
+  }, [statusFilter, searchQuery, transactionPage])
 
     const loadPromoCodes = useCallback(async () => {
     setPromoLoading(true)
@@ -249,6 +255,10 @@ export default function AdminRevenuePage() {
   }, [loadData, searchQuery, pageTab])
 
   useEffect(() => {
+    setTransactionPage(1)
+  }, [statusFilter, searchQuery])
+
+  useEffect(() => {
     if (pageTab === 'promo_codes' && !promoLoaded && !promoLoading) {
       loadPromoCodes()
     }
@@ -261,12 +271,17 @@ export default function AdminRevenuePage() {
 
   async function handleExportCsv() {
     setExporting(true)
-    await adminRevenueAPI.exportTransactions({
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      search: searchQuery.trim() || undefined,
-      format: 'csv',
-    })
-    setExporting(false)
+    setExportError(null)
+    try {
+      const result = await adminRevenueAPI.exportTransactions({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchQuery.trim() || undefined,
+        format: 'csv',
+      })
+      if (!result.success) setExportError(result.error)
+    } finally {
+      setExporting(false)
+    }
   }
 
   function handleTxnChanged(paymentId: string, newStatus: PaymentStatus) {
@@ -311,6 +326,8 @@ export default function AdminRevenuePage() {
             </button>
           )}
         </div>
+
+        {exportError && <div className="rv-error" role="alert">{exportError}</div>}
 
         <div className="rv-page-tabs">
           <button
@@ -467,8 +484,33 @@ export default function AdminRevenuePage() {
               </div>
 
               <div className="rv-footer">
-                <span className="rv-footer-text">Showing {transactions.length} transactions</span>
+                <span className="rv-footer-text">
+                  Showing {transactionCount === 0 ? 0 : (transactionPage - 1) * TRANSACTIONS_PAGE_SIZE + 1}–{Math.min(transactionPage * TRANSACTIONS_PAGE_SIZE, transactionCount)} of {transactionCount} transactions
+                </span>
                 <span className="rv-footer-total">Page total: {formatNairaFromKobo(filteredTotal)}</span>
+                {transactionCount > TRANSACTIONS_PAGE_SIZE && (
+                  <div className="rv-pagination">
+                    <button
+                      type="button"
+                      className="rv-page-btn"
+                      aria-label="Previous transactions page"
+                      disabled={transactionPage <= 1 || loading}
+                      onClick={() => setTransactionPage((current) => Math.max(1, current - 1))}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="rv-footer-text">Page {transactionPage} of {Math.ceil(transactionCount / TRANSACTIONS_PAGE_SIZE)}</span>
+                    <button
+                      type="button"
+                      className="rv-page-btn"
+                      aria-label="Next transactions page"
+                      disabled={transactionPage >= Math.ceil(transactionCount / TRANSACTIONS_PAGE_SIZE) || loading}
+                      onClick={() => setTransactionPage((current) => current + 1)}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>

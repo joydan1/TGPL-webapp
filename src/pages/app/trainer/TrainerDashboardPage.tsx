@@ -56,8 +56,9 @@ const PAGE_CSS = `
   .db-empty-note { color: #9CA3AF; font-size: 0.85rem; text-align: center; padding: 1rem 0; margin: 0; }
 
   .db-course-card { background: #fff; border-radius: 1rem; padding: 1.1rem; box-shadow: 0 16px 46px rgba(15, 23, 42, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); max-width: 340px; }
-  .db-course-img-wrap { position: relative; }
+  .db-course-img-wrap { position: relative; overflow: hidden; border-radius: 1rem; background: #E2E8F0; }
   .db-course-img { width: 100%; height: 176px; object-fit: cover; border-radius: 1rem; background: #E2E8F0; display: block; }
+  .db-course-img-placeholder { width: 100%; height: 176px; background: linear-gradient(135deg, #E8EDF2, #D8E0E8); }
   .db-course-body { margin-top: 1rem; display: grid; gap: 0.5rem; }
   .db-course-cat { margin: 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #2492EB; font-weight: 700; }
   .db-course-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; }
@@ -70,7 +71,7 @@ const PAGE_CSS = `
     max-width: 100%;
     box-sizing: border-box;
   }
-  .db-course-img {
+  .db-course-img, .db-course-img-placeholder {
     height: 140px;   /* was fixed at 176px for all breakpoints */
   }
   .db-course-body {
@@ -372,11 +373,16 @@ export default function TrainerDashboardPage() {
             {activeCourse && (
               <div className="db-course-card">
                 <div className="db-course-img-wrap">
-                  <img
-                    src={activeCourse.thumbnail_url || '/image1.png'}
-                    alt={activeCourse.title}
-                    className="db-course-img"
-                  />
+                  {activeCourse.thumbnail_url ? (
+                    <img
+                      src={activeCourse.thumbnail_url}
+                      alt={`${activeCourse.title} cover`}
+                      className="db-course-img"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className="db-course-img-placeholder" aria-label="No course cover uploaded" />
+                  )}
                  
                 </div>
                 <div className="db-course-body">

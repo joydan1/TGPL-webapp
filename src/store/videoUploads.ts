@@ -12,6 +12,7 @@ export interface UploadJob {
   file: File
   durationSeconds: number | null
   multipartSession: MultipartUploadSession | null
+  confirmed: boolean
   status: UploadStatus
   progress: number     // 0–100
   note: string | null  // e.g. "Connection problem — retrying (1/2)…"
@@ -86,6 +87,7 @@ export const useVideoUploads = create<UploadState>(() => ({
       file,
       durationSeconds,
       multipartSession: null,
+      confirmed: false,
       status: 'queued',
       progress: 0,
       note: null,
@@ -130,7 +132,43 @@ async function runJob(key: string, token: number) {
 
   const controller = new AbortController()
   controllers.set(key, controller)
-  patch(key, { status: 'uploading', progress: 0, note: null, error: null }, token)
+  patch(key, {
+    status: 'uploading',
+    progress: job.confirmed ? 99 : 0,
+    note: job.confirmed ? 'Upload confirmed; checking lesson attachment…' : null,
+    error: null,
+  }, token)
+
+  async function resolveConfirmedAttachment(): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const lessonResult = await coursesManageAPI.getLesson(key)
+      if (lessonResult.success) {
+        const url = lessonResult.data.video_url ?? lessonResult.data.videoUrl ?? null
+        if (url || lessonResult.data.video_key) {
+          patch(key, { status: 'done', progress: 100, note: null, error: null, url }, token)
+          return true
+        }
+      }
+      if (attempt < 2) await sleep(1000, controller.signal)
+      if (controller.signal.aborted) return false
+    }
+
+    patch(key, {
+      status: 'error',
+      confirmed: true,
+      error: 'The upload was confirmed, but the lesson API has not returned its video link. Retry to check again, or refresh the course/contact support. Do not upload the file again yet.',
+      note: null,
+    }, token)
+    return false
+  }
+
+  if (job.confirmed) {
+    await resolveConfirmedAttachment()
+    if (controllers.get(key) === controller) controllers.delete(key)
+    pump()
+    return
+  }
+
   let multipartSession = job.multipartSession
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -153,7 +191,15 @@ async function runJob(key: string, token: number) {
     if (controller.signal.aborted) break
 
     if (res.success) {
-      patch(key, { status: 'done', progress: 100, note: null, error: null, url: res.data.url ?? null }, token)
+      const confirmedUrl = res.data.url ?? res.data.video_url ?? res.data.videoUrl ?? null
+      patch(key, {
+        status: 'done',
+        progress: 100,
+        note: null,
+        error: null,
+        confirmed: true,
+        url: confirmedUrl,
+      }, token)
       break
     }
     if (res.cancelled) break

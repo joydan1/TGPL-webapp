@@ -55,6 +55,8 @@ const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage')
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'))
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage'))
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'))
+const AdminForgotPasswordPage = lazy(() => import('./pages/admin/Adminforgotpasswordpage'))
+const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'))
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'))
 const AdminCommunityPage = lazy(() => import('./pages/admin/AdminCommunityPage'))
 const AdminCourseManagePage = lazy(() => import('./pages/admin/AdminCourseManagePage'))
@@ -65,7 +67,7 @@ const AdminSystemStatusPage = lazy(() => import('./pages/admin/AdminSystemStatus
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  requiredRole?: 'learner' | 'trainer' | 'admin'
+  requiredRole?: 'learner' | 'trainer' | 'admin' | ('learner' | 'trainer' | 'admin')[]
   requiredPermission?: keyof NonNullable<import('./types').User['permissions']>
 }
 
@@ -87,7 +89,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
     user?.role === 'admin'
       ? (user.available_modes ?? ['admin'])
       : user?.role ? [user.role] : []
-  if (requiredRole && !modes.includes(requiredRole)) {
+  const requiredRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : []
+  if (requiredRoles.length > 0 && !requiredRoles.some((role) => modes.includes(role))) {
     return <Navigate to={ROUTES.FORBIDDEN} replace />
   }
 
@@ -404,7 +407,7 @@ function App() {
         <Route
           path="/courses/:slug"
           element={
-            <ProtectedRoute requiredRole="learner">
+            <ProtectedRoute requiredRole={['learner', 'trainer']}>
               <CourseDetailPage />
             </ProtectedRoute>
           }
@@ -492,6 +495,8 @@ function App() {
           }
         />
         <Route path={ROUTES.ADMIN_LOGIN} element={<AdminLoginPage />} />
+        <Route path={ROUTES.ADMIN_FORGOT_PASSWORD} element={<AdminForgotPasswordPage />} />
+        <Route path={ROUTES.ADMIN_RESET_PASSWORD} element={<AdminResetPasswordPage />} />
         <Route
           path={ROUTES.ADMIN_SETTINGS}
           element={

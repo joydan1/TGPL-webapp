@@ -28,6 +28,7 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
   .cc-state-note { text-align: center; color: #99A1AF; font-size: 13px; padding: 3rem 1rem; }
   .cc-state-note.error { color: #DC2626; }
+  .cc-action-error { margin: 0.75rem 1.5rem 0; padding: 0.65rem 0.85rem; border: 1px solid #FECACA; border-radius: 0.6rem; background: #FEF2F2; color: #B91C1C; font-size: 0.8rem; }
 
   .cc-msg-row { display: flex; align-items: flex-start; gap: 12px; max-width: 640px; }
   .cc-msg-row.own { margin-left: auto; flex-direction: row-reverse; }
@@ -273,7 +274,7 @@ interface ThreadPanelProps {
   currentUserInitials: string
   viewerRole: CommunityRole
   onClose: () => void
-  onSendReply: (body: string) => void
+  onSendReply: (body: string) => void | boolean | Promise<void | boolean>
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
   reactions: Record<string, CommunityReaction[]>
@@ -287,11 +288,11 @@ function ThreadPanel({
 }: ThreadPanelProps) {
   const [draft, setDraft] = useState('')
 
-  function submit() {
+  async function submit() {
     const body = draft.trim()
     if (!body || sending) return
-    onSendReply(body)
-    setDraft('')
+    const sent = await onSendReply(body)
+    if (sent !== false) setDraft('')
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -377,8 +378,9 @@ export interface CommunityChatPanelProps {
   rules: CommunityRule[] | null
   loading: boolean
   error: string | null
+  actionError?: string | null
   sending: boolean
-  onSend: (body: string) => void
+  onSend: (body: string) => void | boolean | Promise<void | boolean>
   onDeleteMine: (messageId: string) => void
   onDeleteModerator: (messageId: string) => void
 
@@ -390,12 +392,12 @@ export interface CommunityChatPanelProps {
   threadSending: boolean
   onOpenThread: (topLevelMessage: CommunityMessage) => void
   onCloseThread: () => void
-  onSendReply: (body: string) => void
+  onSendReply: (body: string) => void | boolean | Promise<void | boolean>
 }
 
 export default function CommunityChatPanel({
   role, currentUserId, currentUserInitials, messages, activeMembers, totalMembers, rules,
-  loading, error, sending, onSend, onDeleteMine, onDeleteModerator,
+  loading, error, actionError, sending, onSend, onDeleteMine, onDeleteModerator,
   openThreadParent, threadReplies, threadLoading, threadError, threadSending,
   onOpenThread, onCloseThread, onSendReply,
 }: CommunityChatPanelProps) {
@@ -437,11 +439,11 @@ export default function CommunityChatPanel({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function submit() {
+  async function submit() {
     const body = draft.trim()
     if (!body || sending) return
-    onSend(body)
-    setDraft('')
+    const sent = await onSend(body)
+    if (sent !== false) setDraft('')
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -480,6 +482,8 @@ export default function CommunityChatPanel({
           </ul>
         </div>
       )}
+
+      {actionError && <p className="cc-action-error" role="alert">{actionError}</p>}
 
       <div className="cc-messages">
         {loading && <p className="cc-state-note">Loading messages…</p>}

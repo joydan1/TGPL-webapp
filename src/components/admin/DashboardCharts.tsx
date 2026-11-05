@@ -20,6 +20,13 @@ function formatNaira(amount: number) {
   return `₦${amount.toLocaleString('en-NG')}`
 }
 
+function formatCompactNaira(amountKobo: number) {
+  const amountNaira = amountKobo / 100
+  if (amountNaira >= 1_000_000) return `₦${(amountNaira / 1_000_000).toFixed(1)}M`
+  if (amountNaira >= 1_000) return `₦${(amountNaira / 1_000).toFixed(1)}K`
+  return `₦${Math.round(amountNaira).toLocaleString('en-NG')}`
+}
+
 export default function DashboardCharts({
   enrollmentTrend,
   revenueMonthly,
@@ -96,7 +103,7 @@ export default function DashboardCharts({
                 tick={{ fontSize: 11, fill: '#9CA3AF' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(value) => `₦${(value / 100_000_000).toFixed(0)}M`}
+                tickFormatter={(value) => formatCompactNaira(Number(value))}
               />
               <Tooltip formatter={(value) => [formatNaira(Number(value) / 100), 'Revenue']} />
               <Bar dataKey="revenue_kobo" radius={[6, 6, 0, 0]}>

@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "The Global Project Leaders",
+  "short_name": "TGPL",
+  "description": "Training, consulting, and community for project leaders.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2492eb",
+  "categories": ["education", "business"],
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

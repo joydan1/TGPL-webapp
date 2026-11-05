@@ -171,7 +171,7 @@ export default function AdminForgotPasswordPage() {
                 Reset your password
               </h2>
               <p style={{ color: 'rgba(0,0,0,0.65)', fontSize: '1rem', lineHeight: 1.7, margin: 0 }}>
-                Enter your email and we'll send you a link to reset your password.
+                Enter your email. If it belongs to an administrator account, reset instructions will be sent.
               </p>
             </div>
           )}
@@ -193,10 +193,10 @@ export default function AdminForgotPasswordPage() {
                 <CheckCircleIcon />
               </div>
               <h2 style={{ color: 'var(--black)', fontSize: '1.75rem', lineHeight: 1.1, marginBottom: '0.75rem' }}>
-                Check your email
+                Request received
               </h2>
               <p style={{ color: 'rgba(0,0,0,0.65)', fontSize: '1rem', lineHeight: 1.6, margin: '0 0 1.5rem' }}>
-                We've sent a password reset link to <br />
+                If this address belongs to an administrator account, reset instructions will be sent to <br />
                 <strong style={{ color: 'var(--black)' }}>{email}</strong>
               </p>
 
@@ -213,9 +213,9 @@ export default function AdminForgotPasswordPage() {
                   Next steps:
                 </p>
                 <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'rgba(0,0,0,0.7)', fontSize: '0.9rem', lineHeight: 1.9 }}>
-                  <li>Check your email inbox</li>
-                  <li>Click the reset link (valid for 1 hour)</li>
-                  <li>Create a new password</li>
+                  <li>Check your inbox if the account is eligible</li>
+                  <li>Use the reset link within 1 hour</li>
+                  <li>If no message arrives, confirm the address or contact your administrator</li>
                 </ul>
               </div>
 

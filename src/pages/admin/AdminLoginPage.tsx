@@ -256,7 +256,7 @@ export default function AdminLoginPage() {
             </form>
 
             <div className="login-footer">
-              <p>New here? <Link to={ROUTES.ADMIN_SIGNUP}>Create an account</Link></p>
+              <p>Admin access is provided by invitation from an existing administrator.</p>
             </div>
           </div>
 

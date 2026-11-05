@@ -1,12 +1,7 @@
 // types/adminSettings.ts
 //
-// Field availability:
-// Every FieldConfig carries `available`. `true` means the key exists on the
-// real backend schema (GET/PATCH /api/v1/admin/settings/, confirmed against
-// Swagger on 2026-08-18). `false` means the field only exists in the Figma
-// design / the (stale) JOY_COMPLETE_ADMIN_SETTINGS_GUIDE.md — it renders
-// disabled with a "Not available yet" badge and is NEVER included in the
-// PATCH payload. Flip to `true` once backend confirms + ships the field.
+// Every FieldConfig carries `available`; unavailable fields are rendered as
+// disabled and are never included in the PATCH payload.
 
 export interface SystemSettings {
   // ── Confirmed on backend ──────────────────────────────────────────────
@@ -14,25 +9,17 @@ export interface SystemSettings {
   updated_by_name: string | null
 
   platform_name: string
-  platform_url: string
   support_email: string
-  max_concurrent_users: number
 
-  email_provider: string // "resend" | "sendgrid" | "postmark"
   email_from_name: string
   email_from_address: string
 
   enable_live_sessions: boolean
-  enable_tutor_booking: boolean
-  enable_assignments: boolean
-  enable_certificates: boolean
   enable_notifications_email: boolean
-  enable_notifications_inapp: boolean
   enable_notifications_push: boolean
   enable_refunds: boolean
 
   inactivity_threshold_days: number
-  assignment_late_threshold_hours: number
 
   primary_color: string
   secondary_color: string
@@ -142,12 +129,6 @@ export interface SectionConfig {
   groups: FieldGroup[]
 }
 
-export const EMAIL_PROVIDER_OPTIONS: SelectOption[] = [
-  { value: 'resend', label: 'Resend' },
-  { value: 'sendgrid', label: 'SendGrid' },
-  { value: 'postmark', label: 'Postmark' },
-]
-
 export const TIMEZONE_OPTIONS: SelectOption[] = [
   { value: 'UTC', label: 'UTC' },
   { value: 'Africa/Lagos', label: 'Africa/Lagos' },
@@ -190,9 +171,7 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         description: 'Core platform identity and regional defaults',
         fields: [
           { key: 'platform_name', label: 'Platform name', help: 'Shown in emails, certificates and the browser tab', type: 'text', available: true },
-          { key: 'platform_url', label: 'Platform URL', help: 'The public base URL of the platform', type: 'url', available: true },
           { key: 'support_email', label: 'Support email', help: 'Learners and trainers contact this address for help', type: 'email', available: true },
-          { key: 'max_concurrent_users', label: 'Max concurrent users', help: 'Upper bound before new sign-ins are throttled', type: 'number', min: 1, available: true },
           { key: 'default_timezone', label: 'Default timezone', help: 'Used for scheduling, cohorts and notification delivery', type: 'select', options: TIMEZONE_OPTIONS, available: false },
           { key: 'locale', label: 'Locale', help: 'Number and date formatting for the platform', type: 'select', options: LOCALE_OPTIONS, available: false },
         ],
@@ -201,7 +180,6 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         title: 'Email Configuration',
         description: 'Provider and sender identity for outgoing platform email',
         fields: [
-          { key: 'email_provider', label: 'Email provider', type: 'select', options: EMAIL_PROVIDER_OPTIONS, available: true },
           { key: 'email_from_name', label: 'Email from name', type: 'text', available: true },
           { key: 'email_from_address', label: 'Email from address', type: 'email', available: true },
         ],
@@ -211,10 +189,7 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         description: 'Global on/off switches for major platform features',
         fields: [
           { key: 'enable_live_sessions', label: 'Enable live sessions', type: 'boolean', showOnOffLabel: true, available: true },
-          { key: 'enable_tutor_booking', label: 'Enable tutor booking', type: 'boolean', showOnOffLabel: true, available: true },
-          { key: 'enable_assignments', label: 'Enable assignments', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_email', label: 'Enable email notifications', type: 'boolean', showOnOffLabel: true, available: true },
-          { key: 'enable_notifications_inapp', label: 'Enable in-app notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_push', label: 'Enable push notifications', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_refunds', label: 'Enable refunds', type: 'boolean', disabled: true, showOnOffLabel: true, available: true },
         ],
@@ -224,7 +199,6 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         description: 'Numeric thresholds that drive reminders and nudges',
         fields: [
           { key: 'inactivity_threshold_days', label: 'Inactivity threshold (days)', type: 'number', min: 1, available: true },
-          { key: 'assignment_late_threshold_hours', label: 'Assignment late threshold (hours)', type: 'number', min: 0, available: true },
         ],
       },
       {
@@ -271,7 +245,6 @@ export const SETTINGS_SECTIONS: SectionConfig[] = [
         fields: [
           { key: 'enable_notifications_email', label: 'Email notifications', help: 'Transactional and marketing emails', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_sms', label: 'SMS notifications', help: 'OTPs and critical alerts via SMS', type: 'boolean', disabled: true, showOnOffLabel: true, available: false },
-          { key: 'enable_notifications_inapp', label: 'In-app notifications', help: 'Bell icon alerts inside the learner and admin portals', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_push', label: 'Push notifications', help: 'Browser and device push alerts', type: 'boolean', showOnOffLabel: true, available: true },
           { key: 'enable_notifications_slack', label: 'Slack integration', help: 'Post admin alerts to a configured Slack channel', type: 'boolean', showOnOffLabel: true, available: false },
           { key: 'slack_webhook_url', label: 'Slack webhook URL', type: 'text', showIf: 'enable_notifications_slack', available: false },

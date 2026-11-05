@@ -152,6 +152,7 @@ export default function TrainerCourseManagePage() {
     async function load() {
       setLoading(true)
       setLoadError(null)
+      setCurriculumError(null)
       const [draftRes, curriculumRes] = await Promise.all([
         coursesManageAPI.getDraft(courseId),
         coursesManageAPI.getCurriculum(courseId),
@@ -177,6 +178,8 @@ export default function TrainerCourseManagePage() {
         })
         savedTitles.current = titles
         setModules(loaded)
+      } else {
+        setCurriculumError(curriculumRes.error)
       }
       setLoading(false)
     }
