@@ -32,7 +32,6 @@ const PAGE_CSS = `
   .rv-pending-avatar { width: 42px; height: 42px; border-radius: 999px; object-fit: cover; background: #E2E8F0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 700; }
   .rv-pending-name-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .rv-pending-name { margin: 0; font-weight: 700; color: #111827; font-size: 0.95rem; }
-  .rv-overdue-badge { background: #FEF3C7; color: #D97706; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; }
   .rv-pending-assignment { margin: 0.35rem 0 0; color: #2492EB; font-weight: 600; font-size: 0.875rem; }
   .rv-pending-meta { margin: 0.35rem 0 0; color: #9CA3AF; font-size: 0.8rem; }
   .rv-grade-btn { width: 100%; border: none; border-top: 1px solid #F3F4F6; background: none; color: #2492EB; font-weight: 700; cursor: pointer; padding: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.875rem; }
@@ -312,7 +311,6 @@ export default function TrainerReviewsPage() {
                   <div style={{ minWidth: 0 }}>
                     <div className="rv-pending-name-row">
                       <p className="rv-pending-name">{review.learner_name}</p>
-                      {review.is_late && <span className="rv-overdue-badge">Overdue</span>}
                     </div>
                     <p className="rv-pending-assignment">{review.assignment_title}</p>
                     <p className="rv-pending-meta">{review.course_title} · {formatRelativeDate(review.submitted_at)}</p>
@@ -386,7 +384,6 @@ export default function TrainerReviewsPage() {
                     <p className="rv-grade-name">{activeReview.learner_name}</p>
                     <p className="rv-grade-assignment-title">{activeReview.assignment_title}</p>
                   </div>
-                  {activeReview.is_late && <span className="rv-overdue-badge">Overdue</span>}
                 </div>
                 <div className="rv-grade-meta">
                   <span>{formatRelativeDate(activeReview.submitted_at)}</span>

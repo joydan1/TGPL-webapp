@@ -1,6 +1,6 @@
 // components/nudges/NudgeComponents.tsx
 import {
-  History, AlertTriangle, Radio, CalendarClock, Award, X, Play, Send, Video, CalendarPlus,
+  History, Radio, CalendarClock, Award, X, Play, Video, CalendarPlus,
 } from 'lucide-react'
 
 export const NUDGE_CSS = `
@@ -60,41 +60,6 @@ export function InactivityNudge({ daysInactive, firstName, onResume, onDismiss }
               </button>
             )}
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── DeadlineUrgencyNudge — inject into the deadline/assignments section ────
-interface DeadlineUrgencyNudgeProps extends NudgeBaseProps {
-  assignmentTitle: string
-  courseTitle: string
-  onSubmitNow: () => void
-}
-
-export function DeadlineUrgencyNudge({ assignmentTitle, courseTitle, onSubmitNow, onDismiss }: DeadlineUrgencyNudgeProps) {
-  return (
-    <div className="nudge-card" style={{ background: '#FEF2F2', border: '1px solid #FFC9C9', alignItems: 'flex-start' }}>
-      <div className="nudge-icon-wrap" style={{ background: '#FFE2E2', marginTop: 2 }}>
-        <AlertTriangle size={17} color="#FB2C36" />
-      </div>
-      <div className="nudge-body">
-        <div className="nudge-head">
-          <p className="nudge-title" style={{ color: '#C10007' }}>Assignment missed</p>
-          {onDismiss && (
-            <button className="nudge-dismiss" onClick={onDismiss} aria-label="Dismiss">
-              <X size={13} color="#FFA2A2" />
-            </button>
-          )}
-        </div>
-        <p className="nudge-desc" style={{ color: 'rgba(231,0,11,0.8)' }}>
-         {assignmentTitle} ({courseTitle}) — you need to complete all assignments to get your certificate.
-         </p>
-        <div className="nudge-actions">
-          <button className="nudge-btn" style={{ background: '#FB2C36', color: '#fff' }} onClick={onSubmitNow}>
-            Submit now <Send size={11} />
-          </button>
         </div>
       </div>
     </div>

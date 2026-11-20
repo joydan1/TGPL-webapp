@@ -7,6 +7,7 @@ import Input from '../../components/Input'
 import Button from '../../components/Button'
 import Alert from '../../components/Alert'
 import { ROUTES } from '../../constants/routes'
+import { getPasswordError, isPasswordValid, PASSWORD_GUIDANCE, PASSWORD_PLACEHOLDER } from '../../utils/password'
 
 type StrengthLevel = { score: number; label: string; color: string }
 type ContactFormData = { name: string; email: string; subject: string; message: string }
@@ -16,11 +17,12 @@ const emptyCode = (): string[] => Array(CODE_LENGTH).fill('')
 
 function getPasswordStrength(password: string): StrengthLevel {
   if (!password) return { score: 0, label: '', color: '' }
-  let score = 0
-  if (password.length >= 8) score++
-  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++
-  if (/[0-9]/.test(password)) score++
-  if (/[^A-Za-z0-9]/.test(password)) score++
+  const score = [
+    password.length >= 8,
+    /[A-Za-z]/.test(password),
+    /[0-9]/.test(password),
+    password.length >= 12,
+  ].filter(Boolean).length
   const levels: StrengthLevel[] = [
     { score: 1, label: 'Weak', color: 'var(--danger)' },
     { score: 2, label: 'Fair', color: 'var(--warning)' },
@@ -107,8 +109,8 @@ export default function SignupPage() {
     formData.firstName.trim().length > 0 &&
     formData.lastName.trim().length > 0 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-    formData.password.length >= 8 &&
-    formData.confirmPassword.length > 0 &&
+    isPasswordValid(formData.password) &&
+    formData.password === formData.confirmPassword &&
     termsAccepted &&
     (role === 'learner' || formData.trainerCode.length === CODE_LENGTH)
 
@@ -121,11 +123,8 @@ export default function SignupPage() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address'
     }
-    if (!formData.password) {
-      errors.password = 'Password is required'
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters'
-    }
+    const passwordError = getPasswordError(formData.password)
+    if (passwordError) errors.password = passwordError
     if (!formData.confirmPassword) {
       errors.confirmPassword = 'Please confirm your password'
     } else if (formData.password !== formData.confirmPassword) {
@@ -173,7 +172,11 @@ export default function SignupPage() {
     const trainerCodeError = result.fieldErrors?.trainer_code ?? result.fieldErrors?.trainerCode
     if (trainerCodeError) {
       const message = Array.isArray(trainerCodeError) ? trainerCodeError[0] : trainerCodeError
+      setUniqueCode(emptyCode())
+      setFormData((prev) => ({ ...prev, trainerCode: '' }))
       setFormErrors((prev) => ({ ...prev, trainerCode: message }))
+    } else if (result.error === "That name isn't available. Please use your real name.") {
+      setFormErrors((prev) => ({ ...prev, firstName: result.error! }))
     }
   }
 
@@ -463,7 +466,8 @@ export default function SignupPage() {
         .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 
         .password-wrapper { position: relative; }
-        .eye-button { position: absolute; right: 0.75rem; top: 2.375rem; background: none; border: none; cursor: pointer; color: #999999; display: flex; align-items: center; justify-content: center; padding: 0; transition: color 300ms ease; }
+        .password-wrapper input { padding-right: 2.75rem !important; }
+        .eye-button { position: absolute; z-index: 2; right: 0.75rem; top: 2.875rem; background: none; border: none; cursor: pointer; color: #999999; display: flex; align-items: center; justify-content: center; padding: 0.25rem; transition: color 300ms ease; }
         .eye-button:hover { color: #666666; }
         .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
 
@@ -568,7 +572,7 @@ export default function SignupPage() {
                   </div>
                   <h2 className="signup-title" style={{ marginBottom: '0.5rem' }}>Request received</h2>
                   <p style={{ color: '#4a4a4a', lineHeight: 1.6, fontSize: '0.9rem', margin: '0 0 1.5rem' }}>
-                    Our team will review your request. If approved, we'll email you a trainer access code — it's valid for 7 days.
+                    Our team will review your request. Expect an email with either a trainer access code or an interview invitation.
                   </p>
                   <button type="button" className="go-back-link" style={{ marginBottom: 0, justifyContent: 'center', width: '100%' }} onClick={handleBackFromContact}>
                     <ChevronLeft size={16} /> Back to signup
@@ -687,8 +691,8 @@ export default function SignupPage() {
                   )}
 
                   <div className="password-wrapper">
-                    <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={formData.password} onChange={handleInputChange} error={formErrors.password} />
-                    <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder={PASSWORD_PLACEHOLDER} value={formData.password} onChange={handleInputChange} error={formErrors.password} hint={PASSWORD_GUIDANCE} />
+                    <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
@@ -696,7 +700,7 @@ export default function SignupPage() {
 
                   <div className="password-wrapper">
                     <Input label="Confirm password" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter your password" value={formData.confirmPassword} onChange={handleInputChange} error={formErrors.confirmPassword} />
-                    <button type="button" className="eye-button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
+                    <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
                       {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>

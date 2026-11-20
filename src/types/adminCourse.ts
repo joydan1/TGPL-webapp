@@ -46,7 +46,7 @@ export interface AdminCourseRow {
   enrollment_count: number
   completion_count: number
   completion_percentage: number
-  revenue_kobo: number
+  revenue_kobo?: number
   is_final_assignment_set: boolean
   certificate_setup_issue?: string | null
   has_live_sessions: boolean
@@ -113,7 +113,6 @@ export type ArchiveReason =
   | 'low_completion'
   | 'outdated_content'
   | 'trainer_departed'
-  | 'policy_violation'
   | 'other'
 
 export interface ArchiveCoursePayload {
@@ -124,5 +123,5 @@ export interface CatalogStats {
   total_courses: number
   published: number
   draft: number
-  total_revenue_kobo: number
+  total_revenue_kobo?: number
 }

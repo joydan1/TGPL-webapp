@@ -59,6 +59,7 @@ export const useAuth = () => {
         learner_profile: userData.learner_profile || null,
         avatar_url: userData.avatar_url || null,
         permissions: userData.permissions || null,
+        is_super_admin: userData.is_super_admin === true,
         available_modes: userData.available_modes ?? [],
       }
       store.login(user, result.access, result.refresh)
@@ -191,6 +192,7 @@ export const useAuth = () => {
           learner_profile: userData.learner_profile || null,
           avatar_url: userData.avatar_url || null,
           permissions: userData.permissions || null,
+          is_super_admin: userData.is_super_admin === true,
           available_modes: userData.available_modes ?? [],
         }
         store.setUser(user)
@@ -227,6 +229,7 @@ export const useAuth = () => {
           learner_profile: userData.learner_profile || null,
           avatar_url: userData.avatar_url || null,
           permissions: userData.permissions || null,
+          is_super_admin: userData.is_super_admin === true,
           available_modes: userData.available_modes ?? [],
         }
         store.setUser(user)

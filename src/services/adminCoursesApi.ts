@@ -3,7 +3,6 @@
 import apiClient, { parseApiError } from '../services/api'
 import type {
   AdminCourseDetail,
-  AdminCourseRow,
   ArchiveCoursePayload,
   CatalogStats,
   ListCoursesParams,
@@ -107,11 +106,9 @@ export const adminCoursesAPI = {
     }
   },
 
-  // Total/published/draft come cheaply from `count` on page_size=1 filtered
-  // requests. Revenue has no aggregate endpoint at all, so it's summed by
-  // paging through every course. Returns the first failing request's error
-  // as-is if any of the four calls fail.
-  aggregateCatalogStats: async (): Promise<ApiResult<CatalogStats>> => {
+  // Revenue has no aggregate endpoint, so only admins with revenue access page
+  // through every course to calculate it.
+  aggregateCatalogStats: async (includeRevenue = true): Promise<ApiResult<CatalogStats>> => {
     const [totalRes, publishedRes, draftRes] = await Promise.all([
       adminCoursesAPI.listCourses({ page_size: 1 }),
       adminCoursesAPI.listCourses({ page_size: 1, status: 'published' }),
@@ -123,16 +120,19 @@ export const adminCoursesAPI = {
     if (!draftRes.success) return draftRes
 
     let totalRevenueKobo = 0
-    let page = 1
-    for (let i = 0; i < MAX_REVENUE_PAGES; i++) {
-      const pageRes = await adminCoursesAPI.listCourses({ page, page_size: 100 })
-      if (!pageRes.success) return pageRes
-      totalRevenueKobo += pageRes.data.results.reduce(
-        (sum: number, c: AdminCourseRow) => sum + c.revenue_kobo,
-        0,
-      )
-      if (!pageRes.data.next) break
-      page += 1
+    let revenueAvailable = includeRevenue
+    if (includeRevenue) {
+      let page = 1
+      for (let i = 0; i < MAX_REVENUE_PAGES; i++) {
+        const pageRes = await adminCoursesAPI.listCourses({ page, page_size: 100 })
+        if (!pageRes.success) return pageRes
+        for (const course of pageRes.data.results) {
+          if (typeof course.revenue_kobo !== 'number') revenueAvailable = false
+          else totalRevenueKobo += course.revenue_kobo
+        }
+        if (!pageRes.data.next) break
+        page += 1
+      }
     }
 
     return {
@@ -141,7 +141,7 @@ export const adminCoursesAPI = {
         total_courses: totalRes.data.count,
         published: publishedRes.data.count,
         draft: draftRes.data.count,
-        total_revenue_kobo: totalRevenueKobo,
+        ...(revenueAvailable ? { total_revenue_kobo: totalRevenueKobo } : {}),
       },
     }
   },

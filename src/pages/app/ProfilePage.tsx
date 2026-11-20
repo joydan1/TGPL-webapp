@@ -266,9 +266,10 @@ export default function SettingsProfilePage() {
       setOriginal(response.data)
       await loadCurrentUser()
       showToast('Profile updated successfully', 'success')
-    } catch (err) {
-      setError('Failed to save changes. Please try again.')
-      showToast('Failed to update profile. Please try again.', 'error')
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || 'Failed to save changes. Please try again.'
+      setError(message)
+      showToast(message, 'error')
     } finally {
       setSaving(false)
     }

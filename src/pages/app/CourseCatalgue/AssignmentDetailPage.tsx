@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  BookOpen, Calendar,
+  BookOpen,
   CheckCircle2, AlertTriangle, Upload, X, Plus,
   FileText, FileSpreadsheet, Presentation, Download,
   Info, BookMarked, FileCheck2,
@@ -54,9 +54,7 @@ interface RawAssignmentDetail {
   module_id: string
   title: string
   instructions: string
-  deadline: string | null
   max_attempts: number
-  accept_late: boolean
   grading_criteria: unknown
   order: number
   requirements: AssignmentRequirement[]
@@ -182,7 +180,6 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
     course_slug: ctx.courseSlug ?? '',
     course_title: ctx.courseTitle ?? '',
     module_title: ctx.moduleTitle ?? '',
-    due_at: raw.deadline ?? '',
     points: 0,
     grade_status: deriveGradeStatus(attempt),
     grade_weight_percent: 0,
@@ -221,14 +218,6 @@ function normalizeAssignment(raw: RawAssignmentDetail, ctx: AssignmentNavContext
       max_files: requirements.length,
     },
   }
-}
-
-function fmtDueDate(iso: string): string {
-  if (!iso) return 'No due date'
-  const d = new Date(iso)
-  const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-  const timePart = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
-  return `${datePart} · ${timePart} WAT`
 }
 
 function fmtShortDate(iso: string): string {
@@ -583,7 +572,7 @@ function SubmissionModal({
                   </span>
                 </div>
                 <span className="req-slot-hint">
-                  {req.allowed_file_types} · up to {toMB(req.max_bytes)} MB
+                  {(req.allowed_file_types_labels?.length ? req.allowed_file_types_labels : req.allowed_file_types).join(', ')} · up to {toMB(req.max_bytes)} MB
                   {req.naming_hint ? ` · Name your file: ${req.naming_hint}` : ''}
                 </span>
 
@@ -771,13 +760,12 @@ async function handleResourceDownload(resourceId: string, resourceTitle: string)
                 </div>
                 <div className={`status-pill ${assignment.status}`}>
                   {assignment.status === 'not_started' && <><span style={{ width: 6, height: 6, borderRadius: '50%', border: '1.5px solid #9CA3AF', display: 'inline-block' }} />Not started</>}
-                  {assignment.status === 'in_progress' && <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 11-3-6.7" /><polyline points="21,3 21,9 15,9" /></svg>In progress</>}
+                  {assignment.status === 'in_progress' && <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 11-3-6.7" /><polyline points="21,3 21,9 15,9" /></svg>{assignment.feedback?.type === 'revision_requested' ? 'Revision requested' : 'Submitted'}</>}
                   {assignment.status === 'graded' && <><CheckCircle2 size={12} />Graded</>}
                 </div>
               </div>
 
               <div className="meta-row">
-                <span className="meta-item"><Calendar size={12} />{fmtDueDate(assignment.due_at)}</span>
                 {hasPoints && <span className="meta-item meta-pts">{assignment.points} pts</span>}
                 {hasWeight && <span className="meta-item">· {assignment.grade_weight_percent}% of final grade</span>}
                 {assignment.max_attempts > 0 && (

@@ -4,7 +4,7 @@ import {
   Play, Pause, CheckCircle, Lock,
   Volume2, VolumeX, Captions, Settings2, Maximize, SkipBack, SkipForward,
   FileText, FileSpreadsheet, Presentation, Download, Headphones,
-  X, Coffee, ChevronRight, ChevronLeft, ChevronDown,
+  X, Coffee, ChevronRight, ChevronLeft, ChevronDown, PictureInPicture2,
 } from 'lucide-react'
 import { ROUTES, RouteBuilder } from '../../../constants/routes'
 import { coursesAPI, assignmentsAPI, liveSessionsAPI } from '../../../services/api'
@@ -138,6 +138,19 @@ const PAGE_CSS = `
   .state-screen.error { color: #EF4444; }
 
   .player-card { width: 100%; background: #111827; border-radius: 1.25rem; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.12); }
+  .lesson-player-anchor { width: 100%; }
+  .player-card.mini-player { position: fixed; right: 1rem; bottom: 1rem; z-index: 450; width: min(360px, calc(100vw - 2rem)); border-radius: 0.875rem; box-shadow: 0 12px 36px rgba(0,0,0,0.32); }
+  .player-card.mini-player .video-wrap { aspect-ratio: 16/9; }
+  .player-card.mini-player .video-back,
+  .player-card.mini-player .video-title-overlay,
+  .player-card.mini-player .center-controls,
+  .player-card.mini-player .video-controls { display: none; }
+  .mini-player-bar { display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0.75rem; background: #111827; color: #fff; }
+  .mini-player-play, .mini-player-close { flex: 0 0 34px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: rgba(255,255,255,0.12); color: #fff; cursor: pointer; }
+  .mini-player-play:hover, .mini-player-close:hover { background: rgba(255,255,255,0.22); }
+  .mini-player-info { min-width: 0; flex: 1; }
+  .mini-player-title { overflow: hidden; color: #fff; font-size: 0.8rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+  .mini-player-time { margin-top: 0.15rem; color: #9CA3AF; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
   .video-wrap { position: relative; width: 100%; aspect-ratio: 16/7.2; overflow: hidden; background: #000; cursor: pointer; }
   .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
   .video-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 55%, rgba(0,0,0,0.65) 100%); pointer-events: none; }
@@ -380,6 +393,7 @@ const PAGE_CSS = `
     /* Ask-for-help popover: clamp width on small screens */
     .ask-help-popover { width: min(320px, calc(100vw - 2rem)); right: 0; left: auto; }
     .booking-modal-card { max-height: calc(100dvh - 1.5rem); }
+    .player-card.mini-player { right: 0.75rem; bottom: calc(72px + env(safe-area-inset-bottom)); width: min(320px, calc(100vw - 1.5rem)); }
   }
 `
 
@@ -403,6 +417,7 @@ export default function CourseLearnPage() {
     (location.state as { courseTitle?: string; moduleTitle?: string; thumbnailUrl?: string }) ?? {}
 
   const [lesson, setLesson]   = useState<LessonDetailResponse | null>(null)
+  const [courseTrainerName, setCourseTrainerName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 const [paywalled, setPaywalled] = useState(false)
@@ -414,12 +429,19 @@ const [paywalled, setPaywalled] = useState(false)
 
   // ── Video ──
   const videoRef                              = useRef<HTMLVideoElement | null>(null)
+  const playerAnchorRef                       = useRef<HTMLDivElement | null>(null)
+  const [miniPlayerVisible, setMiniPlayerVisible] = useState(false)
+  const [miniPlayerDismissed, setMiniPlayerDismissed] = useState(false)
+  const [playerAnchorHeight, setPlayerAnchorHeight] = useState(0)
   const [isPlaying, setIsPlaying]             = useState(false)
   const [currentTime, setCurrentTime]         = useState(0)
   const [duration, setDuration]               = useState(0)
   const [volume, setVolume]                   = useState(1)
   const [muted, setMuted]                     = useState(false)
   const [buffering, setBuffering]             = useState(false)
+  const [pictureInPicture, setPictureInPicture] = useState(false)
+  const [pictureInPictureError, setPictureInPictureError] = useState<string | null>(null)
+  const [pictureInPictureSupported, setPictureInPictureSupported] = useState(false)
   const [videoRefreshError, setVideoRefreshError] = useState<string | null>(null)
   const [qualityOpen, setQualityOpen]         = useState(false)
   const [quality, setQuality]                 = useState('Auto')
@@ -463,6 +485,16 @@ const [paywalled, setPaywalled] = useState(false)
   const [monthIndex, setMonthIndex]             = useState(0)
   const [selectedDateKey, setSelectedDateKey]   = useState<string | null>(null)
   const [timeDropdownOpen, setTimeDropdownOpen] = useState(false)
+
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    setCourseTrainerName(null)
+    coursesAPI.getCourseDetail(slug).then((result) => {
+      if (!cancelled && result.success) setCourseTrainerName(result.data.trainer.name)
+    })
+    return () => { cancelled = true }
+  }, [slug])
 
   // ── Load lesson ──
   useEffect(() => {
@@ -635,6 +667,15 @@ const [paywalled, setPaywalled] = useState(false)
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
+    const safariVideo = v as HTMLVideoElement & {
+      webkitSupportsPresentationMode?: (mode: string) => boolean
+      webkitSetPresentationMode?: (mode: string) => void
+      webkitPresentationMode?: string
+    }
+    setPictureInPictureSupported(
+      (document.pictureInPictureEnabled && typeof v.requestPictureInPicture === 'function')
+        || Boolean(safariVideo.webkitSupportsPresentationMode?.('picture-in-picture')),
+    )
     const onPlay         = () => setIsPlaying(true)
     const onPause        = () => setIsPlaying(false)
     const onTimeUpdate   = () => setCurrentTime(v.currentTime)
@@ -653,6 +694,11 @@ const [paywalled, setPaywalled] = useState(false)
     const onWaiting      = () => setBuffering(true)
     const onCanPlay      = () => setBuffering(false)
     const onVolumeChange = () => { setVolume(v.volume); setMuted(v.muted) }
+    const onEnterPictureInPicture = () => setPictureInPicture(true)
+    const onLeavePictureInPicture = () => setPictureInPicture(false)
+    const onPresentationModeChange = () => {
+      setPictureInPicture(safariVideo.webkitPresentationMode === 'picture-in-picture')
+    }
     v.addEventListener('play',           onPlay)
     v.addEventListener('pause',          onPause)
     v.addEventListener('timeupdate',     onTimeUpdate)
@@ -662,6 +708,9 @@ const [paywalled, setPaywalled] = useState(false)
     v.addEventListener('canplay',        onCanPlay)
     v.addEventListener('playing',        onCanPlay)
     v.addEventListener('volumechange',   onVolumeChange)
+    v.addEventListener('enterpictureinpicture', onEnterPictureInPicture)
+    v.addEventListener('leavepictureinpicture', onLeavePictureInPicture)
+    v.addEventListener('webkitpresentationmodechanged', onPresentationModeChange)
     return () => {
       v.removeEventListener('play',           onPlay)
       v.removeEventListener('pause',          onPause)
@@ -672,8 +721,42 @@ const [paywalled, setPaywalled] = useState(false)
       v.removeEventListener('canplay',        onCanPlay)
       v.removeEventListener('playing',        onCanPlay)
       v.removeEventListener('volumechange',   onVolumeChange)
+      v.removeEventListener('enterpictureinpicture', onEnterPictureInPicture)
+      v.removeEventListener('leavepictureinpicture', onLeavePictureInPicture)
+      v.removeEventListener('webkitpresentationmodechanged', onPresentationModeChange)
     }
   }, [lesson])
+
+  useEffect(() => {
+    const anchor = playerAnchorRef.current
+    if (!anchor || !lesson?.video_url) return
+
+    let frame = 0
+    const updateMiniPlayer = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const scrolledPastVideo = anchor.getBoundingClientRect().top < 0
+      if (!scrolledPastVideo) {
+        setMiniPlayerVisible(false)
+        setMiniPlayerDismissed(false)
+        return
+      }
+      if (!pictureInPicture && !miniPlayerDismissed) {
+          setPlayerAnchorHeight(anchor.offsetHeight)
+        setMiniPlayerVisible(true)
+      }
+      })
+    }
+
+    updateMiniPlayer()
+    window.addEventListener('scroll', updateMiniPlayer, { passive: true })
+    window.addEventListener('resize', updateMiniPlayer)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', updateMiniPlayer)
+      window.removeEventListener('resize', updateMiniPlayer)
+    }
+  }, [lesson?.video_url, pictureInPicture, miniPlayerDismissed])
 
   // ── Position heartbeat ──
   useEffect(() => {
@@ -773,6 +856,34 @@ const [paywalled, setPaywalled] = useState(false)
     if (!v) return
     document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : v.requestFullscreen().catch(() => {})
   }, [])
+
+  const handlePictureInPicture = useCallback(async () => {
+    const video = videoRef.current
+    if (!video || !pictureInPictureSupported) return
+    const safariVideo = video as HTMLVideoElement & {
+      webkitSupportsPresentationMode?: (mode: string) => boolean
+      webkitSetPresentationMode?: (mode: string) => void
+      webkitPresentationMode?: string
+    }
+    setPictureInPictureError(null)
+    try {
+      if (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') {
+        if (document.pictureInPictureElement === video) {
+          await document.exitPictureInPicture()
+        } else {
+          await video.requestPictureInPicture()
+        }
+      } else if (safariVideo.webkitSupportsPresentationMode?.('picture-in-picture')) {
+        safariVideo.webkitSetPresentationMode?.(
+          safariVideo.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture',
+        )
+      } else {
+        await document.exitPictureInPicture()
+      }
+    } catch {
+      setPictureInPictureError('Picture-in-picture could not be started in this browser.')
+    }
+  }, [pictureInPictureSupported])
 
   function goToLesson(id: string) {
     if (!slug) return
@@ -1017,7 +1128,12 @@ async function downloadResource(r: LessonResource) {
   
             <>
               {/* ── Video player ── */}
-              <div className="player-card">
+              <div
+                ref={playerAnchorRef}
+                className="lesson-player-anchor"
+                style={miniPlayerVisible ? { height: playerAnchorHeight } : undefined}
+              >
+              <div className={`player-card${miniPlayerVisible ? ' mini-player' : ''}`}>
                 <div className="video-wrap" onClick={togglePlay}>
                   <video
                     ref={videoRef}
@@ -1165,6 +1281,17 @@ async function downloadResource(r: LessonResource) {
                           )}
                         </div>
 
+                        <button
+                          className="ctrl-btn"
+                          type="button"
+                          onClick={handlePictureInPicture}
+                          disabled={!hasVideo || !pictureInPictureSupported}
+                          aria-label={pictureInPicture ? 'Exit picture-in-picture' : 'Enter picture-in-picture'}
+                          title={pictureInPictureSupported ? 'Picture-in-picture' : 'Picture-in-picture is not supported in this browser'}
+                        >
+                          <PictureInPicture2 size={16} />
+                        </button>
+
                         <button className="ctrl-btn" onClick={handleFullscreen}>
                           <Maximize size={16} />
                         </button>
@@ -1172,6 +1299,31 @@ async function downloadResource(r: LessonResource) {
                     </div>
                   </div>
                 </div>
+                {miniPlayerVisible && (
+                  <div className="mini-player-bar">
+                    <button
+                      className="mini-player-play"
+                      type="button"
+                      onClick={togglePlay}
+                      aria-label={isPlaying ? 'Pause lesson video' : 'Play lesson video'}
+                    >
+                      {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                    </button>
+                    <div className="mini-player-info">
+                      <div className="mini-player-title">{lesson.title}</div>
+                      <div className="mini-player-time">{fmtTime(currentTime)} / {duration > 0 ? fmtTime(duration) : lesson.duration_display}</div>
+                    </div>
+                    <button
+                      className="mini-player-close"
+                      type="button"
+                      onClick={() => { setMiniPlayerVisible(false); setMiniPlayerDismissed(true) }}
+                      aria-label="Close mini player"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
               </div>
 
               {videoRefreshError && (
@@ -1186,6 +1338,10 @@ async function downloadResource(r: LessonResource) {
                     Retry
                   </button>
                 </div>
+              )}
+
+              {pictureInPictureError && (
+                <div className="error-banner" role="alert">{pictureInPictureError}</div>
               )}
 
               {/* ── Breadcrumb + title ── */}
@@ -1266,9 +1422,6 @@ async function downloadResource(r: LessonResource) {
                               <div className="assignment-card" key={assignment.id}>
                                 <div className="assignment-info">
                                   <div className="assignment-title">{assignment.title}</div>
-                                  {assignment.deadline && (
-                                    <div className="assignment-meta-light">Due {new Date(assignment.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                                  )}
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   <div style={{ display: 'flex', gap: 8 }}>
@@ -1393,7 +1546,7 @@ async function downloadResource(r: LessonResource) {
                   {askHelpOpen && (
                     <div className="ask-help-popover">
                       <div className="ask-help-popover-title">Get help from a tutor</div>
-                      <div className="ask-help-popover-sub">Book a 1-on-1 session with Amara Osei or a course assistant.</div>
+                      <div className="ask-help-popover-sub">Book a 1-on-1 session with {courseTrainerName || 'your course trainer'} or a course assistant.</div>
                       <button className="ask-help-item primary" onClick={() => { setAskHelpOpen(false); openBookingModal() }}>
                         Book a session
                       </button>

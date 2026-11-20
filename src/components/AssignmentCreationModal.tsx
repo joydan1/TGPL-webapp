@@ -50,17 +50,33 @@ export type AssignmentDraft = {
   requirements: AssignmentRequirementDraft[]
 }
 
-const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'mp4']
+const FILE_TYPE_GROUPS = [
+  { label: 'Documents', options: [
+    { label: 'PDF', extensions: ['pdf'] },
+    { label: 'Word', extensions: ['doc', 'docx'] },
+    { label: 'Excel', extensions: ['xls', 'xlsx'] },
+    { label: 'PowerPoint', extensions: ['ppt', 'pptx'] },
+  ] },
+  { label: 'Data', options: [
+    { label: 'CSV', extensions: ['csv'] },
+    { label: 'Text', extensions: ['txt'] },
+  ] },
+  { label: 'Archives', options: [{ label: 'ZIP', extensions: ['zip'] }] },
+  { label: 'Images', options: [
+    { label: 'PNG', extensions: ['png'] },
+    { label: 'JPG', extensions: ['jpg', 'jpeg'] },
+  ] },
+]
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function makeRequirementDraft(title = 'Submission file', types: string[] = ['pdf', 'docx']): AssignmentRequirementDraft {
+function makeRequirementDraft(title = 'Submission file', types: string[] = []): AssignmentRequirementDraft {
   return {
     id: makeId(),
     label: title.trim() || 'Submission file',
-    allowedFileTypes: types.length ? Array.from(new Set(types.map((t) => t.trim().toLowerCase()).filter(Boolean))) : ['pdf', 'docx'],
+    allowedFileTypes: Array.from(new Set(types.map((t) => t.trim().toLowerCase()).filter(Boolean))),
     maxBytesMb: '20',
     required: true,
     namingHint: 'Use your name and assignment title in the filename.',
@@ -68,7 +84,7 @@ function makeRequirementDraft(title = 'Submission file', types: string[] = ['pdf
 }
 
 export function emptyAssignmentDraft(): AssignmentDraft {
-  const defaultTypes = ['pdf', 'docx']
+  const defaultTypes: string[] = []
   return {
     title: '',
     isFinal: false,
@@ -146,7 +162,7 @@ export function buildAssignmentRequirements(draft: AssignmentDraft): Array<{
     : [{
         id: makeId(),
         label: draft.title.trim() || 'Submission file',
-        allowedFileTypes: draft.acceptedFileTypes.length ? draft.acceptedFileTypes : ['pdf', 'docx'],
+        allowedFileTypes: draft.acceptedFileTypes,
         maxBytesMb: '20',
         required: true,
         namingHint: 'Use your name and assignment title in the filename.',
@@ -274,6 +290,8 @@ const MODAL_CSS = `
   .acm-wc-words { font-family: 'Sora', sans-serif; font-size: 12px; color: #99A1AF; }
 
   .acm-filetype-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .acm-filetype-groups { display: flex; flex-direction: column; gap: 12px; }
+  .acm-filetype-group-label { display: block; margin-bottom: 6px; font-family: 'Sora', sans-serif; font-size: 10px; font-weight: 700; color: #616873; text-transform: uppercase; }
   .acm-filetype-chip { box-sizing: border-box; padding: 0 12px; height: 32px; border-radius: 14px; border: 1px solid #EBEBEB; background: #fff; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 12px; color: #99A1AF; cursor: pointer; }
   .acm-filetype-chip.active { background: #E9F5FF; border-color: #2492EB; color: #2492EB; }
   .acm-filetype-chip:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -859,22 +877,33 @@ export default function AssignmentCreatorModal({
 
                       <div>
                         <div className="acm-cover-label" style={{ marginBottom: 8 }}>Accepted file types</div>
-                        <div className="acm-filetype-row">
-                          {FILE_TYPE_OPTIONS.map((type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              disabled={requirementsLocked}
-                              className={`acm-filetype-chip${requirement.allowedFileTypes.includes(type) ? ' active' : ''}`}
-                              onClick={() => {
-                                const nextList = requirement.allowedFileTypes.includes(type)
-                                  ? requirement.allowedFileTypes.filter((t) => t !== type)
-                                  : [...requirement.allowedFileTypes, type]
-                                updateRequirement(requirement.id, { allowedFileTypes: nextList })
-                              }}
-                            >
-                              .{type}
-                            </button>
+                        <div className="acm-filetype-groups">
+                          {FILE_TYPE_GROUPS.map((group) => (
+                            <div key={group.label}>
+                              <span className="acm-filetype-group-label">{group.label}</span>
+                              <div className="acm-filetype-row">
+                                {group.options.map((option) => {
+                                  const selected = option.extensions.every((extension) => requirement.allowedFileTypes.includes(extension))
+                                  return (
+                                    <button
+                                      key={option.label}
+                                      type="button"
+                                      disabled={requirementsLocked}
+                                      aria-pressed={selected}
+                                      className={`acm-filetype-chip${selected ? ' active' : ''}`}
+                                      onClick={() => {
+                                        const nextList = selected
+                                          ? requirement.allowedFileTypes.filter((type) => !option.extensions.includes(type))
+                                          : Array.from(new Set([...requirement.allowedFileTypes, ...option.extensions]))
+                                        updateRequirement(requirement.id, { allowedFileTypes: nextList })
+                                      }}
+                                    >
+                                      {option.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>

@@ -6,6 +6,7 @@ import {
   Banknote, FileText, Activity as ActivityIcon, TrendingUp, TrendingDown,
 } from 'lucide-react'
 import AdminShell from '../../layouts/AdminShell'
+import { useAuthStore } from '../../store/auth'
 import { adminUsersAPI } from '../../services/adminUsersApi'
 import { adminCoursesAPI } from '../../services/adminCoursesApi'
 import {
@@ -115,7 +116,7 @@ const PAGE_CSS = `
   .ad-page { padding: 1.5rem 2rem 2rem; background: #F5F5F5; }
 
   .ad-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .ad-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #111827; }
+  .ad-title { margin: 0; font-size: 1.75rem; font-weight: 700; color: #2B2B2C; }
   .ad-subtitle { margin: 0.25rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .ad-header-actions { display: flex; align-items: center; gap: 0.75rem; }
 
@@ -134,7 +135,7 @@ const PAGE_CSS = `
   .ad-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); }
   .ad-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
   .ad-stat-top > div:first-child { min-width: 0; }
-  .ad-stat-value { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; overflow-wrap: anywhere; }
+  .ad-stat-value { margin: 0; font-size: 1.6rem; font-weight: 700; color: #2B2B2C; overflow-wrap: anywhere; }
   .ad-stat-title { margin: 0.3rem 0 0.4rem; color: #6B7280; font-size: 0.8rem; }
   .ad-stat-change { font-size: 0.78rem; font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 0.2rem; }
   .ad-stat-change.negative { color: #DC2626; }
@@ -155,7 +156,7 @@ const PAGE_CSS = `
   .ad-top-course-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0; }
   .ad-top-course-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .ad-top-course-name { flex: 1; min-width: 0; font-size: 0.82rem; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ad-top-course-count { font-size: 0.82rem; font-weight: 700; color: #111827; flex-shrink: 0; }
+  .ad-top-course-count { font-size: 0.82rem; font-weight: 600; color: #2B2B2C; flex-shrink: 0; }
   .ad-top-course-bar-track { height: 6px; border-radius: 999px; background: #F3F4F6; margin-top: 0.3rem; overflow: hidden; }
   .ad-top-course-bar-fill { height: 100%; border-radius: 999px; }
 
@@ -193,6 +194,7 @@ function formatNaira(amount: number) {
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
+  const canViewRevenue = useAuthStore((state) => state.user?.permissions?.view_revenue === true)
   const [activeTab, setActiveTab] = useState<string>('all')
 
   const [selectedRangeLabel, setSelectedRangeLabel] = useState('Last Month')
@@ -200,7 +202,7 @@ export default function AdminDashboardPage() {
   const rangeWrapperRef = useRef<HTMLDivElement>(null)
   const selectedRangeOption = RANGE_OPTIONS.find((r) => r.label === selectedRangeLabel)!
 
-  // ── Range-independent stats: users, active courses, revenue, top courses ──
+  // ── Range-independent stats: users, active courses, optional revenue ──
   const [stats, setStats] = useState<DashboardStats>({
     total_users: null,
     active_courses: null,
@@ -246,7 +248,7 @@ export default function AdminDashboardPage() {
 
       const [usersResult, catalogResult, coursesResult] = await Promise.all([
         adminUsersAPI.getCount(),
-        adminCoursesAPI.aggregateCatalogStats(),
+        adminCoursesAPI.aggregateCatalogStats(canViewRevenue),
         adminCoursesAPI.listCourses({ page_size: 5 }),
       ])
 
@@ -261,7 +263,9 @@ export default function AdminDashboardPage() {
       let revenueNaira: number | null = null
       if (catalogResult.success) {
         activeCourses = catalogResult.data.published
-        revenueNaira = catalogResult.data.total_revenue_kobo / 100
+        revenueNaira = canViewRevenue && catalogResult.data.total_revenue_kobo !== undefined
+          ? catalogResult.data.total_revenue_kobo / 100
+          : null
       } else {
         errors.push('courses')
       }
@@ -289,7 +293,7 @@ export default function AdminDashboardPage() {
 
     loadStats()
     return () => { cancelled = true }
-  }, [])
+  }, [canViewRevenue])
 
   // Range-dependent overview — refetches whenever the dropdown changes.
   useEffect(() => {
@@ -307,7 +311,9 @@ export default function AdminDashboardPage() {
         setTotalEnrollments(result.data.total_enrollments)
         setEnrollmentTrend(result.data.enrollment_trends.data)
         setGrowthRate(result.data.enrollment_trends.summary.growth_rate_percent)
-        setActivity(result.data.recent_activity)
+        setActivity(canViewRevenue
+          ? result.data.recent_activity
+          : result.data.recent_activity.filter((item) => item.category !== 'payments'))
         setActiveTab('all')
       } else {
         setOverviewError(result.error || "Couldn't load enrollments/activity")
@@ -317,10 +323,15 @@ export default function AdminDashboardPage() {
 
     loadOverview()
     return () => { cancelled = true }
-  }, [selectedRangeOption.period])
+  }, [canViewRevenue, selectedRangeOption.period])
 
   // Revenue trend — fetched once on mount, not tied to the range dropdown.
   useEffect(() => {
+    if (!canViewRevenue) {
+      setLoadingRevenueMonthly(false)
+      setRevenueMonthly([])
+      return
+    }
     let cancelled = false
 
     async function loadRevenueTrend() {
@@ -341,7 +352,7 @@ export default function AdminDashboardPage() {
 
     loadRevenueTrend()
     return () => { cancelled = true }
-  }, [])
+  }, [canViewRevenue])
 
   const activityTabs = useMemo(() => {
     const counts: Record<string, number> = { all: activity.length }
@@ -390,7 +401,7 @@ export default function AdminDashboardPage() {
         csvRow(['Active courses', stats.active_courses ?? '']),
         csvRow(['Total enrollments', totalEnrollments ?? '']),
         csvRow(['Enrollment growth rate (%)', growthRate ?? '']),
-        csvRow(['Revenue (₦)', stats.revenue_naira ?? '']),
+        ...(canViewRevenue ? [csvRow(['Revenue (₦)', stats.revenue_naira ?? ''])] : []),
       ])
 
       if (enrollmentTrend.length) {
@@ -401,7 +412,7 @@ export default function AdminDashboardPage() {
         ])
       }
 
-      if (revenueMonthly.length) {
+      if (canViewRevenue && revenueMonthly.length) {
         sections.push([
           csvRow(['Revenue Trend']),
           csvRow(['Month', 'Revenue (₦)', 'Current month']),
@@ -433,7 +444,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const exportDisabled = loadingStats && loadingOverview && loadingRevenueMonthly
+  const exportDisabled = loadingStats && loadingOverview && (!canViewRevenue || loadingRevenueMonthly)
 
   return (
     <AdminShell>
@@ -444,8 +455,8 @@ export default function AdminDashboardPage() {
           <div>
             <h1 className="ad-title">Overview</h1>
             <p className="ad-subtitle">
-              {statsError || overviewError || revenueError
-                ? [statsError, overviewError, revenueError].filter(Boolean).join(' · ')
+              {statsError || overviewError || (canViewRevenue && revenueError)
+                ? [statsError, overviewError, canViewRevenue ? revenueError : null].filter(Boolean).join(' · ')
                 : 'Real-time data'}
             </p>
           </div>
@@ -553,7 +564,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="ad-stat-card">
+          {canViewRevenue && stats.revenue_naira !== null && <div className="ad-stat-card">
             <div className="ad-stat-top">
               <div>
                 {loadingStats ? (
@@ -569,12 +580,13 @@ export default function AdminDashboardPage() {
                 <CreditCard size={18} color="#059669" />
               </div>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* ── Charts + Top courses ── */}
         <div className="ad-charts">
           <DashboardCharts
+            showRevenue={canViewRevenue && stats.revenue_naira !== null}
             enrollmentTrend={enrollmentTrend}
             revenueMonthly={revenueMonthly}
             loadingOverview={loadingOverview}

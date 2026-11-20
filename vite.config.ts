@@ -7,11 +7,21 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
 
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react'],
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor',
+              test: /node_modules[\\/](react|react-dom|react-router|react-router-dom)([\\/]|$)/,
+              priority: 2,
+            },
+            {
+              name: 'ui',
+              test: /node_modules[\\/]lucide-react([\\/]|$)/,
+              priority: 1,
+            },
+          ],
         },
       },
     },
@@ -19,17 +29,17 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@components': path.resolve(__dirname, 'src/components'),
-      '@pages': path.resolve(__dirname, 'src/pages'),
-      '@hooks': path.resolve(__dirname, 'src/hooks'),
-      '@services': path.resolve(__dirname, 'src/services'),
-      '@constants': path.resolve(__dirname, 'src/constants'),
-      '@types': path.resolve(__dirname, 'src/types'),
-      '@store': path.resolve(__dirname, 'src/store'),
-      '@styles': path.resolve(__dirname, 'src/styles'),
-      '@layouts': path.resolve(__dirname, 'src/layouts'),
-      '@assets': path.resolve(__dirname, 'src/assets'),
+      '@': path.resolve(import.meta.dirname, 'src'),
+      '@components': path.resolve(import.meta.dirname, 'src/components'),
+      '@pages': path.resolve(import.meta.dirname, 'src/pages'),
+      '@hooks': path.resolve(import.meta.dirname, 'src/hooks'),
+      '@services': path.resolve(import.meta.dirname, 'src/services'),
+      '@constants': path.resolve(import.meta.dirname, 'src/constants'),
+      '@types': path.resolve(import.meta.dirname, 'src/types'),
+      '@store': path.resolve(import.meta.dirname, 'src/store'),
+      '@styles': path.resolve(import.meta.dirname, 'src/styles'),
+      '@layouts': path.resolve(import.meta.dirname, 'src/layouts'),
+      '@assets': path.resolve(import.meta.dirname, 'src/assets'),
     },
   },
 

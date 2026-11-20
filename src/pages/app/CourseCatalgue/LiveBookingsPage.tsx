@@ -94,8 +94,12 @@ function displayStatus(b: EnrichedBooking): DisplayStatus {
   return b.status
 }
 
+function bookingJoinUrl(b: EnrichedBooking): string | null {
+  return b.recording_url || (b.session?.status === 'live' ? b.session.join_url : null) || null
+}
+
 function canJoinNow(b: EnrichedBooking): boolean {
-  return b.status === 'confirmed' && b.session?.status === 'live' && !!b.session.join_url
+  return b.status === 'confirmed' && !isPast(b.slot_ends_at) && !!bookingJoinUrl(b)
 }
 
 const STATUS_LABEL: Record<DisplayStatus, string> = {
@@ -260,11 +264,12 @@ export default function LiveBookingsPage() {
 
   async function handleJoin(e: React.MouseEvent, b: EnrichedBooking) {
     e.stopPropagation()
-    if (!b.session?.join_url) {
+    const joinUrl = bookingJoinUrl(b)
+    if (!joinUrl) {
       setError('Unable to join this session.')
       return
     }
-    window.open(b.session.join_url, '_blank', 'noopener,noreferrer')
+    window.open(joinUrl, '_blank', 'noopener,noreferrer')
   }
 
   useEffect(() => { load() }, [load])
@@ -293,8 +298,12 @@ export default function LiveBookingsPage() {
   const grouped = groupByDate(shown)
 
   function goToBooking(b: EnrichedBooking) {
-    // Adjust to wherever a single booking's detail should live.
-    navigate(RouteBuilder.course(b.course_id), { state: { bookingId: b.id } })
+    const courseSlug = b.courseInfo?.course_slug
+    if (!courseSlug) {
+      setError('Course details are unavailable. Refresh your bookings and try again.')
+      return
+    }
+    navigate(RouteBuilder.course(courseSlug), { state: { bookingId: b.id } })
   }
 
   return (
@@ -383,7 +392,8 @@ export default function LiveBookingsPage() {
                         b.courseInfo?.title ||
                         b.course_title ||
                         `Session with ${name}`
-                      const live = canJoinNow(b)
+                      const canJoin = canJoinNow(b)
+                      const live = canJoin && b.session?.status === 'live' && !b.recording_url
                       return (
                         <div key={b.id} className="bk-row" onClick={() => goToBooking(b)}>
                           <div className="bk-avatar" style={{ background: avatarColor(b.course_id) }}>
@@ -404,7 +414,7 @@ export default function LiveBookingsPage() {
                               <span className={STATUS_CLASS[status]}>{STATUS_LABEL[status]}</span>
                             )}
                           </div>
-                          {live ? (
+                          {canJoin ? (
                             <button className="bk-join-btn" onClick={(e) => handleJoin(e, b)}>
                               <Radio size={13} /> Join
                             </button>

@@ -5,6 +5,7 @@ import type { EnrollmentTrendPoint } from '../../services/adminDashboardApi'
 import type { MonthlyRevenuePoint } from '../../services/adminRevenueApi'
 
 interface DashboardChartsProps {
+  showRevenue: boolean
   enrollmentTrend: EnrollmentTrendPoint[]
   revenueMonthly: MonthlyRevenuePoint[]
   loadingOverview: boolean
@@ -28,6 +29,7 @@ function formatCompactNaira(amountKobo: number) {
 }
 
 export default function DashboardCharts({
+  showRevenue,
   enrollmentTrend,
   revenueMonthly,
   loadingOverview,
@@ -45,7 +47,7 @@ export default function DashboardCharts({
 
   return (
     <>
-      <div className="ad-panel">
+      {showRevenue && <div className="ad-panel">
         <div className="ad-panel-head">
           <div>
             <h3 className="ad-panel-title">Enrollments Over Time</h3>
@@ -76,7 +78,7 @@ export default function DashboardCharts({
             </LineChart>
           </ResponsiveContainer>
         )}
-      </div>
+      </div>}
 
       <div className="ad-panel">
         <div className="ad-panel-head">

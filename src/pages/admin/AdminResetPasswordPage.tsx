@@ -5,6 +5,7 @@ import Input from '../../components/Input'
 import Button from '../../components/Button'
 import { ROUTES } from '../../constants/routes'
 import { authAPI } from '../../services/api'
+import { getPasswordError, isPasswordValid, PASSWORD_GUIDANCE, PASSWORD_PLACEHOLDER } from '../../utils/password'
 
 function Spinner() {
   return (
@@ -33,7 +34,7 @@ export default function AdminResetPasswordPage() {
   const [updated, setUpdated] = useState(false)
   const [invalidToken, setInvalidToken] = useState(false)
 
-  const isFormFilled = password.length > 0 && confirmPassword.length > 0
+  const isFormFilled = isPasswordValid(password) && password === confirmPassword
 
   useEffect(() => {
     if (!token) {
@@ -55,8 +56,9 @@ export default function AdminResetPasswordPage() {
       return
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.')
+    const passwordError = getPasswordError(password)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
 
@@ -215,15 +217,19 @@ export default function AdminResetPasswordPage() {
                   <Input
                     name="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="SecurePass123!"
+                    placeholder={PASSWORD_PLACEHOLDER}
                     value={password}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                     error={undefined}
+                    hint={PASSWORD_GUIDANCE}
                   />
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-grey hover:text-black transition-colors"
+                    style={{ zIndex: 2 }}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -236,15 +242,18 @@ export default function AdminResetPasswordPage() {
                   <Input
                     name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="SecurePass123!"
+                    placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
                     error={undefined}
                   />
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-grey hover:text-black transition-colors"
+                    style={{ zIndex: 2 }}
                   >
                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>

@@ -9,7 +9,7 @@ import { ROUTES, RouteBuilder } from '../../constants/routes'
 import { apiClient, coursesAPI, liveSessionsAPI, type LiveSlotBooking } from '../../services/api'
 import AppShell, { SHELL_CSS } from '../../components/layout/AppShell'
 import {
-  InactivityNudge, DeadlineUrgencyNudge, LiveSessionNudge, BookingReminderNudge, CertificateNudge,
+  InactivityNudge, LiveSessionNudge, BookingReminderNudge, CertificateNudge,
   NUDGE_CSS,
 } from '../../components/nudges/NudgeComponents'
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -82,7 +82,6 @@ interface AssignmentItem {
   title: string
   course_title: string
   course_slug: string
-  due_at: string
   my_submission_status: string
 }
 
@@ -116,13 +115,6 @@ function fmtSessionTime(iso: string): string {
   const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   const timePart = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
   return `${datePart} · ${timePart} WAT`
-}
-
-function fmtDueDate(iso: string): string {
-  if (!iso) return 'No due date'
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return 'No due date'
-  return `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 }
 
 function fmtCertificateDate(iso: string | null | undefined): string | null {
@@ -162,7 +154,7 @@ const PAGE_CSS = `
   .content { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1.75rem; }
 
   .greeting-line { font-size: 0.9375rem; color: #6B7280; }
-  .greeting-name { font-size: 1.625rem; font-weight: 700; color: #111; margin-top: 0.125rem; }
+  .greeting-name { font-size: 1.625rem; font-weight: 600; color: #111; margin-top: 0.125rem; }
 
  .resume-banner {
   background: linear-gradient(135deg, #2492EB 0%, #1560A8 100%);
@@ -296,7 +288,7 @@ const PAGE_CSS = `
 }
 .asgn-badge.active { color: #2492EB; }
 .asgn-badge.revision-requested { color: #B45309; }
-.asgn-badge.upcoming { color: #6A7282; opacity: 0.7; }
+.asgn-badge.not-started { color: #6A7282; opacity: 0.7; }
 .asgn-badge::before {
   content: '';
   width: 6px;
@@ -305,7 +297,7 @@ const PAGE_CSS = `
   background: currentColor;
   flex-shrink: 0;
 }
-.asgn-badge.upcoming::before { background: #D1D5DC; }
+.asgn-badge.not-started::before { background: #D1D5DC; }
 
 .asgn-title {
   font-family: 'Sora';
@@ -432,8 +424,7 @@ export default function DashboardPage() {
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [certProgress, setCertProgress] = useState<CourseCertProgress[]>([])
   const [certProgressLoaded, setCertProgressLoaded] = useState(false)
-  const [assignmentsActive, setAssignmentsActive] = useState<AssignmentItem[]>([])
-  const [assignmentsUpcoming, setAssignmentsUpcoming] = useState<AssignmentItem[]>([])
+  const [assignments, setAssignments] = useState<AssignmentItem[]>([])
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
   const [liveSessions, setLiveSessions] = useState<LiveSessionSummary[]>([])
   const [liveSessionsLoaded, setLiveSessionsLoaded] = useState(false)
@@ -492,33 +483,25 @@ export default function DashboardPage() {
                 title: a.title,
                 course_title: course.title,
                 course_slug: course.course_slug,
-                due_at: a.deadline ?? '',
-                my_submission_status: a.my_submission_status,
+                my_submission_status: a.my_submission_status === 'late_flagged'
+                  ? 'in_progress'
+                  : a.my_submission_status,
               })
             })
           })
         })
 
 
-        const byDueDate = (a: AssignmentItem, b: AssignmentItem) => {
-          if (!a.due_at) return 1
-          if (!b.due_at) return -1
-          return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
-        }
-
-        const active = all
-          .filter((a) => a.my_submission_status === 'in_progress' || a.my_submission_status === 'revision_requested')
+        const available = all
+          .filter((a) => a.my_submission_status === 'not_started'
+            || a.my_submission_status === 'in_progress'
+            || a.my_submission_status === 'revision_requested')
           .sort((a, b) => {
             const aNeedsRevision = a.my_submission_status === 'revision_requested'
             const bNeedsRevision = b.my_submission_status === 'revision_requested'
-            return Number(bNeedsRevision) - Number(aNeedsRevision) || byDueDate(a, b)
+            return Number(bNeedsRevision) - Number(aNeedsRevision)
           })
-        const upcoming = all
-          .filter((a) => a.my_submission_status === 'not_started' || a.my_submission_status == null)
-          .sort(byDueDate)
-
-        setAssignmentsActive(active)
-        setAssignmentsUpcoming(upcoming)
+        setAssignments(available)
       } catch (err) {
         console.error('Failed to fetch assignments:', err)
       } finally {
@@ -611,7 +594,7 @@ export default function DashboardPage() {
   const showEmptyState              = !loading && !error && !hasCourses
   const showCourseDependentSections = !loading && !error && hasCourses
 
-  const hasAssignments = assignmentsActive.length > 0 || assignmentsUpcoming.length > 0
+  const hasAssignments = assignments.length > 0
 
   const liveNowSessions = liveSessions
     .filter((s) => s.status === 'live')
@@ -659,14 +642,6 @@ export default function DashboardPage() {
     : 0
   const showInactivityNudge =
     showCourseDependentSections && daysInactive >= 3 && !dismissedNudges.has('inactivity') && resumeCourse
-
-  // ── DeadlineUrgencyNudge — an in-progress assignment already past due ──
-  const overdueAssignment = assignmentsActive.find((a) => {
-    if (!a.due_at) return false
-    const due = new Date(a.due_at)
-    return !isNaN(due.getTime()) && due.getTime() < nowTick
-  })
-  const showDeadlineNudge = !!overdueAssignment && !dismissedNudges.has(`deadline-${overdueAssignment.id}`)
 
   // ── LiveSessionNudge — a session starting within the next 15 minutes ──
   const startingSoonSession = upcomingSessions.find((s) => {
@@ -798,16 +773,6 @@ function goToCertification() {
             <div className="section-header">
               <span className="section-title">Assignment(s)</span>
             </div>
-            {showDeadlineNudge && overdueAssignment && (
-              <div style={{ marginBottom: '0.875rem' }}>
-                <DeadlineUrgencyNudge
-                  assignmentTitle={overdueAssignment.title}
-                  courseTitle={overdueAssignment.course_title}
-                  onSubmitNow={() => goToAssignment(overdueAssignment)}
-                  onDismiss={() => dismissNudge(`deadline-${overdueAssignment.id}`)}
-                />
-              </div>
-            )}
             {assignmentsLoaded && !hasAssignments && (
               <div className="empty-inline">
                 <div className="empty-inline-icon" style={{ background: '#EFF6FF' }}>
@@ -825,9 +790,10 @@ function goToCertification() {
             {assignmentsLoaded && hasAssignments && (
               <div className="assignments-wrap">
                 <div className="assignments-scroll">
-                  {[...assignmentsActive, ...assignmentsUpcoming].map((a) => {
-                    const isActive = assignmentsActive.some((x) => x.id === a.id)
+                  {assignments.map((a) => {
                     const needsRevision = a.my_submission_status === 'revision_requested'
+                    const isActive = a.my_submission_status === 'in_progress'
+                    const isNotStarted = a.my_submission_status === 'not_started'
                     return (
                       <div
                         key={a.id}
@@ -837,12 +803,11 @@ function goToCertification() {
                         onClick={() => goToAssignment(a)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToAssignment(a) }}
                       >
-                        <div className={`asgn-badge ${needsRevision ? 'revision-requested' : isActive ? 'active' : 'upcoming'}`}>
-                          {needsRevision ? 'Revision requested' : isActive ? 'Active' : 'Upcoming'}
+                        <div className={`asgn-badge ${needsRevision ? 'revision-requested' : isActive ? 'active' : 'not-started'}`}>
+                          {needsRevision ? 'Revision requested' : isActive ? 'Active' : isNotStarted ? 'Not started' : 'Submitted'}
                         </div>
                         <div className="asgn-title">{a.title}</div>
                         {a.course_title && <div className="asgn-course">{a.course_title}</div>}
-                        <div className="asgn-due-note"><Clock size={12} /> {fmtDueDate(a.due_at)}</div>
                       </div>
                     )
                   })}

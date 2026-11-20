@@ -4,6 +4,7 @@ import { Eye, EyeOff, Check } from 'lucide-react'
 import SettingsLayout from '../../components/layout/SettingsLayout'
 import { authAPI } from '../../services/api'
 import { ROUTES } from '../../constants/routes'
+import { getPasswordError, PASSWORD_GUIDANCE, PASSWORD_PLACEHOLDER } from '../../utils/password'
 
 type StrengthLevel = { score: number; label: string; color: string }
 
@@ -20,7 +21,7 @@ function getPasswordStrength(password: string): StrengthLevel {
     { score: 3, label: 'Good', color: '#2492EB' },
     { score: 4, label: 'Strong', color: '#059669' },
   ]
-  return { ...levels[score - 1] }
+  return { ...levels[Math.max(score, 1) - 1] }
 }
 
 function PasswordStrengthIndicator({ password }: { password: string }) {
@@ -58,14 +59,15 @@ export default function SettingsSecurityPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const validate = () => {
     if (!currentPassword) return 'Current password is required'
-    if (!newPassword) return 'New password is required'
-    if (newPassword.length < 8) return 'New password must be at least 8 characters'
+    const passwordError = getPasswordError(newPassword)
+    if (passwordError) return passwordError
     if (newPassword !== confirmPassword) return 'Passwords do not match'
     return null
   }
@@ -101,7 +103,7 @@ export default function SettingsSecurityPage() {
               <label className="field-label">Current Password <span style={{ color: '#EF4444' }}>*</span></label>
               <div style={{ position: 'relative' }}>
                 <input className="field-input" type={showCurrent ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" />
-                <button type="button" aria-label="Toggle" onClick={() => setShowCurrent(!showCurrent)} style={{ position: 'absolute', right: 10, top: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                <button type="button" aria-label={showCurrent ? 'Hide current password' : 'Show current password'} onMouseDown={(e) => e.preventDefault()} onClick={() => setShowCurrent(!showCurrent)} style={{ position: 'absolute', zIndex: 2, right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                   {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -110,17 +112,23 @@ export default function SettingsSecurityPage() {
             <div className="field-row">
               <label className="field-label">New Password</label>
               <div style={{ position: 'relative' }}>
-                <input className="field-input" type={showNew ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" />
-                <button type="button" aria-label="Toggle" onClick={() => setShowNew(!showNew)} style={{ position: 'absolute', right: 10, top: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                <input className="field-input" type={showNew ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={PASSWORD_PLACEHOLDER} />
+                <button type="button" aria-label={showNew ? 'Hide new password' : 'Show new password'} onMouseDown={(e) => e.preventDefault()} onClick={() => setShowNew(!showNew)} style={{ position: 'absolute', zIndex: 2, right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                   {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <p style={{ margin: '-0.5rem 0 0', fontSize: '0.8rem', color: '#6B7280' }}>{PASSWORD_GUIDANCE}</p>
               {newPassword && <PasswordStrengthIndicator password={newPassword} />}
             </div>
 
             <div className="field-row">
               <label className="field-label">Confirm Password</label>
-              <input className="field-input" type={showNew ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" />
+              <div style={{ position: 'relative' }}>
+                <input className="field-input" style={{ paddingRight: '2.75rem' }} type={showConfirm ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" />
+                <button type="button" aria-label={showConfirm ? 'Hide confirmed password' : 'Show confirmed password'} onMouseDown={(e) => e.preventDefault()} onClick={() => setShowConfirm(!showConfirm)} style={{ position: 'absolute', zIndex: 2, right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && <div className="form-error">{error}</div>}

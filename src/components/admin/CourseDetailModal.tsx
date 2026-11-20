@@ -35,6 +35,7 @@ export const COURSE_DETAIL_MODAL_CSS = `
   .admincdm-error { padding: 1rem 1.25rem; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 0.85rem; font-size: 0.85rem; }
 
   .admincdm-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; }
+  .admincdm-stats-grid.restricted { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admincdm-stat-card { background: #F9FAFB; border-radius: 0.85rem; padding: 0.85rem; border: 1px solid #F3F4F6; }
   .admincdm-stat-icon { width: 30px; height: 30px; border-radius: 0.55rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
   .admincdm-stat-value { margin: 0; font-size: 1.2rem; font-weight: 800; color: #111827; }
@@ -216,10 +217,11 @@ interface CourseDetailModalProps {
   onSetPrice?: () => void
   onArchive?: () => void
   onDelete?: () => void
+  showFinancials?: boolean
 }
 
 export default function CourseDetailModal({
-  course, onClose, onEdit, onSetPrice, onArchive, onDelete,
+  course, onClose, onEdit, onSetPrice, onArchive, onDelete, showFinancials = true,
 }: CourseDetailModalProps) {
 
   const [detail, setDetail] = useState<AdminCourseDetail | null>(null)
@@ -327,17 +329,17 @@ export default function CourseDetailModal({
 
           {!loading && !error && (
             <>
-              <div className="admincdm-stats-grid" style={{ display: 'grid' }}>
-                <div className="admincdm-stat-card">
+              <div className={`admincdm-stats-grid${showFinancials ? '' : ' restricted'}`} style={{ display: 'grid' }}>
+                {showFinancials && <div className="admincdm-stat-card">
                   <div className="admincdm-stat-icon" style={{ background: '#DBEAFE' }}><Users size={15} color="#2492EB" /></div>
                   <p className="admincdm-stat-value">{course.enrollment_count}</p>
                   <p className="admincdm-stat-label">Enrolled</p>
-                </div>
-                <div className="admincdm-stat-card">
+                </div>}
+                {showFinancials && course.revenue_kobo !== undefined && <div className="admincdm-stat-card">
                   <div className="admincdm-stat-icon" style={{ background: '#D1FAE5' }}><TrendingUp size={15} color="#059669" /></div>
-                  <p className="admincdm-stat-value">{formatNaira(course.revenue_kobo)}</p>
+                  <p className="admincdm-stat-value">{formatNaira(course.revenue_kobo ?? 0)}</p>
                   <p className="admincdm-stat-label">Revenue</p>
-                </div>
+                </div>}
                 <div className="admincdm-stat-card">
                   <div className="admincdm-stat-icon" style={{ background: '#FFF7E6' }}><Star size={15} color="#FE9A00" /></div>
                   <p className="admincdm-stat-value">{pending.average_rating != null ? pending.average_rating.toFixed(1) : '—'}</p>

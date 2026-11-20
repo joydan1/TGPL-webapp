@@ -26,6 +26,7 @@ export interface UserResponse {
   country: string | null
   bio: string | null
   avatar_url: string | null
+  is_super_admin?: boolean
   available_modes?: UserMode[]
   permissions?: {
     manage_users: boolean
@@ -835,7 +836,6 @@ export interface LearnModuleLessonSummary {
 export interface LearnModuleAssignmentSummary {
   id: string
   title: string
-  deadline: string | null
   order: number
   my_submission_status: string
 }
@@ -1383,8 +1383,8 @@ export const liveSessionsAPI = {
   /** POST /v1/live/manage/bookings/{id}/confirm/ */
   confirmBooking: async (bookingId: string) => {
     try {
-      await apiClient.post(API_ENDPOINTS.LIVE_MANAGE_BOOKING_CONFIRM(bookingId))
-      return { success: true as const }
+      const response = await apiClient.post<LiveManageBooking>(API_ENDPOINTS.LIVE_MANAGE_BOOKING_CONFIRM(bookingId))
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to confirm booking')
       return { success: false as const, error: message, statusCode }
@@ -1394,8 +1394,8 @@ export const liveSessionsAPI = {
   /** POST /v1/live/manage/bookings/{id}/reject/ */
   rejectBooking: async (bookingId: string) => {
     try {
-      await apiClient.post(API_ENDPOINTS.LIVE_MANAGE_BOOKING_REJECT(bookingId))
-      return { success: true as const }
+      const response = await apiClient.post<LiveManageBooking>(API_ENDPOINTS.LIVE_MANAGE_BOOKING_REJECT(bookingId))
+      return { success: true as const, data: response.data }
     } catch (error) {
       const { message, statusCode } = parseApiError(error, 'Failed to reject booking')
       return { success: false as const, error: message, statusCode }
@@ -2282,6 +2282,7 @@ export interface AssignmentRequirement {
   id: string
   label: string
   allowed_file_types: string[]
+  allowed_file_types_labels?: string[]
   max_bytes: number
   required: boolean
   order: number
@@ -2310,7 +2311,6 @@ export interface AssignmentDetail {
   course_slug: string
   course_title: string
   module_title: string
-  due_at: string
   points: number
    max_attempts: number 
     attempts_used: number 
@@ -2549,7 +2549,6 @@ export interface TrainerAssignmentListItem {
   id: string
   title: string
   module: TrainerAssignmentModuleRef
-  deadline: string
   is_final: boolean
   created_at: string
   submission_count: number
@@ -2565,7 +2564,6 @@ export interface TrainerAssignmentDetail extends TrainerAssignmentListItem {
   instructions: string
   grading_criteria: TrainerGradingCriterion[]
   max_attempts: number
-  accept_late: boolean
   requirements?: CreateAssignmentRequirementPayload[]
   created_by: string
 }
@@ -2680,14 +2678,6 @@ export const trainerAssignmentsAPI = {
         return {
           success: false as const,
           error: 'This assignment can no longer be edited — learners have already submitted work.',
-          statusCode,
-          fieldErrors: extractFieldErrors(error),
-        }
-      }
-      if (statusCode === 400 && message.toLowerCase().includes('deadline')) {
-        return {
-          success: false as const,
-          error: 'Deadline can only be moved forward, not backward.',
           statusCode,
           fieldErrors: extractFieldErrors(error),
         }
@@ -2863,6 +2853,7 @@ export const trainerAssignmentsAPI = {
 export interface ApiNotification {
   id: string
   type: string
+  category: 'assignments' | 'feedback' | 'live' | 'bookings' | 'certificate' | 'system'
   title: string
   body: string
   action_url: string | null

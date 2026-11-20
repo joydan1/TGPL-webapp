@@ -538,8 +538,12 @@ export default function TrainerBookingsPage() {
       setActionError(result.error)
       return
     }
-    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'confirmed' } : b)))
-    setSelectedBooking((prev) => (prev && prev.id === bookingId ? { ...prev, status: 'confirmed' } : prev))
+    setBookings((prev) => prev.map((booking) => booking.id === bookingId
+      ? { ...booking, ...result.data, status: result.data.status }
+      : booking))
+    setSelectedBooking((prev) => prev && prev.id === bookingId
+      ? { ...prev, ...result.data, status: result.data.status }
+      : prev)
   }
 
   async function handleReject(bookingId: string) {
@@ -552,8 +556,12 @@ export default function TrainerBookingsPage() {
       setActionError(result.error)
       return
     }
-    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'rejected' } : b)))
-    setSelectedBooking((prev) => (prev && prev.id === bookingId ? { ...prev, status: 'rejected' } : prev))
+    setBookings((prev) => prev.map((booking) => booking.id === bookingId
+      ? { ...booking, ...result.data, status: result.data.status }
+      : booking))
+    setSelectedBooking((prev) => prev && prev.id === bookingId
+      ? { ...prev, ...result.data, status: result.data.status }
+      : prev)
   }
 
   async function saveRecording(bookingId: string) {

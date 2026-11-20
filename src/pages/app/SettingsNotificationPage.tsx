@@ -17,7 +17,7 @@ type CategoryPrefs = {
 
 // ---------- LEARNER CONTENT ----------
 const LEARNER_CATEGORIES: CategoryPrefs[] = [
-  { id: 'deadlines', label: 'Deadlines & assignments', inApp: false, email: false, push: true },
+  { id: 'assignments', label: 'Assignments', inApp: false, email: false, push: true },
   { id: 'liveSessions', label: 'Live sessions', inApp: true, email: false, push: true },
   { id: 'feedback', label: 'Feedback & grades', inApp: false, email: true, push: true },
 ]

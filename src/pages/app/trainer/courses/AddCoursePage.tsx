@@ -23,6 +23,7 @@ import AssignmentCreatorModal, {
 } from '../../../../components/AssignmentCreationModal'
 import ConfirmDialog from '../../../../components/ConfirmDialog'
 import { useConfirm } from '../../../../hooks/useConfirm'
+import { sentenceCaseStart } from '../../../../utils/text'
 import {
   useVideoUploads,
   useUploadGuard,
@@ -191,7 +192,7 @@ function normalizeAssignmentDraft(detail: TrainerAssignmentDetail | null): Assig
     ? Array.from(new Set(detail.requirements.flatMap((req) =>
         (req.allowed_file_types || []).map((type) => type.trim().toLowerCase()).filter(Boolean)
       )))
-    : ['pdf', 'docx']
+    : []
 
   const requirementDrafts = (detail.requirements ?? []).length
     ? detail.requirements!.map((req, index) => {
@@ -201,7 +202,7 @@ function normalizeAssignmentDraft(detail: TrainerAssignmentDetail | null): Assig
         return {
           id: makeId(),
           label: req.label || `Submission file ${index + 1}`,
-          allowedFileTypes: normalizedTypes.length ? normalizedTypes : fileTypes,
+          allowedFileTypes: normalizedTypes,
           maxBytesMb: String(Math.max(1, Math.round((req.max_bytes || 20 * 1024 * 1024) / (1024 * 1024)))),
           required: req.required,
           namingHint: req.naming_hint || 'Use your name and assignment title in the filename.',
@@ -756,8 +757,8 @@ export default function AddCoursePage() {
           return {
             id: makeId(),
             remoteId: lesson.id,
-            title: lesson.title ?? '',
-            description: detail?.body ?? '',
+            title: sentenceCaseStart(lesson.title ?? ''),
+            description: sentenceCaseStart(detail?.body ?? ''),
             videoFile: null,
             durationSeconds: lesson.duration_seconds ?? detail?.duration_seconds ?? null,
             existingVideoUrl: rawVideoUrl,
@@ -773,27 +774,27 @@ export default function AddCoursePage() {
         return {
           id: makeId(),
           remoteId: mod.id,
-          title: mod.title ?? '',
-          savedTitle: mod.title ?? '',
+          title: sentenceCaseStart(mod.title ?? ''),
+          savedTitle: sentenceCaseStart(mod.title ?? ''),
           lessons: lessons.length ? lessons : [emptyLesson()],
         }
       })
 
       setForm((f) => ({
         ...f,
-        title: draft.title ?? '',
-        subtitle: draft.subtitle ?? '',
+        title: sentenceCaseStart(draft.title ?? ''),
+        subtitle: sentenceCaseStart(draft.subtitle ?? ''),
         category: draft.category ?? '',
         language: draft.language ?? '',
         level: draft.level ?? '',
         coverImage: null,
         existingCoverImageUrl: draft.cover_image_url ?? (draft as typeof draft & { thumbnail_url?: string | null }).thumbnail_url ?? null,
-        description: draft.description ?? '',
-        expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes.slice(0, 8) : ['', ''],
+        description: sentenceCaseStart(draft.description ?? ''),
+        expectedOutcomes: draft.expected_outcomes?.length ? draft.expected_outcomes.slice(0, 8).map(sentenceCaseStart) : ['', ''],
         // Every audience item is kept, not just the first.
         targetAudience: (draft.target_audience ?? []).join(', '),
-        audienceDescription: draft.audience_description ?? '',
-        prerequisites: draft.prerequisites?.length ? draft.prerequisites.slice(0, 8) : [''],
+        audienceDescription: sentenceCaseStart(draft.audience_description ?? ''),
+        prerequisites: draft.prerequisites?.length ? draft.prerequisites.slice(0, 8).map(sentenceCaseStart) : [''],
         modules: prefilledModules.length ? prefilledModules : [emptyModule()],
         isFree: draft.is_free ?? false,
         priceNaira: draft.price_kobo ? String(draft.price_kobo / 100) : '',
@@ -1218,6 +1219,14 @@ export default function AddCoursePage() {
     if (step === 4) return saveSettingsAndContinue()
   }
 
+  const firstTitleLetter = form.title.trimStart().match(/\p{L}/u)?.[0]
+  const basicsReady = Boolean(
+    form.title.trim()
+    && firstTitleLetter === firstTitleLetter?.toLocaleUpperCase()
+    && form.category
+    && form.level,
+  )
+
   // Makes the server match the visibility the trainer picked:
   //   public + not live  -> publish        hidden + live -> unpublish
   //   public + live      -> nothing to do  hidden + not live -> nothing to do
@@ -1271,9 +1280,10 @@ export default function AddCoursePage() {
   }
 
   function updateListItem(field: 'expectedOutcomes' | 'prerequisites', index: number, value: string) {
+    const sentenceCasedValue = sentenceCaseStart(value)
     setForm((f) => {
       const list = [...f[field]]
-      list[index] = value
+      list[index] = sentenceCasedValue
       return { ...f, [field]: list }
     })
   }
@@ -1555,7 +1565,7 @@ export default function AddCoursePage() {
                       className="ac-input"
                       placeholder="e.g. Project Management Course"
                       value={form.title}
-                      onChange={(e) => update('title', e.target.value)}
+                      onChange={(e) => update('title', sentenceCaseStart(e.target.value))}
                     />
                     <p className="ac-hint">Keep it clear and specific — e.g. 'Project Management for Early-Career Professionals'</p>
                   </div>
@@ -1566,7 +1576,7 @@ export default function AddCoursePage() {
                       className="ac-input"
                       placeholder="e.g. Master the fundamentals of managing projects end-to-end"
                       value={form.subtitle}
-                      onChange={(e) => update('subtitle', e.target.value)}
+                      onChange={(e) => update('subtitle', sentenceCaseStart(e.target.value))}
                     />
                     <p className="ac-hint">One line that expands on the title — appears in search results</p>
                   </div>
@@ -1655,7 +1665,7 @@ export default function AddCoursePage() {
                     className="ac-textarea"
                     placeholder="This course covers the fundamentals of project management, from planning and scheduling to stakeholder communication and risk management…"
                     value={form.description}
-                    onChange={(e) => update('description', e.target.value)}
+                    onChange={(e) => update('description', sentenceCaseStart(e.target.value))}
                   />
                   <p className="ac-hint">Aim for 150–300 words. Describe what the course covers and the value it delivers.</p>
                 </div>
@@ -1690,7 +1700,7 @@ export default function AddCoursePage() {
                     className="ac-input"
                     placeholder="e.g. Early-career project professionals, Team leads"
                     value={form.targetAudience}
-                    onChange={(e) => update('targetAudience', e.target.value)}
+                    onChange={(e) => update('targetAudience', sentenceCaseStart(e.target.value))}
                   />
                   <p className="ac-hint">Shown as short tags under the "Who this is for" paragraph. Separate several with commas — each up to {MAX_AUDIENCE_ITEM_LENGTH} characters.</p>
                 </div>
@@ -1703,7 +1713,7 @@ export default function AddCoursePage() {
                     style={{ minHeight: 90 }}
                     placeholder="Early-career professionals (0–4 years experience) who work on or aspire to lead projects…"
                     value={form.audienceDescription}
-                    onChange={(e) => update('audienceDescription', e.target.value)}
+                    onChange={(e) => update('audienceDescription', sentenceCaseStart(e.target.value))}
                   />
                   <p className="ac-hint">Describe the ideal learner — their role, experience level, and goals.</p>
                 </div>
@@ -1763,7 +1773,7 @@ export default function AddCoursePage() {
                         aria-label={`Module ${mi + 1} title`}
                         placeholder="Module title, e.g. Project Initiation"
                         value={mod.title}
-                        onChange={(e) => updateModule(mod.id, { title: e.target.value })}
+                        onChange={(e) => updateModule(mod.id, { title: sentenceCaseStart(e.target.value) })}
                       />
                       <button
                         className="ac-module-delete"
@@ -1790,7 +1800,7 @@ export default function AddCoursePage() {
                               aria-label={`Lesson ${i + 1} title`}
                               placeholder="Lesson title"
                               value={lesson.title}
-                              onChange={(e) => updateLesson(mod.id, lesson.id, { title: e.target.value })}
+                              onChange={(e) => updateLesson(mod.id, lesson.id, { title: sentenceCaseStart(e.target.value) })}
                             />
                             <button className="ac-lesson-delete" onClick={() => removeLesson(mod.id, lesson.id)} aria-label="Remove lesson">
                               <Trash2 size={16} />
@@ -1803,7 +1813,7 @@ export default function AddCoursePage() {
                               aria-label={`Lesson ${i + 1} description`}
                               placeholder="What does this lesson cover? (optional)"
                               value={lesson.description}
-                              onChange={(e) => updateLesson(mod.id, lesson.id, { description: e.target.value })}
+                              onChange={(e) => updateLesson(mod.id, lesson.id, { description: sentenceCaseStart(e.target.value) })}
                             />
                           </div>
 
@@ -2166,7 +2176,7 @@ export default function AddCoursePage() {
                 <button className="ac-btn secondary" onClick={goBack} disabled={saving}>
                   <ChevronLeft size={18} /> Back
                 </button>
-                <button className="ac-btn primary" onClick={goNext} disabled={saving}>
+                <button className="ac-btn primary" onClick={goNext} disabled={saving || (step === 1 && !basicsReady)}>
                   {saving ? <Loader2 size={18} className="ac-spin" /> : null}
                   {saving ? 'Saving…' : step === 4 ? 'Review Course' : 'Continue'}
                   {!saving && <ChevronRight size={18} />}

@@ -56,6 +56,7 @@ export interface InviteUserPayload {
 interface InviteUserModalProps {
   onClose: () => void
   onInvite: (payload: InviteUserPayload) => Promise<void> | void
+  allowAdminInvite?: boolean
 }
 
 const MODAL_CSS = `
@@ -189,7 +190,7 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-export default function InviteUserModal({ onClose, onInvite }: InviteUserModalProps) {
+export default function InviteUserModal({ onClose, onInvite, allowAdminInvite = false }: InviteUserModalProps) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<InviteRoleChoice>('Learner')
   const [permissions, setPermissions] = useState<Record<string, boolean>>(() =>
@@ -295,7 +296,7 @@ export default function InviteUserModal({ onClose, onInvite }: InviteUserModalPr
           <div>
             <label className="ium-field-label">Assign role</label>
             <div className="ium-role-row">
-              {(['Learner', 'Trainer', 'Admin Asst'] as InviteRoleChoice[]).map((r) => (
+              {(['Learner', 'Trainer', ...(allowAdminInvite ? ['Admin Asst' as const] : [])] as InviteRoleChoice[]).map((r) => (
                 <button
                   key={r}
                   type="button"

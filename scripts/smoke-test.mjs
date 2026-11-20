@@ -2,10 +2,16 @@ import {spawn} from 'node:child_process'
 
 const port = 4173
 const baseUrl = `http://127.0.0.1:${port}`
-const preview = spawn('npm.cmd', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(port)], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  shell: true,
-})
+const npmCli = process.platform === 'win32'
+  ? 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js'
+  : null
+const preview = npmCli
+  ? spawn(process.execPath, [npmCli, 'run', 'preview', '--', '--host', '127.0.0.1', '--port', String(port)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  : spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(port)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
 
 let output = ''
 preview.stdout.on('data', (chunk) => { output += chunk.toString() })
@@ -36,6 +42,10 @@ const checks = [
   {path: '/privacy', contentType: 'text/html', includes: '<div id="root">'},
   {path: '/terms', contentType: 'text/html', includes: '<div id="root">'},
   {path: '/robots.txt', contentType: 'text/plain', includes: 'User-agent: *'},
+  {path: '/manifest.webmanifest', contentType: 'application/manifest+json', includes: 'The Global Project Leaders'},
+  {path: '/pwa-192.png', contentType: 'image/png', includes: ''},
+  {path: '/pwa-512.png', contentType: 'image/png', includes: ''},
+  {path: '/sw.js', contentType: 'text/javascript', includes: 'tgpl-app-shell-v1'},
 ]
 
 try {

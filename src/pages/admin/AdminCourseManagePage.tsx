@@ -12,6 +12,7 @@ import {
 } from '../../services/api'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
+import { sentenceCaseStart } from '../../utils/text'
 
 const CATEGORY_OPTIONS = ['Management', 'Leadership', 'Data & Analytics', 'Product', 'Design', 'Engineering']
 const LANGUAGE_OPTIONS = ['English', 'French', 'Portuguese']
@@ -134,12 +135,23 @@ export default function AdminCourseManagePage() {
       coursesManageAPI.getCurriculum(resolvedId),
     ])
     if (draftRes.success) {
-      setForm(draftRes.data)
+      setForm({
+        ...draftRes.data,
+        title: sentenceCaseStart(draftRes.data.title ?? ''),
+        subtitle: sentenceCaseStart(draftRes.data.subtitle ?? ''),
+        description: sentenceCaseStart(draftRes.data.description ?? ''),
+        audience_description: sentenceCaseStart(draftRes.data.audience_description ?? ''),
+        target_audience: (draftRes.data.target_audience ?? []).map(sentenceCaseStart),
+      })
     } else {
       setLoadError(draftRes.error)
     }
     if (curriculumRes.success) {
-      setModules(curriculumRes.data.map((m) => ({ ...m, lessons: m.lessons ?? [] })))
+      setModules(curriculumRes.data.map((m) => ({
+        ...m,
+        title: sentenceCaseStart(m.title),
+        lessons: (m.lessons ?? []).map((lesson) => ({ ...lesson, title: sentenceCaseStart(lesson.title) })),
+      })))
     }
     setLoading(false)
   }
@@ -220,7 +232,7 @@ export default function AdminCourseManagePage() {
   }
 
   function handleRenameModule(moduleId: string, title: string) {
-    setModules((prev) => prev.map((m) => (m.id === moduleId ? { ...m, title } : m)))
+    setModules((prev) => prev.map((m) => (m.id === moduleId ? { ...m, title: sentenceCaseStart(title) } : m)))
   }
 
   async function handleModuleBlur(moduleId: string, title: string) {
@@ -275,7 +287,7 @@ export default function AdminCourseManagePage() {
     setModules((prev) =>
       prev.map((m) =>
         m.id === moduleId
-          ? { ...m, lessons: m.lessons.map((l) => (l.id === lessonId ? { ...l, title } : l)) }
+          ? { ...m, lessons: m.lessons.map((l) => (l.id === lessonId ? { ...l, title: sentenceCaseStart(title) } : l)) }
           : m,
       ),
     )
@@ -365,11 +377,11 @@ export default function AdminCourseManagePage() {
               <div className="acm-grid">
                 <div className="acm-field">
                   <label className="acm-label">Title</label>
-                  <input className="acm-input" value={form.title ?? ''} onChange={(e) => updateForm('title', e.target.value)} />
+                  <input className="acm-input" value={form.title ?? ''} onChange={(e) => updateForm('title', sentenceCaseStart(e.target.value))} />
                 </div>
                 <div className="acm-field">
                   <label className="acm-label">Subtitle</label>
-                  <input className="acm-input" value={form.subtitle ?? ''} onChange={(e) => updateForm('subtitle', e.target.value)} />
+                  <input className="acm-input" value={form.subtitle ?? ''} onChange={(e) => updateForm('subtitle', sentenceCaseStart(e.target.value))} />
                 </div>
                 <div className="acm-field">
                   <label className="acm-label">Category</label>
@@ -394,11 +406,11 @@ export default function AdminCourseManagePage() {
                 </div>
                 <div className="acm-field full">
                   <label className="acm-label">Description</label>
-                  <textarea className="acm-textarea" value={form.description ?? ''} onChange={(e) => updateForm('description', e.target.value)} />
+                  <textarea className="acm-textarea" value={form.description ?? ''} onChange={(e) => updateForm('description', sentenceCaseStart(e.target.value))} />
                 </div>
                 <div className="acm-field full">
                   <label className="acm-label">Who this is for</label>
-                  <textarea className="acm-textarea" style={{ minHeight: 80 }} value={form.audience_description ?? ''} onChange={(e) => updateForm('audience_description', e.target.value)} />
+                  <textarea className="acm-textarea" style={{ minHeight: 80 }} value={form.audience_description ?? ''} onChange={(e) => updateForm('audience_description', sentenceCaseStart(e.target.value))} />
                 </div>
                 <div className="acm-field">
                   <label className="acm-label">Target audience</label>
@@ -409,7 +421,7 @@ export default function AdminCourseManagePage() {
                     onChange={(e) =>
                       updateForm(
                         'target_audience',
-                        e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                        e.target.value.split(',').map((s) => sentenceCaseStart(s.trim())).filter(Boolean),
                       )
                     }
                   />

@@ -16,6 +16,7 @@ export interface User {
   learner_profile?: LearnerProfile | null
   avatar_url: string | null
   permissions?: AdminPermissions | null
+  is_super_admin?: boolean
    available_modes?: UserMode[]
 }
 

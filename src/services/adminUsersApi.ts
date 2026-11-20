@@ -10,6 +10,7 @@ export interface AdminUserListItem {
   email: string
   role: ApiRole
   is_active: boolean
+  is_super_admin: boolean | null
   avatar_url: string | null
   created_at: string
 }

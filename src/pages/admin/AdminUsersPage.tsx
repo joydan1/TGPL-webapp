@@ -12,6 +12,7 @@ import DeleteAccountModal from '../../components/admin/DeleteAccountModal'
 import InviteUserModal, { type InviteUserPayload } from '../../components/admin/InviteUserModal'
 import TrainerRequestModal, { TRAINER_REQUEST_MODAL_CSS } from '../../components/admin/TrainerRequestModal'
 import RowActionMenu, { type RowActionMenuItem } from '../../components/admin/RowActionMenu'
+import { useAuthStore } from '../../store/auth'
 
 export interface AdminUser {
   id: string
@@ -22,6 +23,7 @@ export interface AdminUser {
   status: 'active' | 'inactive'
   avatar_color: string
   avatar_url: string | null
+  is_super_admin: boolean
 }
 
 // ─── Invites (unchanged — separate endpoint, not in scope of this fix) ─────
@@ -78,6 +80,7 @@ function toAdminUser(row: AdminUserListItem): AdminUser {
     status: row.is_active ? 'active' : 'inactive',
     avatar_color: colorForId(row.id),
     avatar_url: row.avatar_url ?? null,
+    is_super_admin: row.is_super_admin === true,
   }
 }
 
@@ -182,6 +185,8 @@ const PAGE_CSS = `
   .au-row-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
   .au-row-menu-item.danger { color: #DC2626; }
   .au-row-menu-item.danger:hover { background: #FEF2F2; }
+  .au-row-menu-item.primary { color: #2492EB; }
+  .au-row-menu-item.primary:hover { background: #E9F5FF; }
 
   .au-inline-error { display: flex; align-items: center; gap: 0.5rem; margin: 0 1.25rem 0.9rem; padding: 0.6rem 0.85rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; font-size: 0.75rem; color: #B91C1C; }
 
@@ -316,6 +321,7 @@ function downloadCsv(rows: AdminUser[]) {
 }
 
 export default function AdminUsersPage() {
+  const isSuperAdmin = useAuthStore((state) => state.user?.is_super_admin === true)
   const [view, setView] = useState<AdminView>('members')
 
   // ── Members (server-paginated) ──
@@ -569,14 +575,13 @@ export default function AdminUsersPage() {
       handleTrainerRequestAction(req, action).catch(() => {})
     }
     return [
-      { label: 'Approve', icon: <CheckCircle2 size={15} />, onClick: () => run('approve') },
+      { label: 'Approve', icon: <CheckCircle2 size={15} />, primary: true, onClick: () => run('approve') },
       { label: 'Reject', icon: <Ban size={15} />, danger: true, onClick: () => run('reject') },
     ]
   }
 
   function handleViewProfile(user: AdminUser) {
     setOpenMenuId(null)
-    if (user.role === 'admin') return
     setViewingUser(user)
   }
 
@@ -1027,7 +1032,7 @@ export default function AdminUsersPage() {
                                 </span>
                               </td>
                               <td>
-                                {isPending && (
+                                {isPending && (inv.role !== 'admin' || isSuperAdmin) && (
                                   <div className="au-row-menu-wrap">
                                     <button
                                       className="au-row-menu-btn"
@@ -1087,7 +1092,7 @@ export default function AdminUsersPage() {
                                   <StatusIcon size={12} />
                                   {inv.status}
                                 </span>
-                                {isPending && (
+                                {isPending && (inv.role !== 'admin' || isSuperAdmin) && (
                                   <div className="au-row-menu-wrap">
                                     <button
                                       className="au-row-menu-btn"
@@ -1329,6 +1334,7 @@ export default function AdminUsersPage() {
         <InviteUserModal
           onClose={() => setInviting(false)}
           onInvite={handleInviteUser}
+          allowAdminInvite={isSuperAdmin}
         />
       )}
     </AdminShell>

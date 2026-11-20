@@ -11,6 +11,7 @@ import DeleteAccountModal, { DELETE_MODAL_CSS } from './DeleteAccountModal'
 import MessageComposerModal, { MESSAGE_MODAL_CSS } from './MessageComposerModal'
 import ChangeRoleModal, { CHANGE_ROLE_MODAL_CSS } from './ChangeRoleModal'
 import { ADMIN_PERMISSIONS } from './InviteUserModal'
+import { useAuthStore } from '../../store/auth'
 
 export const USER_PROFILE_MODAL_CSS = `
   .up-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: flex-start; justify-content: center; z-index: 900; padding: 2rem 1rem; overflow-y: auto; }
@@ -101,6 +102,12 @@ export const USER_PROFILE_MODAL_CSS = `
   .up-perm-state { font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
   .up-perm-state.on { color: #2492EB; }
   .up-perm-state.off { color: #9CA3AF; }
+  .up-perm-toggle { width: 36px; height: 22px; border: 0; border-radius: 999px; position: relative; flex-shrink: 0; cursor: pointer; }
+  .up-perm-toggle.on { background: #2492EB; }
+  .up-perm-toggle.off { background: #D1D5DB; }
+  .up-perm-toggle:disabled { opacity: 0.55; cursor: not-allowed; }
+  .up-perm-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+  .up-perm-toggle.on::after { transform: translateX(14px); }
 
   .up-course-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1.1rem; border-top: 1px solid #F3F4F6; }
   .up-course-icon { width: 32px; height: 32px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #E9F5FF; color: #2492EB; }
@@ -150,6 +157,7 @@ interface AdminUserDetail {
   avatar_url: string | null
   created_at: string
   last_login_at: string | null
+  is_super_admin: boolean | null
   // Learner and trainer fields live side by side here — each detail
   // response only populates the set that applies to that user's role.
   stats?: {
@@ -272,6 +280,11 @@ function permissionEnabled(detail: AdminUserDetail, id: string): boolean {
   return Boolean((detail.permissions as unknown as Record<string, boolean | undefined> | null)?.[id])
 }
 
+function permissionDraftFrom(permissions: AdminUserDetail['permissions']): Record<string, boolean> {
+  const values = permissions as unknown as Record<string, boolean | undefined> | null
+  return Object.fromEntries(ADMIN_PERMISSIONS.map((permission) => [permission.id, values?.[permission.id] === true]))
+}
+
 function StatCard({
   icon, iconBg, value, line1, line2, muted,
 }: {
@@ -306,6 +319,9 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<'resetPassword' | 'suspend' | 'delete' | 'role' | null>(null)
+  const [permissionDraft, setPermissionDraft] = useState<Record<string, boolean> | null>(null)
+  const [savingPermissions, setSavingPermissions] = useState(false)
+  const actor = useAuthStore((state) => state.user)
 
   const [showDeactivate, setShowDeactivate] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -336,7 +352,12 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
     apiClient
       .get<AdminUserDetail>(`/v1/admin/users/${user.id}/`)
       .then((res) => {
-        if (!cancelled) setDetail(res.data)
+        if (!cancelled) {
+          setDetail(res.data)
+          if (res.data.permissions) {
+            setPermissionDraft(permissionDraftFrom(res.data.permissions))
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadError("Couldn't load this user's profile. Please try again.")
@@ -420,21 +441,49 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
   const roleIsAdmin = detail?.role === 'admin'
   const canDelete = roleIsLearner || roleIsTrainer
   const canChangeRole = roleIsLearner || roleIsTrainer
+  const isSuperAdminActor = actor?.is_super_admin === true
+  const isOwnAccount = actor?.id === user.id
+  const permissionsLocked = isOwnAccount || detail?.is_super_admin === true
+  const canEditPermissions = isSuperAdminActor && !permissionsLocked
+  const canResetPassword = !roleIsAdmin || (isSuperAdminActor && !isOwnAccount && detail?.is_super_admin !== true)
 
   const enabledPermCount = useMemo(() => {
     if (!detail || !roleIsAdmin) return 0
-    return ADMIN_PERMISSIONS.filter((perm) => permissionEnabled(detail, perm.id)).length
-  }, [detail, roleIsAdmin])
+    return ADMIN_PERMISSIONS.filter((perm) => permissionDraft?.[perm.id] ?? permissionEnabled(detail, perm.id)).length
+  }, [detail, roleIsAdmin, permissionDraft])
+
+  const permissionsChanged = Boolean(detail?.permissions && permissionDraft && ADMIN_PERMISSIONS.some(
+    (permission) => permissionDraft[permission.id] !== permissionEnabled(detail, permission.id),
+  ))
 
   async function handleResetPassword() {
     setActionError(null)
     setBusyAction('resetPassword')
     try {
       await apiClient.post(`/v1/admin/users/${user.id}/reset-password/`)
-    } catch {
-      setActionError("Couldn't send the reset email. Please try again.")
+    } catch (error: any) {
+      setActionError(error?.response?.data?.detail || "Couldn't send the reset email. Please try again.")
     } finally {
       setBusyAction(null)
+    }
+  }
+
+  async function handleSavePermissions() {
+    if (!detail || !permissionDraft || !canEditPermissions) return
+    setActionError(null)
+    setSavingPermissions(true)
+    try {
+      const payload = Object.fromEntries(ADMIN_PERMISSIONS.map((permission) => [
+        permission.id,
+        permissionDraft[permission.id] === true,
+      ]))
+      const response = await apiClient.patch<AdminUserDetail>(`/v1/admin/users/${user.id}/permissions/`, payload)
+      setDetail(response.data)
+      setPermissionDraft(permissionDraftFrom(response.data.permissions))
+    } catch (error: any) {
+      setActionError(error?.response?.data?.detail || "Couldn't update admin permissions. Please try again.")
+    } finally {
+      setSavingPermissions(false)
     }
   }
 
@@ -581,14 +630,14 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                   <button className="up-btn" onClick={() => setShowMessage(true)} type="button">
                     <Mail size={16} /> Message
                   </button>
-                  <button
+                  {canResetPassword && <button
                     className="up-btn"
                     type="button"
                     onClick={handleResetPassword}
-                    disabled={busyAction === 'resetPassword'}
+                    disabled={busyAction === 'resetPassword' || (roleIsAdmin && (isOwnAccount || detail?.is_super_admin === true))}
                   >
                     <KeyRound size={16} /> {busyAction === 'resetPassword' ? 'Sending…' : 'Reset password'}
-                  </button>
+                  </button>}
                   {canChangeRole && (
                     <button
                       className="up-btn"
@@ -601,6 +650,16 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                     </button>
                   )}
                   <div style={{ flex: 1 }} />
+                  {roleIsAdmin && isSuperAdminActor && (
+                    <button
+                      className="up-btn"
+                      type="button"
+                      onClick={handleSavePermissions}
+                      disabled={!canEditPermissions || !permissionsChanged || savingPermissions}
+                    >
+                      {savingPermissions ? 'Saving permissions…' : 'Save permissions'}
+                    </button>
+                  )}
                   <button
                     className={`up-btn up-deactivate${!isActive ? ' active' : ''}`}
                     onClick={() => setShowDeactivate(true)}
@@ -665,7 +724,7 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                         <span className="up-section-count">{enabledPermCount} of {ADMIN_PERMISSIONS.length} enabled</span>
                       </div>
                       {ADMIN_PERMISSIONS.map((perm) => {
-                        const on = permissionEnabled(detail, perm.id)
+                        const on = permissionDraft?.[perm.id] ?? permissionEnabled(detail, perm.id)
                         const Icon = perm.icon
                         return (
                           <div className="up-perm-row" key={perm.id}>
@@ -679,10 +738,23 @@ export default function UserProfileModal({ user, onClose, onStatusChange, onDele
                               </div>
                               <div className={`up-perm-desc ${on ? 'on' : 'off'}`}>{perm.description}</div>
                             </div>
-                            <span className={`up-perm-state ${on ? 'on' : 'off'}`}>{on ? 'On' : 'Off'}</span>
+                            <button
+                              className={`up-perm-toggle ${on ? 'on' : 'off'}`}
+                              type="button"
+                              role="switch"
+                              aria-checked={on}
+                              aria-label={`${perm.label} permission`}
+                              disabled={!canEditPermissions || !permissionDraft || savingPermissions}
+                              onClick={() => setPermissionDraft((previous) => previous
+                                ? { ...previous, [perm.id]: !previous[perm.id] }
+                                : previous)}
+                            />
                           </div>
                         )
                       })}
+                      {permissionsLocked && (
+                        <div className="up-section-pending">Super-admin permissions and your own permissions cannot be changed.</div>
+                      )}
                     </div>
                   )}
 

@@ -193,7 +193,8 @@ export default function LoginPage() {
         .forgot-link { font-size: 0.875rem; color: var(--primary-500); text-decoration: none; font-weight: 500; }
         .forgot-link:hover { text-decoration: underline; }
         .password-wrapper { position: relative; }
-        .eye-button { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; display: flex; align-items: center; padding: 0.25rem; transition: color 200ms ease; }
+        .password-wrapper input { padding-right: 2.75rem !important; }
+        .eye-button { position: absolute; z-index: 2; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; display: flex; align-items: center; padding: 0.25rem; transition: color 200ms ease; }
         .eye-button:hover { color: #666; }
         .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
         .remember-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
@@ -299,7 +300,7 @@ export default function LoginPage() {
                 <div className="password-wrapper">
                   <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={formData.password} onChange={handleInputChange} error={formErrors.password} disabled={unverifiedEmail !== null} />
                   {unverifiedEmail === null && (
-                    <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   )}

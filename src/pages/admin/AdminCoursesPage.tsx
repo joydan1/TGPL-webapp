@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react'
 import {
   Plus, Search, MoreVertical, Layers, Globe, Pencil, TrendingUp,
-  Eye, Tag, UserCog, Archive, Trash2, AlertCircle, X as XIcon,
+  Eye, Tag, UserCog, Archive, ArchiveRestore, Trash2, AlertCircle, X as XIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../../store/auth'
 import AdminShell from '../../layouts/AdminShell'
 import {
   type AdminCourseRow, type CourseStatus, type CatalogStats,
@@ -22,7 +23,7 @@ const PAGE_CSS = `
   .cc-page { padding: 1.5rem 2rem 2rem; background: #F5F5F5; }
 
   .cc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .cc-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #111827; }
+  .cc-title { margin: 0; font-size: 1.75rem; font-weight: 700; color: #2B2B2C; }
   .cc-subtitle { margin: 0.25rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .cc-create-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #2492EB; color: #fff; border: none; border-radius: 0.7rem; padding: 0.7rem 1.2rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 
@@ -30,6 +31,7 @@ const PAGE_CSS = `
   .cc-error-banner button { margin-left: auto; background: none; border: none; color: #B91C1C; cursor: pointer; display: flex; flex-shrink: 0; }
 
   .cc-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .cc-stats-grid.restricted { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cc-stat-card { background: #fff; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05); border: 1px solid rgba(148, 163, 184, 0.12); min-width: 0; }
   .cc-stat-icon { width: 44px; height: 44px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cc-stat-value { margin: 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
@@ -97,6 +99,7 @@ const PAGE_CSS = `
 
   @media (max-width: 900px) {
     .cc-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cc-stats-grid.restricted { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 640px) {
     .cc-page { padding: 1.25rem; }
@@ -108,6 +111,7 @@ const PAGE_CSS = `
   }
   @media (max-width: 420px) {
     .cc-stats-grid { grid-template-columns: 1fr; }
+    .cc-stats-grid.restricted { grid-template-columns: 1fr; }
   }
 `
 
@@ -146,13 +150,17 @@ const SEARCH_DEBOUNCE_MS = 400
 
 export default function AdminCoursesPage() {
   const navigate = useNavigate()
+  const canViewRevenue = useAuthStore((state) => state.user?.permissions?.view_revenue === true)
 
   // ── List data ──
   const [courses, setCourses] = useState<AdminCourseRow[]>([])
+  const showRevenueColumn = canViewRevenue && courses.length > 0
+    && courses.every((course) => course.revenue_kobo !== undefined)
   const [count, setCount] = useState(0)
   const [next, setNext] = useState<string | null>(null)
   const [previous, setPrevious] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [listReloadKey, setListReloadKey] = useState(0)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
 
@@ -195,7 +203,7 @@ export default function AdminCoursesPage() {
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true)
-    const res = await adminCoursesAPI.aggregateCatalogStats()
+    const res = await adminCoursesAPI.aggregateCatalogStats(canViewRevenue)
     if (res.success) {
       setStats(res.data)
     } else {
@@ -203,7 +211,7 @@ export default function AdminCoursesPage() {
       setStats(null)
     }
     setStatsLoading(false)
-  }, [])
+  }, [canViewRevenue])
 
   useEffect(() => {
     fetchStats()
@@ -233,7 +241,7 @@ export default function AdminCoursesPage() {
     })
 
     return () => { cancelled = true }
-  }, [page, debouncedSearch, statusFilter])
+  }, [page, debouncedSearch, statusFilter, canViewRevenue, listReloadKey])
 
   
   useEffect(() => {
@@ -350,11 +358,34 @@ export default function AdminCoursesPage() {
     const res = await adminCoursesAPI.archiveCourse(course.slug, payload)
     setActioningSlug(null)
     if (res.success) {
-      setCourses((prev) => prev.map((c) => (c.slug === course.slug ? { ...c, ...res.data } : c)))
+      setCourses((previous) => statusFilter === 'all'
+        ? previous.map((item) => item.slug === course.slug
+          ? { ...item, ...res.data, status: 'archived', is_archived: true }
+          : item)
+        : previous.filter((item) => item.slug !== course.slug))
       setArchivingCourse(null)
+      setListReloadKey((key) => key + 1)
       fetchStats()
     } else {
       
+      setActionError(apiErrorMessage(res.error))
+    }
+  }
+
+  async function restoreCourse(course: AdminCourseRow) {
+    setActioningSlug(course.slug)
+    setActionError(null)
+    const res = await adminCoursesAPI.updateCourse(course.slug, { status: 'draft' })
+    setActioningSlug(null)
+    if (res.success) {
+      setCourses((previous) => statusFilter === 'all'
+        ? previous.map((item) => item.slug === course.slug
+          ? { ...item, ...res.data, status: 'draft', is_archived: false }
+          : item)
+        : previous.filter((item) => item.slug !== course.slug))
+      setListReloadKey((key) => key + 1)
+      fetchStats()
+    } else {
       setActionError(apiErrorMessage(res.error))
     }
   }
@@ -426,7 +457,7 @@ function handleCreateCourse() {
     </div>
   )}
 
-        <div className="cc-stats-grid">
+        <div className={`cc-stats-grid${canViewRevenue && stats?.total_revenue_kobo !== undefined ? '' : ' restricted'}`}>
           <div className="cc-stat-card">
             <div className="cc-stat-icon" style={{ background: '#E9F5FF' }}>
   <Layers size={20} color="#2492EB" />
@@ -454,7 +485,7 @@ function handleCreateCourse() {
               <p className="cc-stat-label">Draft</p>
             </div>
           </div>
-          <div className="cc-stat-card">
+          {canViewRevenue && stats?.total_revenue_kobo !== undefined && <div className="cc-stat-card">
            <div className="cc-stat-icon" style={{ background: '#F5F3FF' }}>
   <TrendingUp size={20} color="#8B5CF6" />
 </div>
@@ -462,7 +493,7 @@ function handleCreateCourse() {
               <p className={`cc-stat-value${statsLoading ? ' loading' : ''}`}>{statsLoading ? '—' : formatNaira(stats?.total_revenue_kobo ?? 0)}</p>
               <p className="cc-stat-label">Total revenue</p>
             </div>
-          </div>
+          </div>}
         </div>
 
         <div className="cc-panel">
@@ -502,18 +533,18 @@ function handleCreateCourse() {
                   <th>Trainer</th>
                   <th>Price</th>
                   <th>Status</th>
-                  <th>Enrolled</th>
-                  <th>Revenue</th>
+                  {canViewRevenue && <th>Enrolled</th>}
+                  {showRevenueColumn && <th>Revenue</th>}
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {listLoading && (
-                  <tr className="cc-loading-row"><td colSpan={8}>Loading courses…</td></tr>
+                  <tr className="cc-loading-row"><td colSpan={6 + (canViewRevenue ? 1 : 0) + (showRevenueColumn ? 1 : 0)}>Loading courses…</td></tr>
                 )}
 
                 {!listLoading && listError && (
-                  <tr className="cc-loading-row"><td colSpan={8}>{listError}</td></tr>
+                  <tr className="cc-loading-row"><td colSpan={6 + (canViewRevenue ? 1 : 0) + (showRevenueColumn ? 1 : 0)}>{listError}</td></tr>
                 )}
 
                 {!listLoading && !listError && courses.map((course) => (
@@ -559,8 +590,8 @@ function handleCreateCourse() {
                         {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
                       </span>
                     </td>
-                    <td>{course.enrollment_count}</td>
-                    <td>{formatNaira(course.revenue_kobo)}</td>
+                    {canViewRevenue && <td>{course.enrollment_count}</td>}
+                    {showRevenueColumn && <td>{course.revenue_kobo !== undefined ? formatNaira(course.revenue_kobo) : '—'}</td>}
                     <td>
                       <div className="cc-row-menu-wrap">
                         <button
@@ -628,14 +659,25 @@ function handleCreateCourse() {
               <UserCog size={15} /> Assign trainer
             </button>
             <div className="cc-row-menu-divider" />
-            <button
-              className="cc-row-menu-item"
-              onClick={() => handleArchive(openCourse)}
-              type="button"
-              disabled={openCourse.status === 'archived'}
-            >
-              <Archive size={15} /> Archive
-            </button>
+            {openCourse.status === 'archived' ? (
+              <button
+                className="cc-row-menu-item"
+                onClick={() => { closeRowMenu(); void restoreCourse(openCourse) }}
+                type="button"
+                disabled={actioningSlug === openCourse.slug}
+              >
+                <ArchiveRestore size={15} /> Restore to draft
+              </button>
+            ) : (
+              <button
+                className="cc-row-menu-item"
+                onClick={() => handleArchive(openCourse)}
+                type="button"
+                disabled={actioningSlug === openCourse.slug}
+              >
+                <Archive size={15} /> Archive
+              </button>
+            )}
             <button className="cc-row-menu-item danger" onClick={() => handleDelete(openCourse)} type="button">
               <Trash2 size={15} /> Delete course
             </button>
@@ -646,6 +688,7 @@ function handleCreateCourse() {
       {viewingCourse && (
         <CourseDetailModal
           course={viewingCourse}
+          showFinancials={canViewRevenue}
           onClose={() => setViewingCourse(null)}
           onEdit={() => navigate(`/admin/courses/${viewingCourse.slug}/edit`)}
           onSetPrice={() => { setPricingCourse(viewingCourse); setViewingCourse(null) }}
@@ -673,6 +716,7 @@ function handleCreateCourse() {
       {archivingCourse && (
         <ArchiveCourseModal
           course={archivingCourse}
+          showEnrollment={canViewRevenue}
           onClose={() => { setArchivingCourse(null); setActionError(null) }}
           onConfirm={(payload: ArchiveCoursePayload) => confirmArchive(archivingCourse, payload)}
           error={actionError}

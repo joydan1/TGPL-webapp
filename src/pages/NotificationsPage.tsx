@@ -125,7 +125,7 @@ function NotifIcon({ category, bg }: { category: Notification['category']; bg: s
     certificate: <Trophy        {...p} color="#F59E0B" />,
     feedback:    <MessageSquare {...p} color="#16A34A" />,
     live:        <Radio         {...p} color="#EF4444" />,
-    deadlines:   <ClipboardList {...p} color="#EF4444" />,
+    assignments: <ClipboardList {...p} color="#EF4444" />,
     bookings:    <CalendarCheck {...p} color="#2492EB" />,
     system:      <Info          {...p} color="#6B7280" />,
   }

@@ -213,7 +213,7 @@ export function notifIcon(category: Notification['category'], bg: string) {
     certificate: <Trophy    {...iconProps} color="#F59E0B" />,
     feedback:    <MessageSquare {...iconProps} color="#16A34A" />,
     live:        <Radio     {...iconProps} color="#EF4444" />,
-    deadlines:   <ClipboardList {...iconProps} color="#EF4444" />,
+    assignments: <ClipboardList {...iconProps} color="#EF4444" />,
     bookings:    <CalendarCheck {...iconProps} color="#2492EB" />,
     system:      <Info      {...iconProps} color="#6B7280" />,
   }

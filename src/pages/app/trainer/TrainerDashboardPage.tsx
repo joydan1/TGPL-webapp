@@ -19,7 +19,7 @@ const PAGE_CSS = `
 
   .db-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .db-greeting { margin: 0; color: #6B7280; font-size: 0.9rem; }
-  .db-name { margin: 0.3rem 0 0; font-size: 1.5rem; font-weight: 800; color: #111827; }
+  .db-name { margin: 0.3rem 0 0; font-size: 1.5rem; font-weight: 600; color: #111827; }
   .db-add-btn { appearance: none; border: none; border-radius: 999px; padding: 0.75rem 1.1rem; background: #2492EB; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; white-space: nowrap; }
 
   .db-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1.25rem; }
@@ -148,7 +148,6 @@ export default function TrainerDashboardPage() {
 
   const [pendingReviews, setPendingReviews] = useState<TrainerPendingReview[]>([])
   const [pendingCount, setPendingCount] = useState<number | null>(null)
-  const [overdueCount, setOverdueCount] = useState<number | null>(null)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
 
   const [nextSession, setNextSession] = useState<TrainerSession | null>(null)
@@ -195,7 +194,6 @@ export default function TrainerDashboardPage() {
 
     if (pendingRes.success) {
       setPendingReviews(pendingRes.data.slice(0, 2))
-      setOverdueCount(pendingRes.data.filter((r) => r.is_late).length)
     } else {
       setReviewsError(pendingRes.error)
     }
@@ -246,8 +244,8 @@ export default function TrainerDashboardPage() {
     {
       title: 'Pending reviews',
       value: pendingCount !== null ? String(pendingCount) : '—',
-      label: overdueCount !== null && totalReviews !== null
-        ? `${overdueCount} overdue · ${totalReviews} total`
+      label: totalReviews !== null
+        ? `${totalReviews} total`
         : '—',
       labelColor: '#D97706',
       icon: ClipboardList,

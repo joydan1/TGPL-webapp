@@ -8,6 +8,8 @@ import AdminShell from '../../layouts/AdminShell'
 import MaintenanceScreen from '../../components/MaintenanceScreen'
 import { useAuthStore } from '../../store/auth'
 import { adminSettingsAPI, adminProfileAPI, NO_OP_ERROR_MESSAGE } from '../../services/adminSettingsApi'
+import { publicSettingsAPI } from '../../services/publicSettingsApi'
+import { isPasswordValid, PASSWORD_GUIDANCE } from '../../utils/password'
 import {
   SETTINGS_SECTIONS,
   type SystemSettings, type PatchedSystemSettings, type FieldConfig, type FieldGroup,
@@ -105,7 +107,7 @@ const PAGE_CSS = `
   .as-upload-photo-btn { display: flex; align-items: center; gap: 8px; padding: 0 16px; height: 36px; background: #F7F7F7; border: 1px solid #EBEBEB; border-radius: 14px; font-size: 12px; font-weight: 600; color: #616873; cursor: pointer; margin-left: auto; }
 
   .as-password-input-wrap { position: relative; width: 240px; }
-  .as-password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #99A1AF; cursor: pointer; padding: 0; }
+  .as-password-toggle { position: absolute; z-index: 2; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #99A1AF; cursor: pointer; padding: 0.25rem; }
   .as-password-btn { height: 36px; padding: 0 20px; background: #2492EB; color: #fff; border: none; border-radius: 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .as-password-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -226,6 +228,13 @@ export default function AdminSettingsPage() {
     if (result.success) {
       setValues(result.data)
       setDirty({})
+      if ('maintenance_mode' in dirty
+        || 'maintenance_scheduled_message' in dirty
+        || 'maintenance_expected_end_time' in dirty) {
+        await publicSettingsAPI.getPublicSettings()
+        window.localStorage.setItem('public-settings-updated', String(Date.now()))
+        window.dispatchEvent(new Event('public-settings-updated'))
+      }
       setFeedback({ type: 'success', text: 'Settings saved.' })
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 2000)
@@ -664,7 +673,7 @@ function ProfilePanel() {
     }
   }
 
-  const pwValid = currentPw.length > 0 && newPw.length >= 8 && newPw === confirmPw
+  const pwValid = currentPw.length > 0 && isPasswordValid(newPw) && newPw === confirmPw
 
   async function handleChangePassword() {
     if (!pwValid) return
@@ -738,7 +747,7 @@ function ProfilePanel() {
             <PasswordInput value={currentPw} onChange={setCurrentPw} show={showPw} onToggleShow={() => setShowPw((s) => !s)} placeholder="Enter current password" />
           </div>
           <div className="as-row">
-            <div className="as-row-label"><p className="as-row-label-title">New password</p><p className="as-row-label-help">Minimum 8 characters with uppercase, number and symbol</p></div>
+            <div className="as-row-label"><p className="as-row-label-title">New password</p><p className="as-row-label-help">{PASSWORD_GUIDANCE}</p></div>
             <PasswordInput value={newPw} onChange={setNewPw} show={showPw} onToggleShow={() => setShowPw((s) => !s)} placeholder="New password" />
           </div>
           <div className="as-row">
@@ -808,7 +817,7 @@ function PasswordInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      <button type="button" className="as-password-toggle" onClick={onToggleShow} aria-label={show ? 'Hide password' : 'Show password'}>
+      <button type="button" className="as-password-toggle" onMouseDown={(e) => e.preventDefault()} onClick={onToggleShow} aria-label={show ? 'Hide password' : 'Show password'}>
         {show ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
     </div>

@@ -3,7 +3,7 @@ import type { ApiNotification } from '../../services/api'
 
 export type NotifCategory =
   | 'all'
-  | 'deadlines'
+  | 'assignments'
   | 'live'
   | 'bookings'
   | 'feedback'
@@ -23,7 +23,7 @@ export interface Notification {
 
 export const TABS: { key: NotifCategory; label: string }[] = [
   { key: 'all',         label: 'All'         },
-  { key: 'deadlines',   label: 'Assignments' },
+  { key: 'assignments', label: 'Assignments' },
   { key: 'live',        label: 'Live'        },
   { key: 'bookings',    label: 'Bookings'    },
   { key: 'feedback',    label: 'Feedback'    },
@@ -35,26 +35,9 @@ const ICON_BG: Record<Exclude<NotifCategory, 'all'>, string> = {
   certificate: '#FEF9EC',
   feedback:    '#ECFDF5',
   live:        '#FEF2F2',
-  deadlines:   '#FEF2F2',
+  assignments: '#FEF2F2',
   bookings:    '#EFF6FF',
   system:      '#F3F4F6',
-}
-
-// Best-effort mapping from backend `type` strings (e.g. "CERTIFICATE_ISSUED",
-// "ASSIGNMENT_GRADED_PASS") to a display category. Order matters — first
-// match wins. Adjust/extend once the real set of `type` values is confirmed;
-// anything unmatched falls through to 'system' rather than erroring.
-const CATEGORY_RULES: { category: Exclude<NotifCategory, 'all'>; pattern: RegExp }[] = [
-  { category: 'certificate', pattern: /CERTIFICATE/i },
-  { category: 'feedback',    pattern: /GRAD|FEEDBACK|REVISION/i },
-  { category: 'deadlines',   pattern: /ASSIGNMENT|DEADLINE/i },
-  { category: 'live',        pattern: /LIVE|SESSION/i },
-  { category: 'bookings',    pattern: /BOOKING/i },
-]
-
-function categoryFromType(type: string): Exclude<NotifCategory, 'all'> {
-  const rule = CATEGORY_RULES.find((r) => r.pattern.test(type))
-  return rule ? rule.category : 'system'
 }
 
 /** "5 minutes ago" / "2h ago" / "Yesterday" / "3 days ago" / locale date fallback */
@@ -77,7 +60,7 @@ export function formatRelativeTime(iso: string): string {
 }
 
 export function mapApiNotification(n: ApiNotification): Notification {
-  const category = categoryFromType(n.type)
+  const category = n.category
   return {
     id: n.id,
     category,

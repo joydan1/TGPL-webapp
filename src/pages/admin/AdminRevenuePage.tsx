@@ -12,7 +12,7 @@ const PAGE_CSS = `
   .rv-page { padding: 1.5rem 2rem 2rem; background: #F5F5F5; }
 
   .rv-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .rv-title { margin: 0; font-size: 1.75rem; font-weight: 800; color: #111827; }
+  .rv-title { margin: 0; font-size: 1.75rem; font-weight: 700; color: #2B2B2C; }
   .rv-subtitle { margin: 0.25rem 0 0; color: #6B7280; font-size: 0.9rem; }
   .rv-export-btn { display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1px solid #E5E7EB; border-radius: 0.7rem; padding: 0.65rem 1.1rem; font-size: 0.875rem; font-weight: 700; color: #374151; cursor: pointer; }
   .rv-export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -36,6 +36,7 @@ const PAGE_CSS = `
   .rv-status-tabs::-webkit-scrollbar { display: none; }
   .rv-status-tab { border: none; background: none; color: #6B7280; font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 0.6rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .rv-status-tab.active { background: #2492EB; color: #fff; }
+  .rv-promo-filter-tabs { flex: 1 1 auto; min-width: 0; }
   .rv-search-wrap { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.75rem; padding: 0.6rem 1rem; }
   .rv-search-wrap input { flex: 1; background: none; border: none; outline: none; font-size: 0.875rem; color: #111; }
   .rv-search-wrap input::placeholder { color: #9CA3AF; }
@@ -68,6 +69,8 @@ const PAGE_CSS = `
   .rv-status-badge.refunded { background: #F5F3FF; color: #8B5CF6; }
   .rv-status-badge.active { background: #BBF7D0; color: #10B981; }
   .rv-status-badge.inactive { background: #F3F4F6; color: #6B7280; }
+  .rv-status-badge.expired { background: #FEF2F2; color: #DC2626; }
+  .rv-status-badge.scheduled { background: #EFF6FF; color: #1D4ED8; }
 
   .rv-code-pill { font-family: monospace; font-weight: 700; background: #EFF6FF; color: #2492EB; padding: 0.25rem 0.6rem; border-radius: 0.5rem; letter-spacing: 0.02em; }
   .rv-promo-actions { display: flex; align-items: center; gap: 0.5rem; }
@@ -200,6 +203,7 @@ export default function AdminRevenuePage() {
   const [editingPromoCode, setEditingPromoCode] = useState<AdminPromoCode | null>(null)
   const [loadingPromoCodeId, setLoadingPromoCodeId] = useState<string | null>(null)
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
+  const [promoFilter, setPromoFilter] = useState<PromoFilter>('all')
 
   const loadData = useCallback(async () => {
     const requestId = ++loadRequestId.current
@@ -268,6 +272,20 @@ export default function AdminRevenuePage() {
     () => transactions.reduce((sum, t) => sum + t.amount_kobo, 0),
     [transactions],
   )
+
+  const filteredPromoCodes = useMemo(() => {
+    const now = Date.now()
+    return promoCodes.filter((code) => promoFilter === 'all' || promoStatus(code, now) === promoFilter)
+  }, [promoCodes, promoFilter])
+
+  const promoFilterCounts = useMemo(() => {
+    const now = Date.now()
+    return promoCodes.reduce<Record<PromoFilter, number>>((counts, code) => {
+      counts.all += 1
+      counts[promoStatus(code, now)] += 1
+      return counts
+    }, { all: 0, active: 0, scheduled: 0, expired: 0, inactive: 0 })
+  }, [promoCodes])
 
   async function handleExportCsv() {
     setExporting(true)
@@ -517,6 +535,18 @@ export default function AdminRevenuePage() {
         ) : (
           <div className="rv-panel">
             <div className="rv-toolbar">
+              <div className="rv-status-tabs rv-promo-filter-tabs" aria-label="Filter promo codes">
+                {PROMO_FILTERS.map((filter) => (
+                  <button
+                    key={filter.key}
+                    className={`rv-status-tab${promoFilter === filter.key ? ' active' : ''}`}
+                    type="button"
+                    onClick={() => setPromoFilter(filter.key)}
+                  >
+                    {filter.label} ({promoFilterCounts[filter.key]})
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 className="rv-add-code-btn"
@@ -540,13 +570,16 @@ export default function AdminRevenuePage() {
                       <th>Per learner</th>
                       <th>Scope</th>
                       <th>Status</th>
+                      <th>Expires</th>
                       <th>Created</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {promoCodes.map((code) => (
-                      <tr key={code.id}>
+                    {filteredPromoCodes.map((code) => {
+                      const status = promoStatus(code, Date.now())
+                      const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+                      return <tr key={code.id}>
                         <td><span className="rv-code-pill">{code.code}</span></td>
                         <td style={{ fontWeight: 700 }}>{formatDiscount(code)}</td>
                         <td>{formatRedemptions(code)}</td>
@@ -555,11 +588,12 @@ export default function AdminRevenuePage() {
 <td>{code.applicable_course_ids === undefined ? 'Scope not provided' : code.applicable_course_ids.length === 0 ? 'Platform-wide' : `${code.applicable_course_ids.length} course(s)`}</td>
 <td>
                        
-<span className={`rv-status-badge ${code.is_active ? 'active' : 'inactive'}`}>
+<span className={`rv-status-badge ${status}`}>
   <span className="rv-status-dot" />
-  {code.is_active ? 'Active' : 'Inactive'}
+  {statusLabel}
 </span>
                         </td>
+                        <td>{formatDateTime(code.expires_at)}</td>
                         <td>{formatDate(code.created_at)}</td>
                         <td>
                           <div className="rv-promo-actions">
@@ -571,7 +605,7 @@ export default function AdminRevenuePage() {
                             >
                               <Pencil size={13} /> {loadingPromoCodeId === code.id ? 'Loading…' : 'Edit'}
                             </button>
-                          {code.is_active !== false && (
+                          {code.is_active && status !== 'expired' && (
                             <button
                               type="button"
                               className="rv-deactivate-btn"
@@ -584,13 +618,16 @@ export default function AdminRevenuePage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    })}
                   </tbody>
                 </table>
               )}
 
               {!promoLoading && !promoError && promoCodes.length === 0 && (
                 <div className="rv-empty">No promo codes yet. Create one to get started.</div>
+              )}
+              {!promoLoading && !promoError && promoCodes.length > 0 && filteredPromoCodes.length === 0 && (
+                <div className="rv-empty">No {promoFilter} promo codes.</div>
               )}
             </div>
           </div>
@@ -616,3 +653,30 @@ export default function AdminRevenuePage() {
     </AdminShell>
   )
 }
+
+function formatDateTime(dateStr: string | null) {
+  if (!dateStr) return 'No expiry'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr
+  return date.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+type PromoStatus = 'active' | 'scheduled' | 'expired' | 'inactive'
+type PromoFilter = 'all' | PromoStatus
+
+function promoStatus(code: AdminPromoCode, now: number): PromoStatus {
+  if (!code.is_active) return 'inactive'
+  if (code.expires_at && new Date(code.expires_at).getTime() <= now) return 'expired'
+  if (code.starts_at && new Date(code.starts_at).getTime() > now) return 'scheduled'
+  return 'active'
+}
+
+const PROMO_FILTERS: { key: PromoFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'scheduled', label: 'Scheduled' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'inactive', label: 'Inactive' },
+]

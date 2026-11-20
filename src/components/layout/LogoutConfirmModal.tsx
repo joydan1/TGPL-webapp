@@ -18,12 +18,12 @@ interface LogoutConfirmModalProps {
 export default function LogoutConfirmModal({ onCancel, onConfirm }: LogoutConfirmModalProps) {
   return (
     <div className="logout-modal-overlay" onClick={onCancel}>
-      <div className="logout-modal" role="dialog" aria-modal="true" aria-label="Confirm logout" onClick={(e) => e.stopPropagation()}>
-        <h2 className="logout-modal-title">Logout?</h2>
+      <div className="logout-modal" role="dialog" aria-modal="true" aria-label="Confirm log out" onClick={(e) => e.stopPropagation()}>
+        <h2 className="logout-modal-title">Log out?</h2>
         <p className="logout-modal-text">You'll need to sign in again to access your courses and progress.</p>
         <div className="logout-modal-actions">
           <button className="logout-modal-btn cancel" onClick={onCancel}>Cancel</button>
-          <button className="logout-modal-btn confirm" onClick={onConfirm}>Logout</button>
+          <button className="logout-modal-btn confirm" onClick={onConfirm}>Log out</button>
         </div>
       </div>
     </div>

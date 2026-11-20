@@ -6,6 +6,7 @@ export interface RowActionMenuItem {
   label: string
   icon?: ReactNode
   danger?: boolean
+  primary?: boolean
   disabled?: boolean
   /** Renders a link instead of a button (e.g. a mailto: link). */
   href?: string
@@ -19,9 +20,11 @@ interface RowActionMenuProps {
   /** Shows a spinner and disables the trigger while an action is running */
   loading?: boolean
   disabled?: boolean
+  menuWidth?: number
+  menuClassName?: string
+  menuPlacement?: 'bottom' | 'right'
 }
 
-const MENU_WIDTH = 190 // keep in sync with .au-row-menu { width }
 const GAP = 6
 const EDGE = 8
 const ITEM_HEIGHT_FALLBACK = 40
@@ -39,6 +42,9 @@ export default function RowActionMenu({
   label = 'Row actions',
   loading = false,
   disabled = false,
+  menuWidth = 190,
+  menuClassName,
+  menuPlacement = 'bottom',
 }: RowActionMenuProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -54,19 +60,29 @@ export default function RowActionMenu({
     const button = buttonRef.current
     if (!button) return
     const rect = button.getBoundingClientRect()
+    const actualMenuWidth = menuRef.current?.offsetWidth ?? menuWidth
     const menuHeight = menuRef.current?.offsetHeight ?? items.length * ITEM_HEIGHT_FALLBACK + 12
     const spaceBelow = window.innerHeight - rect.bottom
     const spaceAbove = rect.top
     const openUp = spaceBelow < menuHeight + GAP + EDGE && spaceAbove > spaceBelow
+    const rightSideLeft = rect.right + GAP
+    const leftSideLeft = rect.left - actualMenuWidth - GAP
 
-    const top = openUp ? Math.max(EDGE, rect.top - menuHeight - GAP) : rect.bottom + GAP
-    // Right-align to the button, then keep the menu inside the viewport
-    const left = Math.min(
-      Math.max(EDGE, rect.right - MENU_WIDTH),
-      Math.max(EDGE, window.innerWidth - MENU_WIDTH - EDGE),
-    )
+    const top = menuPlacement === 'right'
+      ? Math.min(Math.max(EDGE, rect.top + (rect.height - menuHeight) / 2), window.innerHeight - menuHeight - EDGE)
+      : openUp ? Math.max(EDGE, rect.top - menuHeight - GAP) : rect.bottom + GAP
+    const left = menuPlacement === 'right'
+      ? rightSideLeft + actualMenuWidth <= window.innerWidth - EDGE
+        ? rightSideLeft
+        : leftSideLeft >= EDGE
+          ? leftSideLeft
+          : Math.max(EDGE, window.innerWidth - actualMenuWidth - EDGE)
+      : Math.min(
+          Math.max(EDGE, rect.right - actualMenuWidth),
+          Math.max(EDGE, window.innerWidth - actualMenuWidth - EDGE),
+        )
     setPos({ top, left })
-  }, [items.length])
+  }, [items.length, menuWidth, menuPlacement])
 
   // Measure after the menu is in the DOM but before paint, so it never flashes in the wrong spot
   useLayoutEffect(() => {
@@ -125,7 +141,7 @@ export default function RowActionMenu({
         createPortal(
           <div
             ref={menuRef}
-            className="au-row-menu"
+            className={`au-row-menu${menuClassName ? ` ${menuClassName}` : ''}`}
             role="menu"
             style={{
               position: 'fixed',
@@ -139,7 +155,7 @@ export default function RowActionMenu({
             onClick={(e) => e.stopPropagation()}
           >
             {items.map((item) => {
-              const className = `au-row-menu-item${item.danger ? ' danger' : ''}`
+              const className = `au-row-menu-item${item.danger ? ' danger' : ''}${item.primary ? ' primary' : ''}`
               if (item.href) {
                 return (
                   <a key={item.label} className={className} href={item.href} role="menuitem" onClick={close}>

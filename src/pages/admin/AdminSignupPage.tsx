@@ -10,6 +10,7 @@ import Button from '../../components/Button'
 import Alert from '../../components/Alert'
 import AuthHero from '../../components/auth/AuthHero'
 import { ROUTES } from '../../constants/routes'
+import { getPasswordError, isPasswordValid, PASSWORD_GUIDANCE, PASSWORD_PLACEHOLDER } from '../../utils/password'
 
 type StrengthLevel = { score: number; label: string; color: string }
 
@@ -26,7 +27,7 @@ function getPasswordStrength(password: string): StrengthLevel {
     { score: 3, label: 'Good', color: 'var(--primary-500)' },
     { score: 4, label: 'Strong', color: 'var(--success)' },
   ]
-  return { ...levels[score - 1] }
+  return { ...levels[Math.max(score, 1) - 1] }
 }
 
 function PasswordStrengthIndicator({ password }: { password: string }) {
@@ -79,8 +80,8 @@ export default function AdminSignupPage() {
     formData.firstName.trim().length > 0 &&
     formData.lastName.trim().length > 0 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-    formData.password.length >= 8 &&
-    formData.confirmPassword.length > 0 &&
+    isPasswordValid(formData.password) &&
+    formData.password === formData.confirmPassword &&
     termsAccepted
 
   const validateForm = (): boolean => {
@@ -92,11 +93,8 @@ export default function AdminSignupPage() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address'
     }
-    if (!formData.password) {
-      errors.password = 'Password is required'
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters'
-    }
+    const passwordError = getPasswordError(formData.password)
+    if (passwordError) errors.password = passwordError
     if (!formData.confirmPassword) {
       errors.confirmPassword = 'Please confirm your password'
     } else if (formData.password !== formData.confirmPassword) {
@@ -245,7 +243,8 @@ export default function AdminSignupPage() {
         .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 
         .password-wrapper { position: relative; }
-        .eye-button { position: absolute; right: 0.75rem; top: 2.375rem; background: none; border: none; cursor: pointer; color: #999999; display: flex; align-items: center; justify-content: center; padding: 0; transition: color 300ms ease; }
+        .password-wrapper input { padding-right: 2.75rem !important; }
+        .eye-button { position: absolute; z-index: 2; right: 0.75rem; top: 2.875rem; background: none; border: none; cursor: pointer; color: #999999; display: flex; align-items: center; justify-content: center; padding: 0.25rem; transition: color 300ms ease; }
         .eye-button:hover { color: #666666; }
         .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
 
@@ -304,8 +303,8 @@ export default function AdminSignupPage() {
               <Input label="Email" name="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleInputChange} error={formErrors.email} />
 
               <div className="password-wrapper">
-                <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={formData.password} onChange={handleInputChange} error={formErrors.password} />
-                <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder={PASSWORD_PLACEHOLDER} value={formData.password} onChange={handleInputChange} error={formErrors.password} hint={PASSWORD_GUIDANCE} />
+                <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
@@ -313,7 +312,7 @@ export default function AdminSignupPage() {
 
               <div className="password-wrapper">
                 <Input label="Confirm password" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter your password" value={formData.confirmPassword} onChange={handleInputChange} error={formErrors.confirmPassword} />
-                <button type="button" className="eye-button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
+                <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>

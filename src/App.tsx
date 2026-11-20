@@ -5,6 +5,7 @@ import { useAuth } from './hooks/useAuth'
 import { ROUTES, RouteBuilder } from './constants/routes'
 import MaintenanceGate from './components/MaintenanceGate'
 import PushPrompt from './components/layout/PushPrompt'
+import InstallPrompt, { INSTALL_PROMPT_CSS } from './components/layout/InstallPrompt'
 // Layout
 import PublicLayout from './layouts/PublicLayout'
 
@@ -566,8 +567,14 @@ function App() {
         <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
         </Routes>
         </MaintenanceGate>
-        {/* Asks logged-in users to allow notifications, and keeps their push subscription fresh */}
-        {isAuthenticated && <PushPrompt />}
+        {/* Asks logged-in users to allow notifications and offers PWA installation */}
+        {isAuthenticated && (
+          <>
+            <style>{INSTALL_PROMPT_CSS}</style>
+            <InstallPrompt />
+            <PushPrompt />
+          </>
+        )}
       </Suspense>
     </Router>
   )

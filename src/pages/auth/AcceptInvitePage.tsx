@@ -8,6 +8,7 @@ import Button from '../../components/Button'
 import Alert from '../../components/Alert'
 import Spinner from '../../components/Spinner'
 import { ROUTES, RouteBuilder } from '../../constants/routes'
+import { getPasswordError, isPasswordValid, PASSWORD_GUIDANCE, PASSWORD_PLACEHOLDER } from '../../utils/password'
 
 export default function AcceptInvitePage() {
   const navigate = useNavigate()
@@ -24,14 +25,14 @@ export default function AcceptInvitePage() {
   const isFormFilled =
     formData.firstName.trim().length > 0 &&
     formData.lastName.trim().length > 0 &&
-    formData.password.length >= 8
+    isPasswordValid(formData.password)
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
     if (!formData.firstName.trim()) errors.firstName = 'First name is required'
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required'
-    if (!formData.password) errors.password = 'Password is required'
-    else if (formData.password.length < 8) errors.password = 'Password must be at least 8 characters'
+    const passwordError = getPasswordError(formData.password)
+    if (passwordError) errors.password = passwordError
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -116,7 +117,8 @@ export default function AcceptInvitePage() {
 
         .login-form { display: flex; flex-direction: column; gap: 1rem; }
         .password-wrapper { position: relative; }
-        .eye-button { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; display: flex; align-items: center; padding: 0.25rem; transition: color 200ms ease; }
+        .password-wrapper input { padding-right: 2.75rem !important; }
+        .eye-button { position: absolute; z-index: 2; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; display: flex; align-items: center; padding: 0.25rem; transition: color 200ms ease; }
         .eye-button:hover { color: #666; }
         .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
         .login-footer { text-align: center; margin-top: 2rem; }
@@ -174,8 +176,8 @@ export default function AcceptInvitePage() {
                   <div>
                     <label htmlFor="password" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--black)', display: 'block', marginBottom: '0.375rem' }}>Password</label>
                     <div className="password-wrapper">
-                      <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="At least 8 characters" value={formData.password} onChange={handleInputChange} error={formErrors.password} />
-                      <button type="button" className="eye-button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                      <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder={PASSWORD_PLACEHOLDER} value={formData.password} onChange={handleInputChange} error={formErrors.password} hint={PASSWORD_GUIDANCE} />
+                      <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>

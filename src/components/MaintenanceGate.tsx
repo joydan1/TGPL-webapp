@@ -18,9 +18,22 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
       const res = await publicSettingsAPI.getPublicSettings()
       if (!cancelled && res.success) setSettings(res.data)
     }
+    function handleSettingsRefresh() {
+      void check()
+    }
+    function handleStorageRefresh(event: StorageEvent) {
+      if (event.key === 'public-settings-updated') void check()
+    }
     check()
     const id = setInterval(check, POLL_INTERVAL_MS)
-    return () => { cancelled = true; clearInterval(id) }
+    window.addEventListener('public-settings-updated', handleSettingsRefresh)
+    window.addEventListener('storage', handleStorageRefresh)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      window.removeEventListener('public-settings-updated', handleSettingsRefresh)
+      window.removeEventListener('storage', handleStorageRefresh)
+    }
   }, [])
 
   const bypassesMaintenance = location.pathname.startsWith('/admin') || role === 'admin'

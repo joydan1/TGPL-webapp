@@ -54,12 +54,12 @@ const REASON_OPTIONS: { value: ArchiveReason; label: string }[] = [
   { value: 'low_completion',   label: 'Low completion rate' },
   { value: 'outdated_content', label: 'Outdated content' },
   { value: 'trainer_departed', label: 'Trainer departed' },
-  { value: 'policy_violation', label: 'Policy violation' },
   { value: 'other',            label: 'Other' },
 ]
 
 interface ArchiveCourseModalProps {
   course: AdminCourseRow
+  showEnrollment?: boolean
   onClose: () => void
   onConfirm: (payload: ArchiveCoursePayload) => void
   error?: string | null
@@ -67,7 +67,7 @@ interface ArchiveCourseModalProps {
 }
 
 export default function ArchiveCourseModal({
-  course, onClose, onConfirm, error = null, submitting = false,
+  course, showEnrollment = true, onClose, onConfirm, error = null, submitting = false,
 }: ArchiveCourseModalProps) {
   const [reason, setReason] = useState<ArchiveReason>('low_completion')
   const [note, setNote] = useState('')
@@ -102,10 +102,10 @@ export default function ArchiveCourseModal({
                 <p className="ac-course-sub">{course.trainer.full_name}</p>
               </div>
             </div>
-            <div className="ac-course-enrolled">
+            {showEnrollment && <div className="ac-course-enrolled">
               <div className="ac-course-enrolled-num">{course.enrollment_count}</div>
               <div className="ac-course-enrolled-label">enrolled</div>
-            </div>
+            </div>}
           </div>
 
           <div className="ac-list">
