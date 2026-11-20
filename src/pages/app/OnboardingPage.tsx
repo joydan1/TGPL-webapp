@@ -202,7 +202,7 @@ function SelectField({
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loadCurrentUser } = useAuth()
   const isMobile = useIsMobile()
   const firstName = user?.name?.split(' ')[0] || 'there'
 
@@ -246,7 +246,8 @@ export default function OnboardingPage() {
         goals: data.goals,
         experience_level: data.experienceLevel,
       })
-      navigate(RouteBuilder.dashboard())
+      await loadCurrentUser()
+      navigate(RouteBuilder.dashboard(), { replace: true })
     } catch (error) {
       console.error('Failed to save onboarding progress', error)
     } finally {
