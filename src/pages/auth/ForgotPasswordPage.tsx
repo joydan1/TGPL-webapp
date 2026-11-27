@@ -378,14 +378,14 @@ export default function ForgotPasswordPage() {
                     width: '80px',
                     height: '80px',
                     margin: '0 auto 1rem',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    backgroundColor: 'rgba(36, 146, 235, 0.1)',
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <CheckCircle size={48} color="var(--success)" strokeWidth={1.5} />
+                  <CheckCircle size={48} color="#2492EB" strokeWidth={1.5} />
                 </div>
               </div>
             )}

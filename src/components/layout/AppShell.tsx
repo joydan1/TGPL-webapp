@@ -113,8 +113,8 @@ export const SHELL_CSS = `
   .page-dashboard-back button:hover { color: #2492EB; border-color: #BFDBFE; background: #EFF6FF; }
 
   /* ── Mobile tab bar ── */
-  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
-  .mobile-tabbar-inner { display: flex; height: 100%; }
+  .mobile-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: calc(60px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); background: #fff; border-top: 1px solid #F3F4F6; z-index: 300; }
+  .mobile-tabbar-inner { display: flex; height: 60px; }
   .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: #9CA3AF; font-size: 0.65rem; font-weight: 600; border: none; background: none; padding: 0; }
   .tab-item.active { color: #2492EB; }
 
@@ -125,6 +125,7 @@ export const SHELL_CSS = `
     .navbar-logo img { height: 1.35rem; width: auto; }
     .navbar-page-subtitle { display: none; }
     .mobile-tabbar { display: block; }
+    .main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
     .profile-dropdown { width: min(220px, calc(100vw - 2rem)); }
   }
   @media (max-width: 900px) {

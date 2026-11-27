@@ -14,24 +14,28 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
       bgColor: '#EFF6FF',
       borderColor: '#BEDBFF',
       textColor: '#193CB8',
+      iconColor: '#193CB8',
       icon: <Info size={18} strokeWidth={2.5} />,
     },
     success: {
       bgColor: '#F0FDF4',
       borderColor: '#B9F8CF',
       textColor: '#016630',
+      iconColor: '#2492EB',
       icon: <CheckCircle size={18} strokeWidth={2.5} />,
     },
     warning: {
       bgColor: '#FEFCE8',
       borderColor: '#FFF085',
       textColor: '#894B00',
+      iconColor: '#894B00',
       icon: <AlertCircle size={18} strokeWidth={2.5} />,
     },
     error: {
       bgColor: '#FEF2F2',
       borderColor: '#FFC9C9',
       textColor: '#9F0712',
+      iconColor: '#9F0712',
       icon: <XCircle size={18} strokeWidth={2.5} />,
     },
   }
@@ -59,7 +63,7 @@ const Alert: React.FC<AlertProps> = ({ type = 'info', title, children, className
           }}
         >
           {React.cloneElement(colors.icon as React.ReactElement, {
-            color: colors.textColor,
+            color: colors.iconColor,
           })}
         </div>
 

@@ -129,7 +129,7 @@ const PAGE_CSS = `
 .rv-past-status.revision { background: #DBEAFE; color: #2492EB; }
   .rv-status-btn.active-revision { border-color: #2492EB; background: #DBEAFE; color: #2492EB; }
   .rv-success-modal { background: #fff; border-radius: 1.25rem; padding: 2rem 1.5rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
-  .rv-success-icon { width: 72px; height: 72px; border-radius: 999px; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+  .rv-success-icon { width: 72px; height: 72px; border-radius: 999px; background: #E9F5FF; color: #2492EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
   .rv-success-title { margin: 0; font-size: 1.25rem; font-weight: 800; color: #111827; }
   .rv-success-sub { margin: 0.6rem 0 1.5rem; color: #6B7280; font-size: 0.9rem; }
   .rv-success-btn { width: 100%; border: none; background: #2492EB; color: #fff; font-weight: 700; border-radius: 999px; padding: 0.9rem; cursor: pointer; }

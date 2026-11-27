@@ -10,6 +10,9 @@ import type { CommunityMessage, CommunityRule } from '../../types/community'
 
 const PAGE_CSS = `
   .community-page-content { padding: 20px; height: calc(100vh - 90px); box-sizing: border-box; }
+  @media (max-width: 640px) {
+    .community-page-content { height: calc(100dvh - 124px - env(safe-area-inset-bottom, 0px)); min-height: 0; padding: 8px; overflow: hidden; }
+  }
 `
 
 const POLL_INTERVAL_MS = 7000

@@ -150,7 +150,7 @@ const PAGE_CSS = `
   .lc-meet-input::placeholder { color: #9CA3AF; font-style: italic; }
   .lc-meet-input.invalid { border-color: #FCA5A5; }
   .lc-meet-input:disabled { opacity: 0.6; }
-  .lc-success-icon { width: 72px; height: 72px; border-radius: 50%; background: #22C55E; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 0 0 12px rgba(34,197,94,0.12); }
+  .lc-success-icon { width: 72px; height: 72px; border-radius: 50%; background: #2492EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 0 0 12px rgba(36,146,235,0.12); }
   .lc-success-title { font-size: 1.1rem; font-weight: 800; color: #111827; margin-bottom: 0.4rem; }
   .lc-success-sub { font-size: 0.9rem; color: #6B7280; margin-bottom: 1.5rem; }
 

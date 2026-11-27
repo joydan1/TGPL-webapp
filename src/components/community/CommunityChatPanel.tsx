@@ -12,7 +12,8 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #F7F7F7; position: relative; overflow: hidden; }
 
   .cc-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; background: #fff; border-bottom: 1px solid #EBEBEB; flex-shrink: 0; }
-  .cc-header-left { display: flex; align-items: center; gap: 12px; }
+  .cc-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+  .cc-header-left > div:last-child { min-width: 0; }
   .cc-hash { width: 36px; height: 36px; border-radius: 14px; background: #E9F5FF; color: #2492EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cc-title { font-weight: 700; font-size: 17px; margin: 0; color: #2B2B2C; }
   .cc-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #99A1AF; margin-top: 2px; }
@@ -25,7 +26,7 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-rules-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #2B2B2C; }
   .cc-rules-num { flex-shrink: 0; width: 18px; height: 18px; border-radius: 999px; background: #fff; color: #2492EB; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
 
-  .cc-messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .cc-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
   .cc-state-note { text-align: center; color: #99A1AF; font-size: 13px; padding: 3rem 1rem; }
   .cc-state-note.error { color: #DC2626; }
   .cc-action-error { margin: 0.75rem 1.5rem 0; padding: 0.65rem 0.85rem; border: 1px solid #FECACA; border-radius: 0.6rem; background: #FEF2F2; color: #B91C1C; font-size: 0.8rem; }
@@ -105,6 +106,49 @@ export const COMMUNITY_CHAT_CSS = `
   .cc-thread-parent .cc-bubble { border-radius: 12px; background: #F7F7F7; }
   .cc-thread-replies { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
   .cc-thread-composer-wrap { padding: 8px 16px 16px; flex-shrink: 0; border-top: 1px solid #EBEBEB; }
+
+  @media (max-width: 640px) {
+    .cc-header { gap: 8px; padding: 12px 14px; }
+    .cc-header-left { gap: 8px; min-width: 0; }
+    .cc-hash { width: 32px; height: 32px; border-radius: 10px; }
+    .cc-title { font-size: 15px; }
+    .cc-meta { gap: 4px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cc-rules-btn { gap: 5px; padding: 7px 8px; border-radius: 10px; font-size: 11px; flex-shrink: 0; }
+    .cc-rules-panel { padding: 12px 14px; }
+    .cc-messages { padding: 14px; gap: 14px; }
+    .cc-msg-row { width: 100%; max-width: 100%; gap: 8px; }
+    .cc-avatar { width: 32px; height: 32px; }
+    .cc-msg-col { max-width: calc(100% - 40px); }
+    .cc-msg-meta { flex-wrap: wrap; gap: 3px 5px; }
+    .cc-msg-name { overflow-wrap: anywhere; }
+    .cc-bubble { padding: 9px 12px; overflow-wrap: anywhere; }
+    .cc-menu-btn { width: 28px; height: 28px; opacity: 1; }
+    .cc-msg-row:not(.own) .cc-menu-btn { right: -8px; }
+    .cc-msg-row.own .cc-menu-btn { left: -8px; }
+    .cc-msg-row:not(.own) .cc-menu { right: 0; }
+    .cc-msg-row.own .cc-menu { left: auto; right: 0; }
+    .cc-composer-wrap { padding: 8px 12px 12px; }
+    .cc-composer { gap: 8px; padding: 10px; }
+    .cc-composer-avatar { width: 28px; height: 28px; }
+    .cc-composer-input { width: 0; min-width: 0; }
+    .cc-emoji-btn, .cc-send-btn { width: 40px; height: 40px; border-radius: 12px; }
+    .cc-composer-hint { display: none; }
+    .cc-emoji-panel { right: 8px; width: min(260px, calc(100vw - 32px)); }
+    .cc-thread-panel { width: 100%; max-width: 100%; }
+    .cc-thread-header { padding: 12px 14px; }
+    .cc-thread-parent { padding: 12px 14px; }
+    .cc-thread-replies { padding: 14px; }
+    .cc-thread-composer-wrap { padding: 8px 12px 12px; }
+  }
+
+  @media (max-width: 380px) {
+    .cc-header { padding-right: 10px; padding-left: 10px; }
+    .cc-messages { padding-right: 10px; padding-left: 10px; }
+    .cc-composer-wrap { padding-right: 8px; padding-left: 8px; }
+    .cc-rules-btn { gap: 4px; padding-right: 6px; padding-left: 6px; }
+    .cc-meta { font-size: 9px; }
+    .cc-rules-label { display: none; }
+  }
 `
 
 const EMOJIS = ['😀','😁','🙂','😂','🤣','😍','🥳','😎','🤩','🤗','👍','👎','👏','🙌','🙏','💪','✌️','👌','❤️','🧡','💛','💚','💙','💜','🎉','🎊','🏆','✨','🔥','💯']
@@ -466,8 +510,8 @@ export default function CommunityChatPanel({
             </div>
           </div>
         </div>
-        <button className="cc-rules-btn" type="button" onClick={() => setRulesOpen((v) => !v)}>
-          <ShieldCheck size={13} /> Community rules
+        <button className="cc-rules-btn" type="button" onClick={() => setRulesOpen((v) => !v)} aria-label="Community rules" aria-expanded={rulesOpen}>
+          <ShieldCheck size={13} /> <span className="cc-rules-label">Community rules</span>
           {rulesOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
       </div>

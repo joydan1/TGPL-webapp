@@ -132,7 +132,7 @@ export default function SettingsSecurityPage() {
             </div>
 
             {error && <div className="form-error">{error}</div>}
-            {success && <div style={{ color: '#059669', fontWeight: 700, marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Check size={16} /> {success}</div>}
+            {success && <div style={{ color: '#059669', fontWeight: 700, marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Check size={16} color="#2492EB" /> {success}</div>}
 
             <div className="actions">
               <button className="btn primary" type="button" onClick={handleSubmit} disabled={loading || !!success}>{loading ? 'Updating…' : 'Update Password'}</button>

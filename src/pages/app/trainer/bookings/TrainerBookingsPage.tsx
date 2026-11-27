@@ -137,7 +137,7 @@ const PAGE_CSS = `
 
   /* ── Confirmation modal ──────────────────────────────────────────────── */
   .bk-confirm-modal { background: #fff; border-radius: 1.25rem; padding: 2.25rem 1.75rem; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25); }
-  .bk-confirm-icon { width: 64px; height: 64px; border-radius: 999px; background: #DCFCE7; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; color: #16A34A; }
+  .bk-confirm-icon { width: 64px; height: 64px; border-radius: 999px; background: #E9F5FF; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; color: #2492EB; }
   .bk-confirm-title { margin: 0 0 0.5rem; font-size: 1.15rem; font-weight: 800; color: #111827; }
   .bk-confirm-body { margin: 0 0 1.4rem; color: #6B7280; font-size: 0.9rem; line-height: 1.4; }
   .bk-confirm-close { border: none; background: #2492EB; color: #fff; font-weight: 700; font-size: 0.9rem; padding: 0.8rem 1.4rem; border-radius: 0.85rem; cursor: pointer; width: 100%; }

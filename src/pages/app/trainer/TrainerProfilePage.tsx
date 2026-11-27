@@ -63,7 +63,7 @@ const PAGE_CSS = `
 
   .toast { position: fixed; bottom: 6.5rem; left: 50%; transform: translateX(-50%); background: #1F2937; color: #fff; padding: 0.85rem 1.1rem; border-radius: 0.85rem; display: flex; align-items: center; gap: 0.7rem; font-size: 0.9rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 400; max-width: 90vw; }
   .toast-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .toast-icon.success { background: #22C55E; }
+  .toast-icon.success { background: #2492EB; }
   .toast-icon.error { background: #EF4444; }
   .toast-close { background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 0; display: flex; margin-left: 0.25rem; flex-shrink: 0; }
   .toast-close:hover { color: #fff; }

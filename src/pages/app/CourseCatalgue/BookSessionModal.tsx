@@ -163,7 +163,7 @@ const MODAL_CSS = `
   .bm-btn-full { width: 100%; box-sizing: border-box; }
 
   .bm-success { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.5rem; padding: 1rem 0; }
-  .bm-success-icon { width: 4rem; height: 4rem; border-radius: 999px; background: #ECFDF3; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .bm-success-icon { width: 4rem; height: 4rem; border-radius: 999px; background: #E9F5FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .bm-success-title { font-size: 1.15rem; font-weight: 700; color: #111827; }
   .bm-success-sub { font-size: 0.9rem; color: #6B7280; max-width: 320px; }
 
@@ -454,7 +454,7 @@ export default function BookSessionModal({ onClose, onBooked }: BookSessionModal
 
             {step === 'success' && (
               <div className="bm-success">
-                <div className="bm-success-icon"><CheckCircle2 size={30} color="#16A34A" /></div>
+                <div className="bm-success-icon"><CheckCircle2 size={30} color="#2492EB" /></div>
                 <div className="bm-success-title">Booking Request Sent</div>
                 <div className="bm-success-sub">
                   {bookingSuccessCopy}

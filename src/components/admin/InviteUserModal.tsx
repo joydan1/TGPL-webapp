@@ -151,7 +151,7 @@ const MODAL_CSS = `
   .ium-error svg { flex-shrink: 0; margin-top: 1px; }
 
   .ium-success { display: flex; align-items: flex-start; gap: 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 10px 12px; font-size: 12px; color: #15803D; }
-  .ium-success svg { flex-shrink: 0; margin-top: 1px; }
+  .ium-success svg { flex-shrink: 0; margin-top: 1px; color: #2492EB; }
 
   .ium-footer { padding: 4px 24px 20px; flex-shrink: 0; }
   .ium-submit { width: 100%; height: 44px; border: none; border-radius: 14px; background: #2492EB; color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
