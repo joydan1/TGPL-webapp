@@ -6,6 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string
   iconType?: 'email' | 'password' | 'username' | 'none'
   hint?: string
+  rightAdornment?: React.ReactNode
 }
 
 const Input: React.FC<InputProps> = ({
@@ -13,6 +14,7 @@ const Input: React.FC<InputProps> = ({
   error,
   iconType = 'none',
   hint,
+  rightAdornment,
   className = '',
   style,
   ...props
@@ -35,7 +37,7 @@ const Input: React.FC<InputProps> = ({
     backgroundColor: 'var(--white)',
     color: 'var(--black)',
     fontSize: '1rem',
-    padding: '0.5rem 1rem',
+    padding: rightAdornment ? '0.5rem 2.75rem 0.5rem 1rem' : '0.5rem 1rem',
     width: '100%',
     boxSizing: 'border-box',
     transition: 'all 200ms ease',
@@ -78,6 +80,21 @@ const Input: React.FC<InputProps> = ({
           className={`focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed ${className}`}
           {...props}
         />
+        {rightAdornment && (
+          <span
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: '0.75rem',
+              transform: 'translateY(-50%)',
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {rightAdornment}
+          </span>
+        )}
       </div>
       {error && (
         <p

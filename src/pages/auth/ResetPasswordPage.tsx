@@ -216,51 +216,49 @@ const token = searchParams.get('token') ?? ''
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-black mb-2">New password</label>
-                <div className="relative">
-                  <Input
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder={PASSWORD_PLACEHOLDER}
-                    value={password}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                    error={undefined}
-                    hint={PASSWORD_GUIDANCE}
-                  />
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-grey hover:text-black transition-colors"
-                    style={{ zIndex: 2 }}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                <Input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={PASSWORD_PLACEHOLDER}
+                  value={password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                  error={undefined}
+                  hint={PASSWORD_GUIDANCE}
+                  rightAdornment={(
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      style={{ border: 0, background: 'transparent', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  )}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-black mb-2">Confirm password</label>
-                <div className="relative">
-                  <Input
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
-                    error={undefined}
-                  />
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-grey hover:text-black transition-colors"
-                    style={{ zIndex: 2 }}
-                  >
-                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                <Input
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
+                  error={undefined}
+                  rightAdornment={(
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      style={{ border: 0, background: 'transparent', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  )}
+                />
               </div>
 
               {error && (

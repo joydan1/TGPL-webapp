@@ -116,11 +116,6 @@ export default function AcceptInvitePage() {
         .login-title p { color: var(--black); opacity: 0.85; font-size: 1rem; line-height: 1.6; margin: 0; }
 
         .login-form { display: flex; flex-direction: column; gap: 1rem; }
-        .password-wrapper { position: relative; }
-        .password-wrapper input { padding-right: 2.75rem !important; }
-        .eye-button { position: absolute; z-index: 2; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; display: flex; align-items: center; padding: 0.25rem; transition: color 200ms ease; }
-        .eye-button:hover { color: #666; }
-        .eye-button:focus-visible { outline: 2px solid var(--primary-500); border-radius: 4px; }
         .login-footer { text-align: center; margin-top: 2rem; }
         .login-footer p { color: var(--black); margin: 0; font-size: 0.9375rem; }
         .login-footer a { color: var(--primary-500); font-weight: 600; text-decoration: none; }
@@ -175,12 +170,27 @@ export default function AcceptInvitePage() {
 
                   <div>
                     <label htmlFor="password" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--black)', display: 'block', marginBottom: '0.375rem' }}>Password</label>
-                    <div className="password-wrapper">
-                      <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder={PASSWORD_PLACEHOLDER} value={formData.password} onChange={handleInputChange} error={formErrors.password} hint={PASSWORD_GUIDANCE} />
-                      <button type="button" className="eye-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder={PASSWORD_PLACEHOLDER}
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      error={formErrors.password}
+                      hint={PASSWORD_GUIDANCE}
+                      rightAdornment={(
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          style={{ border: 0, background: 'transparent', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      )}
+                    />
                   </div>
 
                   <Button
